@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Inline Keyboard 布局原型</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="stage">
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="screen" id="screen">
+    <!-- 模拟桌面背景 -->
+    <div class="wallpaper"></div>
+    <div class="fake-window" id="fakeWindow">
+      <div class="fake-titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="fake-content">
+        <p>模拟一个应用窗口，用来看键盘覆盖 / 避让效果。</p>
+        <p class="fake-input">聊天输入框 ▏</p>
+      </div>
+    </div>
+
+    <!-- 键盘 -->
+    <div class="keyboard" id="keyboard">
+      <!-- 候选区 -->
+      <div class="candbar" id="candbar">
+        <div class="preedit" id="preedit">nihao</div>
+        <div class="cands" id="cands"></div>
+        <button class="expand" id="expandBtn" title="展开 / 切换">▾</button>
+      </div>
+      <!-- 键区 -->
+      <div class="keys" id="keys"></div>
+      <!-- 把手条（仅浮动） -->
+      <div class="handlebar" id="handlebar">
+        <button class="handle-btn" id="hideBtn" title="收起">⌄</button>
+        <div class="handle-grip"><i></i></div>
+        <button class="handle-btn lang" id="langBtn" title="切换输入法">拼</button>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- 参数面板 -->
+<aside class="panel">
+  <h1>Inline Keyboard 原型</h1>
+  <p class="hint">改参数即时重排，刷新页面保留设置。</p>
+
+  <label>模式
+    <div class="seg" id="segMode">
+      <button data-v="docked" class="on">贴底</button>
+      <button data-v="floating">浮动</button>
+    </div>
+  </label>
+
+  <label>键盘宽 <output id="outKbW">1050</output>
+    <input type="range" id="kbW" min="680" max="1260" step="10" value="1050">
+  </label>
+
+  <label>键盘高 <output id="outKbH">387</output>
+    <input type="range" id="kbH" min="260" max="620" step="10" value="387">
+  </label>
+
+  <label>键间距 <output id="outGap">6</output>
+    <input type="range" id="gap" min="2" max="14" step="1" value="6">
+  </label>
+
+  <label>圆角 <output id="outRadius">10</output>
+    <input type="range" id="radius" min="0" max="24" step="1" value="10">
+  </label>
+
+  <label>不透明度 <output id="outOpacity">100</output>
+    <input type="range" id="opacity" min="40" max="100" step="5" value="100">
+  </label>
+
+  <label>候选区高度 <output id="outCand">44</output>
+    <input type="range" id="candH" min="36" max="72" step="2" value="44">
+  </label>
+
+  <label class="row">
+    <input type="checkbox" id="showCand" checked> 显示候选（关掉看快捷栏）
+  </label>
+  <label class="row">
+    <input type="checkbox" id="handleDocked" checked> 贴底时也显示把手条
+  </label>
+  <label class="row">
+    <input type="checkbox" id="autoReload" checked> 自动刷新（文件改动后）
+  </label>
+
+  <div class="readout" id="readout"></div>
+  <button class="copy" id="copyBtn">复制当前参数</button>
+</aside>
+
+<script src="layout.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+    "id": "inlineKeyboard",
+    "name": "Inline Keyboard",
+    "description": "Touch keyboard for DMS with fcitx5-backed candidates (kimpanel)",
+    "version": "0.0.2",
+    "license": "GPL-3.0-only",
+    "author": "LilFishyChan",
+    "icon": "keyboard",
+    "type": "composite",
+    "capabilities": [
+        "daemon",
+        "ipc",
+        "dankbar-widget"
+    ],
+    "components": {
+        "daemon": "./InlineKeyboardDaemon.qml",
+        "widget": "./InlineKeyboardWidget.qml"
+    },
+    "settings": "./InlineKeyboardSettings.qml",
+    "requires_dms": ">=2.0.0",
+    "dependencies": [
+        "ydotool",
+        "fcitx5"
+    ],
+    "compositors": [
+        "any"
+    ],
+    "permissions": [
+        "settings_read",
+        "settings_write",
+        "process"
+    ],
+    "repo": "https://github.com/LilFishyChan/dms-inline-keyboard",
+    "startupCheck": "./StartupCheck.qml"
+}

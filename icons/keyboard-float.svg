@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- 键盘外框 -->
+  <rect x="2.6" y="3.4" width="18.8" height="12.2" rx="2.2"
+        fill="none" stroke="#000000" stroke-width="1.7"/>
+
+  <!-- 键点：2 行 × 4 列，在内缩后的区域里均匀分布 -->
+  <rect x="5.45" y="6.9" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="9.15" y="6.9" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="12.85" y="6.9" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="16.55" y="6.9" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+
+  <rect x="5.45" y="10.1" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="9.15" y="10.1" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="12.85" y="10.1" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+  <rect x="16.55" y="10.1" width="2.0" height="2.0" rx="0.5" fill="#000000"/>
+
+  <!-- 底部横线：宽度 = 外框宽度的 0.9，居中 -->
+  <rect x="3.54" y="19.2" width="16.92" height="1.8" rx="0.9" fill="#000000"/>
+</svg>

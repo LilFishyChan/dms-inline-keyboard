@@ -1,0 +1,305 @@
+:root {
+  /* 尺寸参数，由 app.js 写入 */
+  --unit: 78px;
+  --units: 17;
+  --key-h: 52px;
+  --gap: 6px;
+  --pad: 8px;
+  --radius: 10px;
+  --cand-h: 44px;
+  --handle-h: 30px;
+  --kb-opacity: 1;
+
+  /* Material 3 深色 */
+  --surface: #141218;
+  --surface-container: #211f26;
+  --surface-container-high: #2b2930;
+  --surface-container-highest: #36343b;
+  --on-surface: #e6e0e9;
+  --on-surface-variant: #cac4d0;
+  --primary: #d0bcff;
+  --on-primary: #381e72;
+  --outline: #938f99;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  background: #0b0a0e;
+  color: #e6e0e9;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ---------- 屏幕画布 ---------- */
+.stage {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.canvas-wrap {
+  position: relative;
+  flex: none;
+}
+
+.screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 800px;
+  transform-origin: top left;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+}
+
+.wallpaper {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 600px at 20% 10%, #2a2440 0%, transparent 60%),
+    radial-gradient(700px 500px at 85% 85%, #1d2b33 0%, transparent 55%),
+    #131118;
+}
+
+.fake-window {
+  position: absolute;
+  left: 120px;
+  top: 90px;
+  width: 720px;
+  border-radius: 12px;
+  background: rgba(33,31,38,.85);
+  border: 1px solid rgba(147,143,153,.2);
+  overflow: hidden;
+  transition: bottom .18s ease, height .18s ease;
+}
+/* 避让演示：贴底且开启避让时窗口上移 */
+.screen.avoid .fake-window { top: 60px; }
+
+.fake-titlebar {
+  display: flex; gap: 6px; padding: 10px 12px;
+  border-bottom: 1px solid rgba(147,143,153,.15);
+}
+.fake-titlebar .dot { width: 10px; height: 10px; border-radius: 50%; background: #4a4750; }
+
+.fake-content { padding: 14px 16px; color: var(--on-surface-variant); font-size: 14px; }
+.fake-content .fake-input {
+  margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+  background: rgba(54,52,59,.7); color: var(--on-surface);
+}
+
+/* ---------- 键盘 ---------- */
+.keyboard {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: calc(var(--unit) * var(--units) + var(--gap) * (var(--units) - 1) + var(--pad) * 2);
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  background: color-mix(in srgb, var(--surface-container) 92%, transparent);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(147,143,153,.18);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  opacity: var(--kb-opacity);
+}
+
+.keyboard.floating {
+  bottom: 120px;
+  border-radius: var(--radius);
+  box-shadow: 0 18px 48px rgba(0,0,0,.5);
+  border-bottom: 1px solid rgba(147,143,153,.18);
+}
+
+/* ---------- 候选区 ---------- */
+.candbar {
+  height: var(--cand-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: calc(var(--radius) * .7);
+  background: color-mix(in srgb, var(--surface-container-high) 70%, transparent);
+  overflow: hidden;
+}
+
+.preedit {
+  flex: none;
+  color: var(--primary);
+  font-size: 15px;
+  letter-spacing: .5px;
+  padding-right: 8px;
+  border-right: 1px solid rgba(147,143,153,.25);
+  white-space: nowrap;
+}
+.preedit:empty { display: none; }
+
+.cands {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cands::-webkit-scrollbar { display: none; }
+
+.cand {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 17px;
+  color: var(--on-surface);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.cand:hover { background: rgba(208,188,255,.12); }
+.cand:first-child { color: var(--primary); font-weight: 600; }
+.cand .idx { font-size: 11px; opacity: .45; margin-right: 4px; }
+
+/* 快捷栏（无候选时顶替候选区） */
+.shortcuts { flex: 1; display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.shortcut {
+  flex: none; width: 34px; height: 30px; display: grid; place-items: center;
+  border-radius: 8px; background: rgba(54,52,59,.6); font-size: 15px; cursor: pointer;
+}
+
+.expand {
+  flex: none; width: 30px; height: 28px; border-radius: 8px;
+  background: rgba(54,52,59,.8); color: var(--on-surface-variant);
+  border: none; cursor: pointer; font-size: 13px;
+}
+
+/* ---------- 键区 ---------- */
+.keys { display: flex; flex-direction: column; gap: var(--gap); }
+
+.krow {
+  display: flex;
+  gap: var(--gap);
+  width: calc(var(--unit) * var(--units) + var(--gap) * (var(--units) - 1));
+  justify-content: center;
+}
+
+.key {
+  flex: none;
+  height: var(--key-h);
+  border-radius: calc(var(--radius) * .8);
+  border: none;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  /* 字号跟着键高走，键盘被拉矮时不会压字 */
+  font-size: calc(var(--key-h) * 0.38);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  transition: background .08s ease, transform .06s ease;
+}
+.key:active { transform: scale(.97); }
+
+.key.fn { background: var(--surface-container-highest); color: var(--on-surface-variant); font-size: calc(var(--key-h) * 0.29); }
+.key.space { background: var(--surface-container-highest); }
+/* 顶部常驻数字行：比主键区更沉一点，读起来像独立的数字/fn 区 */
+.key.num {
+  font-size: calc(var(--key-h) * 0.33);
+  color: var(--on-surface-variant);
+  background: color-mix(in srgb, var(--surface-container-high) 62%, var(--surface-container));
+}
+.key.shift.on { background: var(--primary); color: var(--on-primary); }
+.key.on { background: var(--primary); color: var(--on-primary); }
+.key.stub { font-size: calc(var(--key-h) * 0.26); }
+.key.small { font-size: calc(var(--key-h) * 0.2); }
+/* Fn 层激活时，被替换的键（数字行 → Esc/F1-F12）用强调色标出 */
+.key.fnlayer {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface-container-high));
+  font-size: calc(var(--key-h) * 0.3);
+}
+.key.shift.lock { background: var(--primary); color: var(--on-primary); box-shadow: inset 0 0 0 2px rgba(255,255,255,.35); }
+.key.up { text-transform: uppercase; }
+.key.spacer { background: transparent; pointer-events: none; }
+/* 真实键盘的双行键面 */
+.key.dual { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.02; }
+.key.dual .top { font-size: 0.62em; opacity: .6; }
+.key.dual .bot { font-size: 1em; }
+
+/* ---------- 把手条 ---------- */
+.handlebar {
+  display: flex;
+  align-items: center;
+  height: var(--handle-h);
+  margin-top: calc(var(--gap) * -1);
+  cursor: grab;
+}
+.handlebar.hidden { display: none; }
+.handlebar:active { cursor: grabbing; }
+
+.handle-btn {
+  flex: none; width: 46px; height: 26px; border-radius: 8px;
+  border: none; background: transparent; color: var(--on-surface-variant);
+  font-size: 16px; cursor: pointer; display: grid; place-items: center;
+}
+.handle-btn:hover { background: rgba(208,188,255,.1); }
+.handle-btn.lang { font-size: 13px; color: var(--primary); font-weight: 600; }
+
+.handle-grip {
+  flex: 1; display: grid; place-items: center; cursor: grab;
+}
+.handle-grip i {
+  display: block; width: 76px; height: 4px; border-radius: 2px;
+  background: rgba(147,143,153,.55);
+}
+/* 贴底模式：中间把手不承担拖动，弱化它 */
+.keyboard:not(.floating) .handlebar { cursor: default; }
+.keyboard:not(.floating) .handle-grip { cursor: default; }
+.keyboard:not(.floating) .handle-grip i { opacity: .28; }
+
+/* ---------- 参数面板 ---------- */
+.panel {
+  width: 268px;
+  flex: none;
+  height: 100%;
+  overflow-y: auto;
+  padding: 18px 18px 40px;
+  background: #16141b;
+  border-left: 1px solid #26232c;
+  font-size: 13px;
+}
+.panel h1 { font-size: 15px; margin: 0 0 4px; }
+.panel .hint { margin: 0 0 16px; color: #8b8595; font-size: 12px; line-height: 1.5; }
+.panel label { display: block; margin-bottom: 14px; color: #b7b1c0; }
+.panel label.row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.panel output { float: right; color: #d0bcff; font-variant-numeric: tabular-nums; }
+.panel input[type=range] { width: 100%; margin-top: 6px; accent-color: #d0bcff; }
+
+.seg { display: flex; gap: 4px; margin-top: 6px; }
+.seg button {
+  flex: 1; padding: 6px 4px; border-radius: 8px; cursor: pointer;
+  background: #232029; color: #b7b1c0; border: 1px solid transparent; font-size: 12px;
+}
+.seg button.on { background: rgba(208,188,255,.16); color: #d0bcff; border-color: rgba(208,188,255,.35); }
+
+.readout {
+  margin-top: 18px; padding: 10px; border-radius: 8px; background: #1d1a23;
+  color: #8b8595; font-family: ui-monospace, monospace; font-size: 11px;
+  line-height: 1.7; white-space: pre-wrap; word-break: break-all;
+}
+.copy {
+  margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; cursor: pointer;
+  background: rgba(208,188,255,.16); color: #d0bcff; border: 1px solid rgba(208,188,255,.35);
+  font-size: 12px;
+}

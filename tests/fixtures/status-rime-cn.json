@@ -1,0 +1,20 @@
+{
+  "preedit": "",
+  "cursor": 0,
+  "visible": true,
+  "keyboard": false,
+  "im": "rime",
+  "imicon": "/usr/share/icons/hicolor/48x48/apps/fcitx-rime.png",
+  "imlabel": "万",
+  "preeditEmbedded": false,
+  "hasPrev": false,
+  "hasNext": true,
+  "items": [
+    "你好",
+    "拟好",
+    "泥蒿",
+    "你",
+    "泥",
+    "尼"
+  ]
+}

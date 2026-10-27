@@ -1,0 +1,8 @@
+*.bak*
+*.old-*
+__pycache__/
+*.pyc
+*.log
+build/
+
+# addon 是 submodule（独立仓库，AUR 用）

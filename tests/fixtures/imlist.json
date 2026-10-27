@@ -1,0 +1,16 @@
+[
+    {
+        "name": "keyboard-us",
+        "title": "键盘 - 英语（美国）",
+        "label": "en",
+        "icon": "/usr/share/icons/AdwaitaLegacy/48x48/legacy/input-keyboard.png",
+        "keyboard": true
+    },
+    {
+        "name": "rime",
+        "title": "中州韵",
+        "label": "ㄓ",
+        "icon": "/usr/share/icons/hicolor/48x48/apps/fcitx-rime.png",
+        "keyboard": false
+    }
+]
