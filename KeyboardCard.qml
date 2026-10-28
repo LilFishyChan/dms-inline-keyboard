@@ -386,9 +386,6 @@ Rectangle {
     signal imSelected(string name)
     property bool imPickerOpen: false
     property var imList: []
-    property string imName: ""
-    property string imIconFile: ""
-    property int imIconVersion: 0
 
     readonly property var rows: {
         const base = Layout.pageRows(page)

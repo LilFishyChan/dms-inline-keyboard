@@ -77,15 +77,8 @@ Item {
     Image {
         visible: grid.c.spaceEntry !== null && grid.c.fcitxImLabel === ""
                  && source !== ""
-        // addon 给的 icon theme 文件路径不重复变化，不需要缓存破除参数；
-        // 托盘抓图是每次重写同一个 PNG，必须带 ?v= 才会刷新
-        source: {
-            if (grid.c.imIconFile === "")
-                return ""
-            if (grid.c.fcitxImIcon !== "")
-                return "file://" + grid.c.imIconFile
-            return "file://" + grid.c.imIconFile + "?v=" + grid.c.imIconVersion
-        }
+        // addon 直接给绝对路径（从 icon theme 解析），不需要缓存破除参数
+        source: grid.c.fcitxImIcon === "" ? "" : "file://" + grid.c.fcitxImIcon
         width: Math.round(grid.c.keyH * 0.4)
         height: width
         x: grid.c.spaceX + (grid.c.spaceW - width) / 2

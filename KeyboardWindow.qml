@@ -49,10 +49,7 @@ PanelWindow {
     property string mode: "keys"
     property bool editing: false
     signal quickAction(string action)
-    property string imName: ""
     property var imList: []
-    property string imIconFile: ""
-    property int imIconVersion: 0
     signal imSwitchRequested()
     signal imListRequested()
     signal imCycleRequested()
@@ -179,10 +176,7 @@ PanelWindow {
         slotActionId: root.slotActionId
         quickBarActions: root.quickBarActions
         isFloating: false
-        imName: root.imName
         imList: root.imList
-        imIconFile: root.imIconFile
-        imIconVersion: root.imIconVersion
 
         onQuickBarChanged: list => root.quickBarChanged(list)
         onEditingChanged: root.editing = editing

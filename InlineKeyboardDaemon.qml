@@ -546,12 +546,9 @@ PluginComponent {
             page: root.page
             mode: root.mode
             editing: root.editing
-            imName: root.imName
             imList: root.imList
             // addon 给了图标路径就直接用（内嵌状态没有托盘图标可用），
             // 否则才看托盘抓图是否成功
-            imIconFile: root.imIconFile
-            imIconVersion: root.imIconVersion
 
             onQuickBarChanged: list => root.saveQuickBar(list)
             onOrderChanged: list => root.saveOrder(list)
@@ -601,12 +598,9 @@ PluginComponent {
             fcitxVisible: root.fcitxVisible
             slotActionId: root.slotActionId
             quickBarActions: root.quickBarActions
-            imName: root.imName
             imList: root.imList
             // addon 给了图标路径就直接用（内嵌状态没有托盘图标可用），
             // 否则才看托盘抓图是否成功
-            imIconFile: root.imIconFile
-            imIconVersion: root.imIconVersion
 
             onQuickBarChanged: list => root.saveQuickBar(list)
             onOrderChanged: list => root.saveOrder(list)
@@ -872,7 +866,7 @@ PluginComponent {
             names.push(root.imList[i].name + ":" + root.imList[i].label)
         return "count=" + root.imList.length
             + " [" + names.join(", ") + "]"
-            + " cur=" + root.imName
+            + " cur=" + root.fcitxImName
             + " ascii=" + root.imAsciiMode
     }
 
