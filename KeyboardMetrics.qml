@@ -10,7 +10,8 @@ QtObject {
 
     // 顶部快捷条高度 / 底部把手高度，都按键高取比例
     readonly property real quickBarRatio: 0.78
-    readonly property real handleRatio: 0.5
+    // 把手高度 = 键高的 0.75（原 0.5，加了一半）
+    readonly property real handleRatio: 0.75
     readonly property int keyRowCount: Layout.pageRows("page1").length
 
     // ---- 输入（窗口绑定，或用户设置换算后的名义值）----

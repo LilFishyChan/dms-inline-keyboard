@@ -23,7 +23,8 @@ Item {
         anchors.leftMargin: controller.pad
         anchors.verticalCenter: parent.verticalCenter
         name: "expand_more"
-        size: Math.round(controller.handleH * 0.92)
+        // 和顶部动作固定栏的图标同尺寸（quickH * 0.5，把手高即 quickH）
+        size: Math.round(controller.handleH * 0.5)
         color: Theme.withAlpha(controller.fg, 0.72)
 
         MouseArea {
@@ -68,7 +69,7 @@ Item {
         anchors.rightMargin: controller.pad
         anchors.verticalCenter: parent.verticalCenter
         name: "language"
-        size: Math.round(controller.handleH * 0.92)
+        size: Math.round(controller.handleH * 0.5)
         color: Theme.withAlpha(controller.fg, 0.72)
 
         MouseArea {

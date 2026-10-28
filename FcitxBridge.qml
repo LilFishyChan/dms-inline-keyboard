@@ -64,16 +64,9 @@ Item {
     // 当前是否英文字模式（按子模式标签是否为纯 ASCII 字母判断）
     readonly property bool isAsciiMode: Data.isAsciiMode(imLabel)
 
-    // 全量候选（展开列表用；addon 收到 expand 请求后写文件）
-    property var allCandidates: []
-
     // ------------------------------------------------------------------
 
     function applyStatus(raw) {
-        // 候选变了就顺手把全量拉一份：候选栏要按全量排列，
-        // 排不下的进展开列表。放在这里而不是 card 的 onChanged ——
-        // QML 里 property var 存数组时，内容变化不保证触发 onChanged
-        // （实测 card 侧那个条件一次都没触发过）。
         // data.js 的 parseStatus 解析失败时返回上一次的副本，
         // 所以文件半写 / 还没生成的情况不会把候选闪空。
         const st = Data.parseStatus(raw, {
@@ -92,11 +85,6 @@ Item {
         hasPrev = st.hasPrev
         hasNext = st.hasNext
         hasMore = st.hasMore
-
-        // 这里**不**拉全量：候选栏只监控前面十几个候选，全量是展开列表才需要的。
-        // 全量要跨页遍历（rime 懒加载，取第 7 个得先生成下一页），
-        // 一次几十毫秒，会卡住 fcitx5 的事件循环 —— 打字就变一格一格的。
-        // 展开时由 card 的 onCandExpandedChanged 触发。
     }
 
     function applyImList(raw) {
@@ -112,15 +100,10 @@ Item {
             applyImList(line.substring(7))
         } else if (line.startsWith("error:")) {
             lastError = line.substring(6)
+            // addon 不认 text:（还没升级）→ 以后直接走剪贴板
+            if (lastError.indexOf("unknown-command:text") === 0)
+                textSupported = false
             console.error("[inline-keyboard/fcitx] addon 报告: " + lastError)
-        } else if (line.startsWith("allcand:")) {
-            try {
-                const arr = JSON.parse(line.substring(8))
-                if (Array.isArray(arr))
-                    allCandidates = arr
-            } catch (e) {
-                console.log("inline-keyboard/fcitx: 全量候选解析失败 " + e)
-            }
         }
     }
 
@@ -134,21 +117,39 @@ Item {
         return true
     }
 
-    // 请求全量候选：addon 用 BulkCandidateList::candidateFromAll 一次取完。
-    function requestAllCandidates() {
-        expandProc.command = ["sh", "-c",
-            "printf '1' > \"" + runtimeDir + "/inline-keyboard-expand\""]
-        expandProc.running = true
+    // ---- 文本提交（表情 / 符号页）----
+    // 为什么不用按键通道：一个表情是多个码位，key: 是 keysym 语义，
+    // ydotool 也只认键码 —— 只有 InputContext::commitString 送得进去。
+    // 老版本 addon 不认识 text: 会回 error:unknown-command:text…，
+    // 收到就把 textSupported 关掉，之后直接走剪贴板，不再白发一次。
+    property bool textSupported: true
+
+    function commitText(text) {
+        if (!text || !textSupported || !socket.connected)
+            return false
+        socket.write("text:" + text + "\n")
+        return true
     }
 
-    // 选第 N 个候选：addon 读到后直接调 CandidateWord::select，
-    // 不受输入法数字选词键限制，也能选到第 10 个以后。
+    // 兜底：复制到剪贴板，由用户自己粘贴。
+    // wl-clipboard 没装就别假装复制成功了 —— 平板上真出现过这种情况（toast 说已复制，实际什么都没发生）
+    property bool clipboardAvailable: false
+
+    function copyText(text) {
+        if (!text || !clipboardAvailable)
+            return false
+        clipboardProc.command = ["wl-copy", text]
+        clipboardProc.running = true
+        return true
+    }
+
+    // 选第 N 个候选。index 是 addon 的 candidateFromAll 全局下标。
+    // 走 socket 的 select: 命令——addon 重写后不再读 inline-keyboard-select 文件，
+    // 之前写文件的做法会让选词静默失效（点了没反应，也不报错）。
     function selectCandidate(index) {
         if (index < 0)
-            return
-        selectProc.command = ["sh", "-c",
-            "printf '" + index + "' > \"" + runtimeDir + "/inline-keyboard-select\""]
-        selectProc.running = true
+            return false
+        return sendFcitx("select:" + index)
     }
 
     // ------------------------------------------------------------------
@@ -166,7 +167,11 @@ Item {
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
     Timer {
         interval: 1000
-        running: true
+        // 只有键盘打开时才连。
+        // 无条件 running: true 会让插件在键盘收起后仍每秒重连，
+        // 一直占着 addon 的唯一客户端槽位 —— 任何别的客户端
+        // （scripts/test-addon.py、排障工具）刚连上就被顶掉。
+        running: keyboardOpen
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -175,14 +180,25 @@ Item {
         }
     }
 
+    // 键盘收起就把连接还回去，别赖着
+    onKeyboardOpenChanged: if (!keyboardOpen && socket.connected)
+                               socket.connected = false
+
+    // 剪贴板兜底：wl-copy 直接吃文本参数，不经过 shell，省掉转义问题
     Process {
-        id: expandProc
-        command: ["sh", "-c", "true"]
+        id: clipboardProc
+        command: ["true"]
     }
 
+    // 开局探一次有没有 wl-copy（Wayland 下唯一的复制手段）
     Process {
-        id: selectProc
-        command: ["sh", "-c", "true"]
+        id: clipboardProbe
+        command: ["sh", "-c", "command -v wl-copy >/dev/null && echo yes || echo no"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: bridge.clipboardAvailable =
+                                  String(text || "").trim() === "yes"
+        }
     }
 
     // socket 没连上时（fcitx5 没起 / addon 没加载）退回文件读取兜底
@@ -215,14 +231,6 @@ Item {
             if (!statusRead.running)
                 statusRead.running = true
         }
-    }
-
-    // 全量候选也走推送：addon 收到 expand 请求后一次取完，直接推 allcand:{json}。
-    // 不再轮询 inline-keyboard-allcand.json（文件只在 socket 没连上时由 probe.sh 用）。
-
-    // 兼容旧调用名（daemon 的 requestAllCandidates 走这里）
-    function requestAllCandidatesFromFile() {
-        requestAllCandidates()
     }
 
 }

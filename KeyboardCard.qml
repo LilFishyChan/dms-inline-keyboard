@@ -25,13 +25,22 @@ Rectangle {
     property real gap: 6
     property real pad: 8
     property real candH: 44
-    property real handleH: 30
+    // 和顶部动作固定栏同高（quickH），图标也按它的比例
+    property real handleH: Math.round(root.quickH)
     property bool showHandle: true
     property bool dragEnabled: false
+    // 长按自动重复的间隔（毫秒），由设置页配置
+    property int repeatInterval: 60
     // 候选/快捷栏：接入 fcitx5 之前先不显示
     // 候选栏整行的开关：有候选才占位显示
-    property bool showCandBar: root.fcitxCandidates.length > 0
-        && !root.fcitxImKeyboard
+    // 显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，不是当前有没有词。
+    // 纯键盘布局（keyboard-us 这类）没有候选能力，不显示；
+    // rime 的中英文模式都会出候选，所以即使这一刻 items 还空着也占位。
+    //
+    // 注意写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成
+    // 「第一行求值 + 第二行变成独立语句」，值悄悄算错（踩过）。
+    // 由窗口赋值（窗口按输入法判据算），默认不显示。
+    property bool showCandBar: false
 
     // 状态
     property bool fnActive: false
@@ -40,10 +49,21 @@ Rectangle {
     // 修饰键状态快照（0 未激活 / 1 一次性 / 2 锁定）
     property var modifierStates: ({})
     property string page: "page1"
+    // 表情页的两级选择：段（表情 / 符号）+ 分类（"all" 或分组 id）。
+    // 放在卡片上是因为顶部分类条和中间的网格要读同一份状态。
+    property string emojiSegment: "emoji"
+    property string emojiCategory: "all"
     // 点候选上屏：把索引写进 $XDG_RUNTIME_DIR/inline-keyboard-select，
     // fcitx5 的 inline-keyboard-status addon 轮询到后直接调 CandidateWord::select()——
     // 这是 fcitx5 内部的真正选词入口，等价于用户按了选择键。
     // 选词逻辑在 daemon（UI 只负责报告"点了第几个"）
+    // 换页请求走和键位同一个入口（keyPressed → 窗口 → daemon.handleKey）。
+    // 卡片里的 page 是**绑定**到 daemon 的，直接赋值会把这个绑定掐断，
+    // 之后 daemon 再换页卡片就收不到了（旧代码里表情页的 X 就是这么写的）。
+    function goPage(target) {
+        root.keyPressed({k: "page", to: target})
+    }
+
     function selectCandidate(index) {
         root.selectCandidateRequested(index)
     }
@@ -411,38 +431,10 @@ Rectangle {
     property var actionList: []
     // fcitx5 候选（daemon 从 inline-keyboard-status.json 读入）
     // 候选完整列表是否展开。状态由 card 自己持有（和 imPickerOpen 一样），
-    // CandidateBar 通过 controller.candExpanded 读写，不经过窗口/daemon 的绑定链
-    // ——那条链实测不可靠（card 根本没有 controller 之外的 daemon 引用）。
-    property bool candExpanded: false
-    // addon 报告的「还有下一页候选」。顶栏池只有 18 个，放得下不代表
-    // 没有更多 —— 判断要不要展开按钮得看这个。
-    readonly property bool hasMoreCandidates: root.fcitxHasMore
-    // 候选栏实际显示了几个（CandidatePanel 要跳过这一段）
-    readonly property int candFitCount: candBar ? candBar.fitCount : 0
-    readonly property int candPoolLen: candBar ? candBar.poolLen : -1
-    readonly property bool candBarOverflow: candBar ? candBar.hasOverflow : false
-    // 候选栏放不下全部候选时才允许展开
-    readonly property bool candOverflow: candBar ? candBar.hasOverflow : false
-    // 展开要拿所有页的候选。card 没有 daemon 引用，不能用 controller.xxx，
-    // 走信号一路传到 daemon（它才是持有 fcitx5 通道的那一层）。
-    signal allCandidatesRequested()
-    // daemon 收齐后下发到这里
-    property var allCandidates: []
-    // 候选栏直接用全量候选排列，所以「有候选但还没有全量」时就要拉。
+    // 展开状态下，候选一有变化就重拉全量。
     //
-    // 不能用 onFcitxCandidatesChanged 驱动：QML 里 property var 存数组时，
-    // 整个数组被替换**也不一定**触发 onChanged（实测这里就没触发过）。
-    // 用派生布尔量做条件，它是由内容算出来的，变化可靠。
-    readonly property bool needsAllCandidates:
-        root.candidates.length > 0 && root.allCandidates.length === 0
-    onNeedsAllCandidatesChanged: if (needsAllCandidates)
-                                      root.allCandidatesRequested()
-    onCandExpandedChanged: {
-        if (candExpanded)
-            root.allCandidatesRequested()
-    }
-    // 候选变少、全部塞进候选栏之后，展开页没有内容了，自动收起
-    onCandOverflowChanged: if (!candOverflow) candExpanded = false
+    // debounce 350ms：跨页遍历 rime 的候选挺慢（懒加载，取第 N 个要先生成
+    // 前面的），每敲一个键都拉会把 fcitx5 的事件循环堵住，打字一格一格跳。
     property var fcitxCandidates: []
     // 当前输入法是否纯键盘布局（这类输入法没有候选，不显示候选栏）
     property bool fcitxImKeyboard: false
@@ -557,6 +549,9 @@ Rectangle {
         ? spaceEntry.key.w * unit + (spaceEntry.key.w - 1) * gap : 0
 
     signal keyPressed(var keyData)
+    // 表情 / 符号上屏：卡片只负责报「点了哪个字符」，
+    // 真正怎么提交（addon commit / 剪贴板）由 daemon 决定。
+    signal textCommitRequested(string text)
     // 点了第 index 个候选
     signal selectCandidateRequested(int index)
     // 修饰键的按下/松开（只有「按住才生效」模式用，daemon 里会过滤非修饰键）
@@ -666,35 +661,23 @@ Rectangle {
                 enabled: root.page !== "emoji" && !root.showCandBar
             }
 
-            // 候选栏：盖在快捷栏上面
+            // 候选栏：盖在快捷栏上面。
+            // 表情页不显示：那一行要留给分类，而且预编辑/候选在表情页上没意义，
+            // 候选栏盖过去还会把左上角的返回 X 压住（踩过，X 点不到）。
             CandidateBar {
                 id: candBar
                 controller: root
                 anchors.fill: parent
-                visible: root.showCandBar
+                visible: root.showCandBar && root.page !== "emoji"
                 z: 10
             }
 
-            // 表情页：左上角一个 X 返回（顶掉快捷栏和右上角的槽）
-            Rectangle {
+            // 表情 / 符号页的分类条：占掉快捷栏那一行（快捷栏此处已淡出）
+            EmojiCategoryBar {
+                id: emojiCats
+                controller: root
+                anchors.fill: parent
                 visible: root.page === "emoji"
-                anchors.left: parent.left
-                anchors.top: parent.top
-                width: root.quickH
-                height: root.quickH
-                radius: width / 2
-                color: Theme.surfaceContainer
-
-                DankIcon {
-                    anchors.centerIn: parent
-                    name: "close"
-                    size: Math.round(root.quickH * 0.45)
-                    color: Theme.withAlpha(root.fg, 0.85)
-                }
-
-                TapHandler {
-                    onTapped: root.page = "keys"
-                }
             }
         }
 
@@ -705,7 +688,6 @@ Rectangle {
             width: parent.width
             // 展开候选列表时整块键区让位：它是「换页」不是「盖一层」，
             // 按键必须真正隐藏，否则下面的按键还能被点到。
-            visible: !root.candExpanded
             // 高度取所有页里最多的行数：切到空页（表情）也不会让键盘缩水
             height: {
                 let lines = root.rows.length
@@ -719,7 +701,14 @@ Rectangle {
             KeyGrid {
                 controller: root
                 anchors.fill: parent
-                visible: root.mode === "keys"
+                visible: root.mode === "keys" && root.page !== "emoji"
+            }
+
+            // ---- 表情 / 符号页 ----
+            EmojiPanel {
+                controller: root
+                anchors.fill: parent
+                visible: root.mode === "keys" && root.page === "emoji"
             }
 
             // ---- 透明度调整面板 ----
@@ -791,12 +780,7 @@ Rectangle {
 
     // ---------------- 展开的候选列表页 ----------------
     // 暴露给 daemon 的调试 IPC（翻页验证用）
-    readonly property var candidatePanel: candPanelItem
 
-    CandidatePanel {
-        id: candPanelItem
-        controller: root
-    }
 
     // ---------------- 拖动中的浮动块 ----------------
     // 放在卡片根部才不会被列表的 clip 裁掉

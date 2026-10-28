@@ -138,7 +138,8 @@ Item {
     readonly property real activeBorderWidth: 2        // 激活态描边宽度（px）
     readonly property real cornerRatio: 0.18           // 键帽圆角相对键高
     readonly property real iconRatio: 0.34
-    readonly property real bigIconRatio: 0.51
+    // 大图标（表情）相对键高。原来 0.51 显得撑满按键，收到 0.43
+    readonly property real bigIconRatio: 0.43
     readonly property real upperLabelRatio: 0.2
     readonly property real mainLabelRatio: 0.32
     readonly property real mainLabelWithUpperRatio: 0.3

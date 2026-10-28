@@ -21,8 +21,13 @@ Item {
     // 必须等于 topArea 的高度。自己算更大的值（preeditH + candH）会压到数字行。
     readonly property real areaH: parent ? parent.height : controller.candH
     // 预编辑由谁画：客户端在画就不重复显示（fcitx5 的 Composing text 模式）
-    readonly property bool hasPreedit: (controller.preedit || "") !== ""
-        && !controller.fcitxPreeditEmbedded
+    // 应用已把预编辑渲染进输入框时不重复显示
+    readonly property bool hasPreedit:
+        (controller.preedit || "") !== "" && !controller.fcitxPreeditEmbedded
+
+    // 可见性由卡片按输入法行为算（有候选才显示）。
+    // 这里**不能**再叠 preedit 条件：那会让候选栏整条消失。
+    readonly property bool imHasCandidates: controller.showCandBar
 
     // 和主键盘一致的度量
     readonly property real unit: controller.unit || 63
@@ -40,33 +45,30 @@ Item {
     // 排不下的一律进展开列表，那里才需要全量。
     readonly property int kPool: 18
 
+    // 顶部只取 items（addon 给的前 18 个，都是单字），宽度可算。
     readonly property var pool: {
         const arr = controller.candidates || []
         return arr.length > kPool ? arr.slice(0, kPool) : arr
     }
 
-    // 池子长度单独用一个 int 表示。
-    // hasOverflow 不能直接写 pool.length —— pool 是 property var 存的数组，
-    // 它内部元素变了不会通知绑定（QML 的经典坑，实测这里就卡住了）。
-    // int 是值类型，candidates 一变就重新求值。
+    // 池子长度单独用一个 int 表示：pool 是 property var 存的数组，
+    // 内部元素变了不会通知绑定（QML 的经典坑）。int 是值类型，可靠。
     readonly property int poolLen:
         Math.min((controller.candidates || []).length, kPool)
 
-    // 量文字宽度用（和下面 Text 的字体必须一致）
+    // 量文字宽度用（必须和下面 Text 的字体一致）
+    readonly property int candFontSize: Math.round((controller.keyH || 64) * 0.42)
+
     TextMetrics {
         id: measure
-        font.pixelSize: Math.round(candArea.areaH * 0.44)
+        font.pixelSize: candArea.candFontSize
         font.weight: Font.Normal
     }
 
     // 能放下的候选个数：累加「文字宽 + 左右内边距 + 间距」，下一个放不下就停。
-    //
-    // 可用宽度**固定**按「展开按钮占位」来算，不随按钮显隐变化：
-    // 否则按钮显隐改变宽度 → 改变 fitCount → 又改变按钮显隐，来回抖。
-    // 代价是全部放下时右边会空出按钮那块，可以接受。
+    // 放不下的直接不画（没有展开列表了，超出部分由 clip 裁掉）。
     readonly property real availWidth: {
-        const btn = Math.round(areaH * 0.58)   // expandButton 的直径
-        return width - 10 - btn - 8 - 6        // 左右边距 + 按钮 + 按钮右距
+        return width - 10 - 6
     }
 
     readonly property int fitCount: {
@@ -86,14 +88,6 @@ Item {
         return n
     }
 
-    // 两个条件任一成立就要展开按钮：
-    //   ① 池子本身排不下；
-    //   ② 输入法还有更多候选（addon 的 hasMore）——候选栏只监控前面一小段，
-    //      6 个全放下不代表没有第 7 个。
-    // 都直接读值类型 / 底层属性：中间的派生 property bool 实测不传值。
-    readonly property bool hasOverflow:
-        fitCount < poolLen || controller.fcitxHasMore === true
-
     // ---------- 候选面板 ----------
     Rectangle {
         id: panel
@@ -106,7 +100,7 @@ Item {
 
             anchors.left: parent.left
             anchors.leftMargin: 10
-            anchors.right: candArea.hasOverflow ? expandButton.left : parent.right
+            anchors.right: parent.right
             anchors.rightMargin: 6
             anchors.top: parent.top
             anchors.bottom: parent.bottom
@@ -137,7 +131,7 @@ Item {
                         anchors.centerIn: parent
                         text: String(candArea.pool[index] ?? "")
                         color: index === 0 ? Theme.primary : candArea.controller.fg
-                        font.pixelSize: Math.round(candArea.areaH * 0.44)
+                        font.pixelSize: candArea.candFontSize
                         font.weight: index === 0 ? Font.DemiBold : Font.Normal
                     }
 
@@ -161,36 +155,6 @@ Item {
             }
         }
 
-        // ---------- 展开按钮（最右）----------
-        Rectangle {
-            id: expandButton
-
-            // 候选全部放得下就没有「更多」，不显示
-            visible: candArea.hasOverflow
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.round(candArea.areaH * 0.58)
-            height: width
-            radius: width / 2
-            color: expandMouse.containsMouse
-                   ? Theme.withAlpha(Theme.primary, 0.18)
-                   : Theme.withAlpha(candArea.controller.fg, 0.07)
-
-            Text {
-                anchors.centerIn: parent
-                text: candArea.controller.candExpanded ? "⌃" : "⌄"
-                color: candArea.controller.fg
-                font.pixelSize: Math.round(expandButton.height * 0.62)
-            }
-
-            MouseArea {
-                id: expandMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: candArea.controller.candExpanded = !candArea.controller.candExpanded
-            }
-        }
     }
 
     // ---------- 原文（在候选区上方，溢出卡片顶边）----------
@@ -216,6 +180,6 @@ Item {
         }
     }
 
-    // 候选消失时自动收起
-    onVisibleChanged: if (!visible && controller) controller.candExpanded = false
+    // 候选消失时**不**自动收起：选字后 preedit 清空、候选栏会隐藏，
+    // 那时收起展开页就看不到列表原地更新了。收起只由用户点 × 触发。
 }

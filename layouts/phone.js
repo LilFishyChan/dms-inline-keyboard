@@ -30,7 +30,7 @@ var rows = {
             {k: "char", l: "0", s: ")", c: 11, fn: {l: "F10", c: 68}},
             {k: "char", l: "-", s: "_", c: 12, fn: {l: "F11", c: 87}},
             {k: "char", l: "=", s: "+", c: 13, fn: {l: "F12", c: 88}},
-            {k: "key", l: "Backspace", c: 14, w: 2}
+            {k: "key", l: "Backspace", c: 14, w: 2, shift: {l: "Del", c: 111}}
         ],
         // QWERTY
         [
@@ -49,7 +49,7 @@ var rows = {
             {k: "char", l: "F", c: 33}, {k: "char", l: "G", c: 34}, {k: "char", l: "H", c: 35},
             {k: "char", l: "J", c: 36}, {k: "char", l: "K", c: 37}, {k: "char", l: "L", c: 38},
             {k: "char", l: ";", s: ":", c: 39}, {k: "char", l: "'", s: "\"", c: 40},
-            {k: "key", l: "Enter", c: 28, w: 2.25, shift: {l: "Del", c: 111}}
+            {k: "key", l: "Enter", c: 28, w: 2.25}
         ],
         // ZXCV
         [
@@ -180,3 +180,13 @@ function layoutFlat(page) {
 // 假候选：候选栏先用这个显示，接入 fcitx5 后由真实候选替换
 var demoCandidates = ["你好", "拟好", "你", "泥", "妮", "呢", "逆", "尼"]
 var demoShortcuts = ["⇱", "⤢", "📌", "⤡", "📋", "⚙", "🚀", "🔈", "🔉", "🔇", "☀", "🌙"]
+
+// node --test 用（QML 里没有 module，这段不会执行）
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+        rows: rows,
+        rowUnits: rowUnits,
+        pageRows: pageRows,
+        layoutFlat: layoutFlat
+    }
+}

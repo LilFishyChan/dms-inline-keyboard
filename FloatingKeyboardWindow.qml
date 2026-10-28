@@ -18,6 +18,11 @@ PanelWindow {
     property real gap: 6
     property real candH: 44
     // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
+    // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
+    //   · rime 中文（万）：会 → 有候选时显示
+    //   · rime abc：英文直接上屏，fcitx5 不弹候选窗 → 不显示
+    //   · keyboard-us：纯键盘布局 → 不显示
+    // 高度由 topArea 固定预留（candH），所以显隐不会让键盘跳动。
     property bool showCandBar: root.fcitxCandidates.length > 0
         && !root.fcitxImKeyboard
 
@@ -30,6 +35,7 @@ PanelWindow {
     property bool editing: false
     property bool avoidWindows: true
     property real bgOpacity: 1.0
+    property int repeatInterval: 60
     property real keyOpacity: 1.0
     property var actionList: []
     // fcitx5 候选（由 daemon 从 inline-keyboard-status.json 读入）
@@ -58,6 +64,8 @@ PanelWindow {
     signal keyPressed(var keyData)
     signal modifierPressed(var keyData)
     signal modifierReleased(var keyData)
+    // 表情 / 符号页点上屏（转给 daemon）
+    signal textCommitRequested(string text)
 
     // 窗口左上角位置（拖动把手时更新）
     property real posX: 100
@@ -147,16 +155,18 @@ PanelWindow {
     // 用 onCompleted 赋值而不是 `property var cardRef: card`：
     // 引用 id 的前向绑定在构造期可能拿到 undefined，且之后不会重算（docked 那边就踩到了）
     property var cardRef: null
-    signal allCandidatesRequested()
-    property var allCandidates: []
     Component.onCompleted: cardRef = card
-
-    onAllCandidatesRequested: root.allCandidatesRequested()
 
     KeyboardCard {
         id: card
 
-        anchors.fill: parent
+        // 卡片按**自己的高度**（= kbHeight）底部对齐，不能 anchors.fill 拉满窗口：
+        // 窗口比卡片高 preeditReserve，那是留给浮在卡片上方那条原文标签的。
+        // fill 会把卡片拉到 486px，内容却仍按 kbHeight 排 → 把手条下面多出一条空白，
+        // 原文标签也被顶到窗口外裁掉。停靠窗口一直是 bottom 锚定，所以没这问题。
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
 
         unit: metrics.unit
         keyH: metrics.keyH
@@ -168,6 +178,7 @@ PanelWindow {
         quickH: metrics.quickH
         showHandle: true
         dragEnabled: true
+        repeatInterval: root.repeatInterval
         fnActive: root.fnActive
         escSwap: root.escSwap
         modifierStates: root.modifierStates
@@ -179,7 +190,6 @@ PanelWindow {
         keyOpacity: root.keyOpacity
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
-        allCandidates: root.allCandidates
         fcitxImKeyboard: root.fcitxImKeyboard
         fcitxHasMore: root.fcitxHasMore
         fcitxImIcon: root.fcitxImIcon
@@ -205,6 +215,7 @@ PanelWindow {
         onKeyPressed: keyData => root.keyPressed(keyData)
         onModifierPressed: keyData => root.modifierPressed(keyData)
         onModifierReleased: keyData => root.modifierReleased(keyData)
+        onTextCommitRequested: text => root.textCommitRequested(text)
 
         // 松手时的落点判断在 onDragMoved 里按「起点 + 累计位移」算，
         // 起点在 onDragStarted 记一次

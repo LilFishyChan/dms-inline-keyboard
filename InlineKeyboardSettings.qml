@@ -378,6 +378,16 @@ PluginSettings {
     }
 
     SliderSetting {
+        settingKey: "repeatInterval"
+        label: root.tr("Key repeat interval")
+        description: root.tr("Delay between repeated keystrokes while a key is held down.")
+        minimum: 20
+        maximum: 200
+        defaultValue: 60
+        unit: " ms"
+    }
+
+    SliderSetting {
         settingKey: "keyOpacity"
         label: root.tr("Key opacity")
         description: root.tr("Opacity of each key; disabled actions multiply with it.")

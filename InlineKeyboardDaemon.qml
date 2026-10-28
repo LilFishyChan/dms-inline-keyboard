@@ -37,7 +37,19 @@ PluginComponent {
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     property bool avoidWindows: PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
     readonly property bool fnActive: root.fnState > 0
+    // 键位页 id：page1 主键区 / page2 F 区 / emoji 表情 & 符号页
+    // （卡片的 page 属性是绑定到这里的，任何地方都别直接给卡片赋值，否则绑定断掉）
     property string page: "page1"
+    readonly property var knownPages: ["page1", "page2", "emoji"]
+    // 换页的唯一入口：非法的目标页直接忽略，避免卡在一个没有布局的页上
+    function setPage(p) {
+        if (root.knownPages.indexOf(p) < 0) {
+            console.warn("inlineKeyboard: 未知键位页 " + p)
+            return root.page
+        }
+        root.page = p
+        return root.page
+    }
     // keys = 正常键盘 / functions = 快捷功能列表（顶部四格按钮切换）
     property string mode: "keys"
     // 动作列表编辑态
@@ -57,6 +69,8 @@ PluginComponent {
 
     // 切换方式：noLock / toggle / tapLock / doubleTapLock（设置页可选）
     property string modifierMode: PluginService.loadPluginData(root.pluginId, "modifierMode", "doubleTapLock")
+    // 长按自动重复的间隔（毫秒）
+    property int repeatInterval: PluginService.loadPluginData(root.pluginId, "repeatInterval", 60)
 
     // ---- fcitx5 状态（实际存在 FcitxBridge 里，这里 alias 给卡片和窗口用）----
     readonly property alias fcitxCandidates: fcitxBridge.candidates
@@ -70,14 +84,15 @@ PluginComponent {
     readonly property alias fcitxHasMore: fcitxBridge.hasMore
     readonly property alias fcitxSocketUp: fcitxBridge.socketUp
     readonly property alias fcitxLastError: fcitxBridge.lastError
-    readonly property alias allCandidates: fcitxBridge.allCandidates
     readonly property alias imList: fcitxBridge.imList
     readonly property alias imRows: fcitxBridge.imRows
     readonly property alias imAsciiMode: fcitxBridge.isAsciiMode
 
     // 预编辑是否由应用自己画（fcitx5 的 clientPreedit 非空）。
     // 为 true 时输入框里已经有拼音串了，键盘不要再重复显示。
-    property bool fcitxPreeditEmbedded: false
+    // 预编辑去重的实现先撤了：属性保留给 UI 引用，值恒 false，
+    // 键盘照常画自己的预编辑行。
+    readonly property bool fcitxPreeditEmbedded: false
 
     // 转发给 FcitxBridge 的解析入口（statusRead 兜底和 debug 用）
     function applyFcitxStatus(raw) { fcitxBridge.applyStatus(raw) }
@@ -85,7 +100,18 @@ PluginComponent {
 
     // ---- 按键注入 / 修饰键：全部在 KeyRouter 里，这里转发 ----
     function injectKey(code, sym) { keyRouter.injectKey(code, sym) }
-    function handleKey(keyData) { keyRouter.handleKey(keyData) }
+    // 换页键（k = "page"）改的是键盘自身的状态，状态在 daemon 上，所以在这里拦下；
+    // 其余键交给 KeyRouter 决定「直通 fcitx5 / ydotool」。
+    // 拆组件时这个分支漏掉过一次：page 键没有键码，走到 injectKey 直接 return，点击静默无效。
+    function handleKey(keyData) {
+        if (!keyData)
+            return
+        if (keyData.k === "page") {
+            root.setPage(keyData.to)
+            return
+        }
+        keyRouter.handleKey(keyData)
+    }
     function modifierStateOf(name) { return keyRouter.stateOf(name) }
     function setModifierState(name, v) { keyRouter.setState(name, v) }
     function cycleModifier(name) { keyRouter.cycleModifier(name) }
@@ -95,6 +121,40 @@ PluginComponent {
     function clearTransientModifiers() { keyRouter.clearTransientModifiers() }
     function probeYdotoold() { keyRouter.probeYdotoold() }
     function sendFcitx(line) { return fcitxBridge.sendFcitx(line) }
+
+    // ---- 表情 / 符号上屏 ----
+    // 优先级：addon 进程内 commit（直接进输入框，用户不用再操作）
+    //        > 复制到剪贴板（没有 fcitx5 扩展时唯一可行的一条）。
+    property string lastTextCommit: ""
+    property string lastTextCommitVia: ""
+    // 提示节流：同一条消息 3 秒内只弹一次
+    property double lastTextToastAt: 0
+    function typeText(text) {
+        if (!text)
+            return ""
+        lastTextCommit = text
+        if (fcitxBridge.commitText(text)) {
+            lastTextCommitVia = "commit"
+            return "commit"
+        }
+        fcitxBridge.copyText(text)
+        const copied = fcitxBridge.clipboardAvailable
+        lastTextCommitVia = copied ? "clipboard" : "none"
+        // 连点几个表情时别刷一屏提示：同一条消息 3 秒内只弹一次
+        const now = Date.now()
+        if (typeof ToastService !== "undefined" && ToastService
+                && now - root.lastTextToastAt > 3000) {
+            root.lastTextToastAt = now
+            // 「什么都没成功」要说清楚缺什么、怎么补 ——
+            // 只说「失败了」，用户完全不知道该装什么（平板上就是这样）
+            const term = copied
+                ? "Copied — long press the text field to paste"
+                : "Cannot insert text: install the fcitx5 addon (inline-keyboard-status) or wl-clipboard"
+            ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor)
+                                  ? I18n.trFor(root.pluginId, term) : term)
+        }
+        return lastTextCommitVia
+    }
 
     // ---- 错误捕获 ----
     // QML 里函数抛异常时，IPC 调用方拿到的是空字符串，分不清「没返回」
@@ -273,7 +333,6 @@ PluginComponent {
     // 本插件自己保存动作 / 槽 / 快捷栏时也会触发这里，所以逐项比较后再赋值：
     // 值没变就不写，避免 Repeater 被无谓重建（拖动刚结束那一下尤其明显）。
     // ---- 展开候选：实际在 FcitxBridge 里（addon 一次取完所有页）----
-    function requestAllCandidates() { fcitxBridge.requestAllCandidatesFromFile() }
     function selectCandidateByIndex(index) { fcitxBridge.selectCandidate(index) }
 
     function reloadSettings() {
@@ -384,8 +443,10 @@ PluginComponent {
     readonly property var floatingLoaderItem: floatingLoader.item
 
     // 当前活动的键盘卡片（dock / float 两个 LazyLoader 之一）
+    // 属性名是 floating，不是 isFloating —— 后者在重构时删掉了，
+    // 这里一直读到一个 undefined，浮动模式下 activeCard 永远是 null（调试 IPC 全失效）
     readonly property var activeCard: {
-        const win = root.isFloating ? floatingLoader.item : dockedLoader.item
+        const win = root.floating ? floatingLoader.item : dockedLoader.item
         return win ? win.cardRef : null
     }
 
@@ -530,7 +591,6 @@ PluginComponent {
             keyOpacity: root.keyOpacity
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
-            allCandidates: root.allCandidates
             fcitxImKeyboard: root.fcitxImKeyboard
             fcitxHasMore: root.fcitxHasMore
             fcitxImIcon: root.fcitxImIcon
@@ -538,6 +598,7 @@ PluginComponent {
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
             fcitxPreedit: root.fcitxPreedit
             fcitxVisible: root.fcitxVisible
+            repeatInterval: root.repeatInterval
             slotActionId: root.slotActionId
             quickBarActions: root.quickBarActions
             fnActive: root.fnActive
@@ -559,13 +620,13 @@ PluginComponent {
             onImListRequested: root.requestImList()
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: index => root.selectCandidateByIndex(index)
-            onAllCandidatesRequested: root.requestAllCandidates()
             onImSelected: name => root.selectIm(name)
             onKeyPressed: keyData => {
                 root.handleKey(keyData)
             }
             onModifierPressed: keyData => root.modifierPress(keyData)
             onModifierReleased: keyData => root.modifierRelease(keyData)
+            onTextCommitRequested: text => root.typeText(text)
             onKeyboardClosed: root.onKeyboardClosed()
         }
     }
@@ -588,7 +649,6 @@ PluginComponent {
             keyOpacity: root.keyOpacity
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
-            allCandidates: root.allCandidates
             fcitxImKeyboard: root.fcitxImKeyboard
             fcitxHasMore: root.fcitxHasMore
             fcitxImIcon: root.fcitxImIcon
@@ -596,6 +656,7 @@ PluginComponent {
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
             fcitxPreedit: root.fcitxPreedit
             fcitxVisible: root.fcitxVisible
+            repeatInterval: root.repeatInterval
             slotActionId: root.slotActionId
             quickBarActions: root.quickBarActions
             imList: root.imList
@@ -611,13 +672,13 @@ PluginComponent {
             onImListRequested: root.requestImList()
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: index => root.selectCandidateByIndex(index)
-            onAllCandidatesRequested: root.requestAllCandidates()
             onImSelected: name => root.selectIm(name)
             onKeyPressed: keyData => {
                 root.handleKey(keyData)
             }
             onModifierPressed: keyData => root.modifierPress(keyData)
             onModifierReleased: keyData => root.modifierRelease(keyData)
+            onTextCommitRequested: text => root.typeText(text)
             onKeyboardClosed: root.onKeyboardClosed()
         }
     }
@@ -654,8 +715,8 @@ PluginComponent {
             if (!card)
                 return "INLINE_KEYBOARD_H:-1"
             // win 的高度才决定 exclusiveZone；card 自己没有 implicitHeight
-            const win = root.isFloating ? root.floatingLoaderItem
-                                        : root.dockedLoaderItem
+            const win = root.floating ? root.floatingLoaderItem
+                                      : root.dockedLoaderItem
             return "INLINE_KEYBOARD_H:card=" + Math.round(card.height)
                    + ":win=" + (win ? Math.round(win.implicitHeight) : "-")
                    + ":zone=" + (win ? Math.round(win.exclusiveZone) : "-")
@@ -664,8 +725,32 @@ PluginComponent {
         }
 
         function setPage(p: string): string {
-            root.page = p
-            return "INLINE_KEYBOARD_PAGE:" + p
+            return "INLINE_KEYBOARD_PAGE:" + root.setPage(p)
+        }
+
+        // 调试用：表情页的段 / 分类（写的是卡片上的属性，和点分类条效果一致）
+        function setEmojiFilter(segment: string, category: string): string {
+            const card = root.activeCard
+            if (!card)
+                return "INLINE_KEYBOARD_EMOJI:no-card"
+            if (segment)
+                card.emojiSegment = segment
+            if (category)
+                card.emojiCategory = category
+            return "INLINE_KEYBOARD_EMOJI:" + card.emojiSegment + ":" + card.emojiCategory
+        }
+
+        // 调试用：走和点表情一模一样的上屏通路（addon commit / 剪贴板兜底）
+        function typeText(text: string): string {
+            return "INLINE_KEYBOARD_TEXT:" + root.typeText(text)
+                   + ":" + root.lastTextCommitVia
+        }
+
+        // 调试用：走和触摸换页键完全相同的入口（卡片 → handleKey），
+        // 验证换页分发而不是绕过它。setPage 是直接赋值，绕过 handleKey。
+        function pressPageKey(to: string): string {
+            root.handleKey({k: "page", to: to})
+            return "INLINE_KEYBOARD_PAGE:" + root.page
         }
 
         // 调试用：直接切 Fn 层（鼠标点击在 layer-shell 上还没验证通过）
@@ -696,6 +781,9 @@ PluginComponent {
             root.modifierRelease(Modifiers.keyDataFor(name))
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
+
+
+
 
         // 调试用：模拟按一个普通键（键码），返回所有修饰键状态
         function pressDebugKey(code: int, sym: string): string {
@@ -769,6 +857,29 @@ PluginComponent {
         }
 
         // 调试用：一次导出卡片 / daemon 的关键数组长度，定位「该显示的不显示」类问题
+        // 一行诊断串。排查键盘问题时这是第一个该看的东西：
+        // socket / 输入法 / 候选数 / 预编辑 / ydotool / 修饰键状态。
+        // 注意不能用可选链 ?. —— QML 的 JS 引擎不支持，整个文件会语法错误。
+        function diag(): string {
+            const parts = []
+            parts.push("open=" + root.open)
+            parts.push("floating=" + root.floating)
+            parts.push("socket=" + root.fcitxSocketUp)
+            parts.push("addonLog=" + root.fcitxLastError)
+            parts.push("im=" + root.fcitxImName + "/" + root.fcitxImLabel
+                       + (root.fcitxImKeyboard ? "(kb)" : "(ime)"))
+            parts.push("imList=" + root.imList.length)
+            const currentRow = root.imRows.find(r => r.current)
+            parts.push("imRows=" + root.imRows.length
+                       + " cur=" + (currentRow ? currentRow.label : "-"))
+            parts.push("cand=" + root.fcitxCandidates.length)
+            parts.push("preedit=" + JSON.stringify(root.fcitxPreedit))
+            parts.push("ydotoold=" + root.ydotooldUp)
+            parts.push("mods=" + root.stateSummary())
+            parts.push("lastError=" + (root.lastError || "-"))
+            return parts.join(" | ")
+        }
+
         function debugRows(): string {
             let out = ["im=" + root.fcitxImName,
                        "ascii=" + root.imAsciiMode,
@@ -793,119 +904,6 @@ PluginComponent {
                 + " list=" + root.imList.length
         }
 
-        function debugExpand(open: string): string {
-        // 接受 1 / true 两种写法（dms ipc call 传字符串）
-        const want = open === "1" || open === "true"
-        if (want)
-            root.requestAllCandidates()
-        // candExpanded 是卡片的属性，得通过 activeCard 设
-        const card = root.activeCard
-        if (card)
-            card.candExpanded = want
-        return "allCand=" + root.allCandidates.length
-            + " expanded=" + (card ? card.candExpanded : "no-card")
-            + " rows=" + root.imRows.length
-    }
-
-    // 调试：翻候选页（和右侧按钮同一条路径），顺便报告页码
-        // 调试：走和底部按钮完全相同的 handleQuick 路径
-        function debugQuick(action: string): string {
-        return root.safeCall("quick", () => {
-            root.handleQuick(action)
-            return "quick=" + action + " open=" + root.open
-        })
-    }
-
-        // 一次性汇总所有关键状态：定位问题时先跑这个，省得一样样问
-        function diag(): string {
-        const parts = []
-        parts.push("open=" + root.open)
-        parts.push("floating=" + root.floating)
-        parts.push("socket=" + root.fcitxSocketUp)
-        parts.push("addonLog=" + root.fcitxLastError)
-        parts.push("im=" + root.fcitxImName + "/" + root.fcitxImLabel
-                   + (root.fcitxImKeyboard ? "(kb)" : "(ime)"))
-        parts.push("imList=" + root.imList.length)
-        parts.push("imRows=" + root.imRows.length
-                   + " cur=" + (root.imRows.find(r => r.current)?.label || "-"))
-        parts.push("cand=" + root.fcitxCandidates.length
-                   + " all=" + root.allCandidates.length)
-        parts.push("preedit=" + JSON.stringify(root.fcitxPreedit))
-        parts.push("ydotoold=" + root.ydotooldUp)
-        parts.push("mods=" + root.stateSummary())
-        parts.push("lastError=" + (root.lastError || "-"))
-        return parts.join(" | ")
-    }
-
-        function debugPage(dir: string): string {
-        const card = root.activeCard
-        if (!card)
-            return "no-card"
-        const panel = card.candidatePanel
-        if (!panel)
-            return "no-panel"
-        if (dir === "up")
-            panel.prevPage()
-        else if (dir === "down")
-            panel.nextPage()
-        return "page=" + (panel.pageIndex + 1) + "/" + panel.pageCount
-            + " items=" + panel.pageModel.length
-            + " fit=" + card.candFitCount
-            + " overflow=" + card.candOverflow
-            + " poolLen=" + card.candPoolLen
-            + " barOverflow=" + card.candBarOverflow
-            + " hasMore=" + card.fcitxHasMore
-            + " bridgeMore=" + root.fcitxHasMore
-            + " vis=" + panel.visible
-            + " first=" + (panel.pageModel.length > 0 ? panel.pageModel[0] : "")
-    }
-
-    function debugImList(): string {
-        let names = []
-        for (let i = 0; i < root.imList.length; i++)
-            names.push(root.imList[i].name + ":" + root.imList[i].label)
-        return "count=" + root.imList.length
-            + " [" + names.join(", ") + "]"
-            + " cur=" + root.fcitxImName
-            + " ascii=" + root.imAsciiMode
-    }
-
-    function debugFcitx(): string {
-        return "path=" + root.fcitxStatusPath
-            + " items=" + root.fcitxCandidates.length
-            + " preedit=[" + root.fcitxPreedit + "]"
-            + " visible=" + root.fcitxVisible
-            + " im=" + root.fcitxImName
-            + " imicon=" + root.fcitxImIcon
-            + " open=" + root.open
-            + ":socket=" + fcitxSocket.connected
-            + " socket=" + fcitxSocket.connected
-    }
-
-    function debugState(): string {
-            const card = root.activeCard
-            let out = "INLINE_KEYBOARD_STATE:daemonActions=" + (root.actions || []).length
-                + ":daemonBar=" + (root.quickBarActions || []).length
-                + ":slot=" + root.slotActionId
-            if (!card)
-                return out + ":noCard"
-            return out + ":cardActions=" + (card.actionList || []).length
-                + ":cardBar=" + (card.quickBarActions || []).length
-                + ":avail=" + (card.availableActions || []).length
-                + ":availDirect=" + card.debugVisibleCount()
-                + ":cardFn=" + (card.modifierStates ? JSON.stringify(card.modifierStates) : "null")
-                + ":cardFnActive=" + card.fnActive
-                + ":barView=" + (card.quickBarResolved || []).length
-                + ":barViewIds=" + (card.quickBarResolved || []).map(a => (a && a.id) ? a.id : "?").join(",")
-                + ":ghost=" + (card.ghostAction ? card.ghostAction.id : "null")
-                + ":insertAt=" + (card.barDropPlan ? card.barDropPlan.insertedAt : "-")
-                + ":ids=" + (card.actionList || []).map(a => (a && a.id) ? a.id : "NO_ID").join(",")
-                + ":barIds=" + (card.quickBarActions || []).map(a => (a && a.id) ? a.id : "NO_ID").join(",")
-                + ":frozenBar=" + (card.frozenBar ? card.frozenBar.length : "null")
-                + ":frozenList=" + (card.frozenList ? card.frozenList.length : "null")
-                + ":mode=" + card.mode + ":editing=" + card.editing
-                + ":open=" + card.visible
-        }
 
         // 调试用：直接走 handleQuick 执行一次动作（验证自定义动作的命令链路）
         // 调试：直接把一次按键交给 handleKey（模拟点键盘）

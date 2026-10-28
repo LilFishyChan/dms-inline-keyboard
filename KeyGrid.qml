@@ -18,16 +18,6 @@ Item {
 
     readonly property var c: controller
 
-    // 表情页还没做：给一句明确的占位，别让用户对着空面板发呆
-    Text {
-        visible: grid.c.page === "emoji"
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: -grid.c.keyH * 0.5
-        text: grid.c.tr("Not implemented yet")
-        color: Theme.withAlpha(grid.c.fg, 0.45)
-        font.pixelSize: Math.round(grid.c.keyH * 0.42)
-    }
-
     Repeater {
         model: grid.c.flatKeys
 
@@ -52,21 +42,67 @@ Item {
             y: modelData.row * (grid.c.keyH + grid.c.gap)
 
             MouseArea {
+                id: keyMouse
                 anchors.fill: parent
                 enabled: !keyItem.isSpacer
+
+                // 只有「按住能连续产出内容」的键才重复。
+                // 判断必须按 label 白名单：k 是 "key" 的还有 Alt / Ctrl / Win /
+                // Tab / Enter / Esc / Home / End / PgUp / PgDn / Ins / NumLk /
+                // Print，一律不该重复——按住 Shift 不放会一直发 Shift。
+                readonly property bool repeatable: {
+                    const k = keyItem.keyData || {}
+                    if (k.k === "char" || k.k === "space")
+                        return true
+                    if (k.k !== "key")
+                        return false
+                    const label = k.l || ""
+                    return label === "Backspace" || label === "Del"
+                        || label === "End" || label === "Home"
+                        || label === "PgUp" || label === "PgDn"
+                }
+
                 onPressed: mouse => {
                     keyItem.pressRipple(mouse.x, mouse.y)
                     grid.c.modifierPressed(keyItem.keyData)
+                    // 可重复的键按下就出字，长按后由定时器接管
+                    if (repeatable) {
+                        grid.c.keyPressed(keyItem.effectiveKeyData)
+                        holdTimer.restart()
+                    }
                 }
                 onReleased: {
                     keyItem.releaseRipple()
                     grid.c.modifierReleased(keyItem.keyData)
+                    holdTimer.stop()
+                    repeatTimer.stop()
                 }
                 onCanceled: {
                     keyItem.releaseRipple()
                     grid.c.modifierReleased(keyItem.keyData)
+                    holdTimer.stop()
+                    repeatTimer.stop()
                 }
-                onClicked: grid.c.keyPressed(keyItem.effectiveKeyData)
+                onClicked: {
+                    if (!repeatable)
+                        grid.c.keyPressed(keyItem.effectiveKeyData)
+                }
+
+                // 长按判定：按住超过 400ms 开始重复
+                Timer {
+                    id: holdTimer
+                    interval: 400
+                    repeat: false
+                    onTriggered: repeatTimer.start()
+                }
+
+                // 重复间隔由设置决定（ydotool 输出间隔）
+                Timer {
+                    id: repeatTimer
+                    interval: Math.max(20, grid.c.repeatInterval || 60)
+                    repeat: true
+                    onTriggered: grid.c.keyPressed(keyItem.effectiveKeyData)
+                }
             }
         }
     }

@@ -175,7 +175,18 @@ Item {
             return
         if (sym) {
             const b = bridge
-            if (b && !b.imKeyboard && !hasComboModifier) {
+            // 三种情况走 ydotool 而不是 socket 直通：
+            //   · 英文模式：Virtual 事件会被当成「组合中」塞进 preedit，不上屏
+            //   · 退格且当前没有 preedit：fcitx5 会把它当成「没有可删的」直接
+            //     吞掉，删不到已上屏的文本
+            //   · 组合键 / 纯键盘布局（原本就有）
+            const backspaceWithNothingToDelete = sym === "Backspace" && b
+                && (b.preedit || "") === ""
+            // 数字键：rime 会把它们当候选序号选词，用户按 1 却打出候选词。
+            // 键盘上的数字就该是数字，一律走 ydotool。
+            const isDigit = /^[0-9]$/.test(sym)
+            if (b && !b.imKeyboard && !hasComboModifier && !b.isAsciiMode
+                && !backspaceWithNothingToDelete && !isDigit) {
                 const mods = shiftState ? 1 : 0
                 if (b.sendFcitx("key:" + sym + (mods ? ":" + mods : ""))) {
                     clearTransientModifiers()
