@@ -95,6 +95,11 @@ onCanceled: r.release()   // 按住后拖出去也得收掉
 - `mode: "functions"` —— 动作磁贴网格；`editing` 时进入拖放排序（列表 ↔ 快捷栏 ↔ 右上角槽）
 - `mode: "transparency"` —— 背景 / 按键两条透明度滑块；左上是确认，右上是取消（恢复进面板前的值）
 
+`mode` 管的是「主区显示哪块面板」；键位页是另一个维度（`page: page1 / page2 / emoji`）。
+表情页占 `page: "emoji"`，主区换成 `EmojiPanel`：顶部那行（`quickH`）从快捷栏换成
+`EmojiCategoryBar` 的分类条，中间是滚动网格，最后一行是「返回 / 表情·符号 / 退格」。
+卡片高度仍然按主键区 5 行算，所以切到表情页键盘不会变高变矮。
+
 ## 透明度的归属
 
 背景与按键透明度由插件自己存（`bgOpacity` / `keyOpacity`），叠加方式：面板底色乘 `bgOpacity`，

@@ -38,55 +38,19 @@ Item {
     visible: height > 0
     z: 20
 
-    // ---------- 候选池：只取前面一小段 ----------
-    // 候选栏只监控前 kPool 个，不追全量。
-    // 全量动辄上千个（长拼音串 rime 能生成 4000+），为了候选栏那一行去
-    // 拉全量纯属浪费：序列化 + 推送几十 KB，打字就卡了。
-    // 排不下的一律进展开列表，那里才需要全量。
-    readonly property int kPool: 18
+    // ---------- 候选池：由卡片统一算好的「前一段」 ----------
+    // 顶栏和候选列表页是同一个列表的两段：卡片按列表前几项量出容量
+    // （candBarCount），顶栏取 slice(0, n)，列表页取 slice(n)。
+    // 这里不再自己算，避免两边各量一次得出不同结果。
+    // 右侧留给展开按钮的那一列：一个标准键宽 + 间距
+    readonly property real trailW: unit + gap
 
-    // 顶部只取 items（addon 给的前 18 个，都是单字），宽度可算。
-    readonly property var pool: {
-        const arr = controller.candidates || []
-        return arr.length > kPool ? arr.slice(0, kPool) : arr
-    }
-
-    // 池子长度单独用一个 int 表示：pool 是 property var 存的数组，
-    // 内部元素变了不会通知绑定（QML 的经典坑）。int 是值类型，可靠。
-    readonly property int poolLen:
-        Math.min((controller.candidates || []).length, kPool)
+    readonly property var pool: controller ? controller.candBarSlice : []
+    readonly property int poolLen: pool.length
+    readonly property int fitCount: poolLen
 
     // 量文字宽度用（必须和下面 Text 的字体一致）
     readonly property int candFontSize: Math.round((controller.keyH || 64) * 0.42)
-
-    TextMetrics {
-        id: measure
-        font.pixelSize: candArea.candFontSize
-        font.weight: Font.Normal
-    }
-
-    // 能放下的候选个数：累加「文字宽 + 左右内边距 + 间距」，下一个放不下就停。
-    // 放不下的直接不画（没有展开列表了，超出部分由 clip 裁掉）。
-    readonly property real availWidth: {
-        return width - 10 - 6
-    }
-
-    readonly property int fitCount: {
-        const avail = availWidth
-        if (avail <= 0 || pool.length === 0)
-            return 0
-        let used = 0
-        let n = 0
-        for (let i = 0; i < pool.length; i++) {
-            measure.text = String(pool[i])
-            const w = measure.advanceWidth + unit * 2 / 3 + gap
-            if (used + w > avail)
-                break
-            used += w
-            n++
-        }
-        return n
-    }
 
     // ---------- 候选面板 ----------
     Rectangle {
@@ -99,9 +63,9 @@ Item {
             id: candRow
 
             anchors.left: parent.left
-            anchors.leftMargin: 10
             anchors.right: parent.right
-            anchors.rightMargin: 6
+            // 右边界留给展开按钮那一列，宽度和 listW 同式
+            anchors.rightMargin: candArea.trailW
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             spacing: candArea.gap
@@ -113,8 +77,18 @@ Item {
                 delegate: Item {
                     required property int index
 
+                    readonly property bool isFirst: index === 0
+                    // 首项最多占候选栏的三分之二，再长就省略**前面**
+                    // （输入法首项通常是用户正在打的那个词，末尾更要紧）。
+                    // 其余项省略末尾，和普通文本流的习惯一致。
+                    readonly property real firstMaxW: candArea.width * 2 / 3
+                    readonly property real pad: candArea.unit * 2 / 3
+                    readonly property real contentW: label.implicitWidth + pad
+                    readonly property real capW:
+                        isFirst ? Math.min(contentW, firstMaxW) : contentW
+
                     // 容器宽 = 文字 + 左右各 ⅓ 键宽
-                    width: label.implicitWidth + candArea.unit * 2 / 3
+                    width: capW
                     height: parent.height
 
                     Rectangle {
@@ -123,23 +97,38 @@ Item {
                         radius: 7
                         color: mouse.containsMouse
                                ? Theme.withAlpha(Theme.primary, 0.18)
-                               : (index === 0 ? Theme.withAlpha(Theme.primary, 0.13) : "transparent")
+                               : (isFirst ? Theme.withAlpha(Theme.primary, 0.13) : "transparent")
                     }
 
                     Text {
                         id: label
                         anchors.centerIn: parent
-                        text: String(candArea.pool[index] ?? "")
-                        color: index === 0 ? Theme.primary : candArea.controller.fg
+                        // 只在超出上限时才限制宽度，正常词按内容排
+                        width: Math.min(implicitWidth, Math.max(0, capW - pad))
+                        elide: isFirst ? Text.ElideLeft : Text.ElideRight
+                        // QML 的 JS 引擎不支持 ?? 和 ?.，用三元代替（踩过两次）
+                        text: {
+                            const item = candArea.pool[index]
+                            if (item === undefined || item === null)
+                                return ""
+                            return item.t !== undefined ? String(item.t)
+                                                        : String(item)
+                        }
+                        color: isFirst ? Theme.primary : candArea.controller.fg
                         font.pixelSize: candArea.candFontSize
-                        font.weight: index === 0 ? Font.DemiBold : Font.Normal
+                        font.weight: isFirst ? Font.DemiBold : Font.Normal
                     }
 
                     MouseArea {
                         id: mouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: candArea.controller.selectCandidate(index)
+                        onClicked: {
+                            // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
+                            const item = candArea.pool[index] || {}
+                            candArea.controller.selectCandidate(
+                                item.i !== undefined ? item.i : index)
+                        }
                     }
 
                     // 分隔线画在「间距正中间」：从容器右边缘往外推半个间距
@@ -155,6 +144,53 @@ Item {
             }
         }
 
+        // ---------- 展开按钮（右侧固定框，和顶部功能栏右边那个同款）----------
+        // 常驻显示：不管候选放不放得下都给入口，点它翻到候选列表页。
+        // 外层占满一列（一个标准键宽 + 间距），保证右侧留白和
+        // 候选列表页那一列严格对齐；里面那个圆按钮按 quickH 画，
+        // 和顶部功能栏右边的固定框同尺寸。
+        Item {
+            id: expandTrail
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: candArea.trailW
+            height: candArea.areaH
+
+            Rectangle {
+                id: expandButton
+
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.round(candArea.controller.quickH)
+                height: width
+                radius: width / 2
+                // 和 QuickBar 右侧固定框同一个底色
+                color: Theme.surfaceContainerHigh
+
+            Ripple {
+                anchors.fill: parent
+                cornerRadius: parent.height / 2
+            }
+
+            DankIcon {
+                anchors.centerIn: parent
+                name: "keyboard_arrow_down"
+                size: Math.round(candArea.controller.quickH * 0.5)
+                color: Theme.withAlpha(candArea.controller.fg, 0.8)
+                // 展开状态下转 180°，变成「收起」
+                rotation: candArea.controller.candListOpen ? 180 : 0
+                Behavior on rotation {
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
+            }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: candArea.controller.toggleCandList()
+                }
+            }
+        }
     }
 
     // ---------- 原文（在候选区上方，溢出卡片顶边）----------

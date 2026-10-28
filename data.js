@@ -48,6 +48,15 @@ function parseStatus(raw, prev) {
         // 还有没显示的候选（rime 的 bulk 列表没有 pageable，hasNext 恒 false，
         // addon 另外算了个 hasMore）。候选栏靠它决定要不要显示展开按钮。
         hasMore: !!d.hasMore,
+        // fcitx5 当前正在用的 UI 实现名。键盘开着但这个值不等于 self
+        // 时说明 UI 被 classicui 顶掉了，插件要发 reclaim 抢回来。
+        ui: typeof d.ui === "string" ? d.ui : "",
+        // addon 自己的 UI 名。和 ui 比就知道自己有没有被顶掉，
+        // 比在 QML 里硬编码字符串可靠（名字里的连字符很容易记错）。
+        self: typeof d.self === "string" ? d.self : "",
+        // 应用是否已经把预编辑画进了自己的输入框（fcitx5 的 Composing text）。
+        // 是的话键盘不要再画一遍，否则同一个拼音会显示两次。
+        embedded: !!d.embedded,
     };
 }
 
@@ -63,6 +72,11 @@ function cloneStatus(s) {
         hasPrev: !!s.hasPrev,
         hasNext: !!s.hasNext,
         hasMore: !!s.hasMore,
+        // 白名单式复制：漏一个字段就会让「解析失败原样返回 prev」这条契约
+        // 悄悄丢数据（ui 就这么丢过一次）。新增状态字段时记得加在这里。
+        ui: s.ui || "",
+        self: s.self || "",
+        embedded: !!s.embedded,
     };
 }
 

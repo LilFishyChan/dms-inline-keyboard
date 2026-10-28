@@ -75,11 +75,35 @@ PluginComponent {
     // ---- fcitx5 状态（实际存在 FcitxBridge 里，这里 alias 给卡片和窗口用）----
     readonly property alias fcitxCandidates: fcitxBridge.candidates
     readonly property alias fcitxPreedit: fcitxBridge.preedit
+
+    // addon 推回来的 label 已经是目标值了 → 立刻收起乐观态，
+    // 这样正常情况下切换是「瞬间到位」，不会白压 1 秒
+    onFcitxImLabelChanged: {
+        if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
+            root.optimisticImActive = false
+    }
     readonly property alias fcitxVisible: fcitxBridge.panelVisible
     readonly property alias fcitxImKeyboard: fcitxBridge.imKeyboard
     readonly property alias fcitxImName: fcitxBridge.imName
-    readonly property alias fcitxImLabel: fcitxBridge.imLabel
-    readonly property alias fcitxImIcon: fcitxBridge.imIcon
+    // 切换输入法时的乐观显示：点下地球键的那一刻就把图标/标签换成目标值，
+    // 不等 addon 回推。否则从 en 切到万象会先闪一下 abc 再变「万」——
+    // D-Bus 切输入法是异步的，中间那几百毫秒就在显示旧状态。
+    property string optimisticImLabel: ""
+    property string optimisticImIcon: ""
+    property bool optimisticImActive: false
+
+    // 乐观值最多压 1 秒。超时还没等到新状态就回落到真实值，
+    // 免得切换失败时图标永远停在目标输入法上。
+    Timer {
+        id: optimisticImTimer
+        interval: 1000
+        onTriggered: root.optimisticImActive = false
+    }
+
+    readonly property string fcitxImLabel: root.optimisticImActive
+        ? root.optimisticImLabel : fcitxBridge.imLabel
+    readonly property string fcitxImIcon: root.optimisticImActive
+        ? root.optimisticImIcon : fcitxBridge.imIcon
     readonly property alias fcitxHasPrev: fcitxBridge.hasPrev
     readonly property alias fcitxHasMore: fcitxBridge.hasMore
     readonly property alias fcitxSocketUp: fcitxBridge.socketUp
@@ -92,7 +116,14 @@ PluginComponent {
     // 为 true 时输入框里已经有拼音串了，键盘不要再重复显示。
     // 预编辑去重的实现先撤了：属性保留给 UI 引用，值恒 false，
     // 键盘照常画自己的预编辑行。
-    readonly property bool fcitxPreeditEmbedded: false
+    readonly property bool fcitxPreeditEmbedded: fcitxBridge.preeditEmbedded
+    // 全量候选（候选列表页用）
+    readonly property var allCandidates: fcitxBridge.allCandidates
+    readonly property int candRevision: fcitxBridge.candRevision
+
+    // 调试候选：终端这类不支持 text-input 的窗口里 fcitx5 不产生候选，
+    // 靠它把候选栏调出来看布局。真实候选非空时仍然以真实值为准。
+    property var debugCandItems: []
 
     // 转发给 FcitxBridge 的解析入口（statusRead 兜底和 debug 用）
     function applyFcitxStatus(raw) { fcitxBridge.applyStatus(raw) }
@@ -443,8 +474,10 @@ PluginComponent {
     readonly property var floatingLoaderItem: floatingLoader.item
 
     // 当前活动的键盘卡片（dock / float 两个 LazyLoader 之一）
-    // 属性名是 floating，不是 isFloating —— 后者在重构时删掉了，
-    // 这里一直读到一个 undefined，浮动模式下 activeCard 永远是 null（调试 IPC 全失效）
+    // 两个名字都在：daemon 上是 floating（真实状态，会持久化），
+    // card 上是 isFloating（由窗口传进去，给 actionStates 判断激活态用）。
+    // 这里必须读 floating —— 写成 isFloating 会读到 undefined，
+    // 浮动模式下 activeCard 永远是 null，调试 IPC 全失效。
     readonly property var activeCard: {
         const win = root.floating ? floatingLoader.item : dockedLoader.item
         return win ? win.cardRef : null
@@ -531,6 +564,9 @@ PluginComponent {
 
     function selectImMode(name, wantAscii) {
         root.selectIm(name)
+        // selectIm 里挂的是中文行，切到 ascii 时要换成对应行（标签是 abc）
+        if (wantAscii)
+            root.optimisticTo(root.imRows.find(r => r.name === name && r.ascii))
         // 等 fcitx5 切完输入法再设子模式：切输入法是异步的，
         // 立刻设会在旧输入法上生效（rs 切完就是中文，不用再设）。
         root.pendingAscii = wantAscii
@@ -551,13 +587,30 @@ PluginComponent {
             root.requestImList()
             return
         }
+        // 先把目标项的图标挂上去，别等 D-Bus 往返
+        root.optimisticTo(next)
         if (next.keyboard)
             root.selectIm(next.name)
         else
             root.selectImMode(next.name, next.ascii)
     }
 
+    // 切到某一项时先把它该显示的图标/标签挂上去（乐观显示）。
+    // row 是 imRows 里的一项；找不到就只压标签、图标保持原样。
+    function optimisticTo(row) {
+        if (!row) {
+            return
+        }
+        root.optimisticImLabel = row.label || ""
+        root.optimisticImIcon = row.icon || ""
+        root.optimisticImActive = true
+        optimisticImTimer.restart()
+    }
+
     function selectIm(name) {
+        // 乐观显示：中文行（非 ascii）的标签/图标先顶上
+        root.optimisticTo(root.imRows.find(r => r.name === name && !r.ascii))
+
         // 走 fcitx5 官方 D-Bus。
         // addon 里不能切：fcitx5 的 setCurrentInputMethod / enumerate 在第三方
         // addon 里（键盘窗口抢占焦点后）调用一律 ABORT，两种 API 都实测崩过。
@@ -596,6 +649,9 @@ PluginComponent {
             fcitxImIcon: root.fcitxImIcon
             fcitxImLabel: root.fcitxImLabel
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
+            debugCandItems: root.debugCandItems
+            allCandidates: root.allCandidates
+            candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
             fcitxVisible: root.fcitxVisible
             repeatInterval: root.repeatInterval
@@ -627,6 +683,7 @@ PluginComponent {
             onModifierPressed: keyData => root.modifierPress(keyData)
             onModifierReleased: keyData => root.modifierRelease(keyData)
             onTextCommitRequested: text => root.typeText(text)
+            onAllCandidatesRequested: fcitxBridge.requestAllCandidates()
             onKeyboardClosed: root.onKeyboardClosed()
         }
     }
@@ -654,6 +711,9 @@ PluginComponent {
             fcitxImIcon: root.fcitxImIcon
             fcitxImLabel: root.fcitxImLabel
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
+            debugCandItems: root.debugCandItems
+            allCandidates: root.allCandidates
+            candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
             fcitxVisible: root.fcitxVisible
             repeatInterval: root.repeatInterval
@@ -679,6 +739,7 @@ PluginComponent {
             onModifierPressed: keyData => root.modifierPress(keyData)
             onModifierReleased: keyData => root.modifierRelease(keyData)
             onTextCommitRequested: text => root.typeText(text)
+            onAllCandidatesRequested: fcitxBridge.requestAllCandidates()
             onKeyboardClosed: root.onKeyboardClosed()
         }
     }
@@ -872,12 +933,69 @@ PluginComponent {
             const currentRow = root.imRows.find(r => r.current)
             parts.push("imRows=" + root.imRows.length
                        + " cur=" + (currentRow ? currentRow.label : "-"))
-            parts.push("cand=" + root.fcitxCandidates.length)
+            parts.push("sel=" + (root.activeCard ? root.activeCard.lastSelectInfo : "-"))
+        // QML 侧真正显示给用户的输入法标签/图标（含乐观值）
+        parts.push("qLabel=" + root.fcitxImLabel)
+        parts.push("opt=" + (root.optimisticImActive ? "1" : "0"))
+            parts.push("candListOpen="
+                       + (root.activeCard ? root.activeCard.candListOpen : "-")
+                       + " loaderActive="
+                       + (root.activeCard
+                          ? (root.activeCard.children.length > 0 ? "?" : "?") : "-"))
+            parts.push("cand=" + root.fcitxCandidates.length
+                       + " dbg=" + root.debugCandItems.length
+                       + " all=" + root.allCandidates.length)
             parts.push("preedit=" + JSON.stringify(root.fcitxPreedit))
             parts.push("ydotoold=" + root.ydotooldUp)
             parts.push("mods=" + root.stateSummary())
             parts.push("lastError=" + (root.lastError || "-"))
             return parts.join(" | ")
+        }
+
+        // dms ipc call inlineKeyboard debugCand "一,二,三" 注入假候选；空串清除
+        // 参数必须标类型：不标会被推断成 QVariant，DMS 的 IPC
+        // 直接拒收（Error parsing function "debugCand": Type of argument 1
+        // (csv: QVariant) cannot be used across IPC）。
+        function debugCand(csv: string): string {
+            const text = String(csv || "")
+            root.debugCandItems = text === ""
+                ? [] : text.split(",").map(s => s.trim()).filter(s => s !== "")
+            return root.debugCandItems.length + " 项"
+        }
+
+        // dms ipc call inlineKeyboard debugCandList   切换候选列表页
+        function debugCandList(): string {
+            const card = root.activeCard
+            if (!card)
+                return "no-card"
+            const before = card.candListOpen
+            card.toggleCandList()
+            const after = card.candListOpen
+            return "before=" + before + " after=" + after
+                + " model=" + card.candListModel.length
+                + " bar=" + card.candBarItems.length
+                + " n=" + card.candBarCount
+                + " list=" + card.candListItems.length
+                + " barFirst=" + (card.candBarItems.length > 0
+                                  ? card.candBarItems[0].t : "-")
+                + " listFirst=" + (card.candListItems.length > 0
+                                   ? card.candListItems[0].t : "-")
+        }
+
+        function debugPanel(): string {
+            const card = root.activeCard
+            if (!card)
+                return "no-card"
+            const panel = card.candListPanel
+            if (!panel)
+                return "no-panel open=" + card.candListOpen
+            return "open=" + card.candListOpen
+                + " slice=" + card.candListSlice.length
+                + " items=" + panel.items.length
+                + " contentH=" + Math.round(panel.contentH)
+                + " w=" + Math.round(panel.width)
+                + " listW=" + Math.round(panel.listW)
+                + " active=" + panel.active
         }
 
         function debugRows(): string {

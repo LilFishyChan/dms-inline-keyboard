@@ -64,8 +64,35 @@ Rectangle {
         root.keyPressed({k: "page", to: target})
     }
 
+    // 最近一次选词：元素是「传进 addon 的 index」和「此刻该下标对应的词」。
+    // 列表是切片出来的，显示位置和原始下标不是一回事，所以要对照着看。
+    // 用属性而不是 console.log：dms 里 console.log 不一定进 journal。
+    property string lastSelectInfo: ""
+
     function selectCandidate(index) {
+        const item = root.candListModel[index]
+        root.lastSelectInfo = "idx=" + index
+            + " word=" + (item && item.t !== undefined ? item.t : "?")
+            + " at=" + Date.now()
         root.selectCandidateRequested(index)
+
+        // 选词后立刻重拉全量并立刻重排，两条 debounce/throttle 都绕过。
+        //
+        // 那 800ms 是给打字用的（rime 的 BulkCandidateList 懒加载，取一次
+        // 要跨页生成）；选词是明确的用户动作，而且列表页本来就不会用来
+        // 连续打字，没有「连续输入」要合并，等它只会让列表明显滞后。
+        if (root.candListOpen) {
+            root.recentSelect = true
+            selectWindowTimer.restart()
+            candReloadTimer.stop()
+            root.candLoading = true
+            root.allCandidatesRequested()
+            candLoadGuard.restart()
+            // 先把当前状态立刻刷上去；addon 回包后 candDataSeq 会再 ++ 一次，
+            // 那次走的就是下面的 recentSelect 分支，同样是立即的
+            if (candListPanel)
+                candListPanel.forceRelayout()
+        }
     }
 
     // 有候选才显示候选行；没有候选时退回快捷键行
@@ -436,6 +463,274 @@ Rectangle {
     // debounce 350ms：跨页遍历 rime 的候选挺慢（懒加载，取第 N 个要先生成
     // 前面的），每敲一个键都拉会把 fcitx5 的事件循环堵住，打字一格一格跳。
     property var fcitxCandidates: []
+    // 调试注入的假候选（dms ipc call inlineKeyboard debugCand "一,二,三"）。
+    // 终端这类不支持 text-input 的窗口里 fcitx5 不产生候选，
+    // 没有它就没法把候选栏调出来看布局。非空时优先于真实候选用。
+    property var debugCandItems: []
+    // 候选列表页是否展开。展开时键区让位（真换页，不是盖一层），
+    // 否则下面的按键还会被点到。
+    property bool candListOpen: false
+    // 候选面板引用（调试用）
+    property var candListPanel: null
+    // 候选内容变化计数（FcitxBridge.candRevision 传下来）
+    property int candRevision: 0
+    onCandRevisionChanged: {
+        if (!root.candListOpen)
+            return
+        if (root.recentSelect) {
+            // 选词刚发生：这是选词引起的候选变化，立刻处理
+            candReloadTimer.stop()
+            root.allCandidatesRequested()
+            if (candListPanel)
+                candListPanel.forceRelayout()
+            return
+        }
+        // 普通打字：走 800ms，合并连续的按键
+        candReloadTimer.restart()
+    }
+
+    // 选词窗口：600ms 后恢复正常（覆盖 addon 回包 + 一次状态推送）
+    Timer {
+        id: selectWindowTimer
+        interval: 600
+        repeat: false
+        onTriggered: root.recentSelect = false
+    }
+    // 全量候选（窗口从 FcitxBridge 转发下来）
+    property var allCandidates: []
+    // 正在等 addon 回包
+    property bool candLoading: false
+    // 「刚选过词」窗口：选词是明确动作，列表页此时也不会再打字，
+    // 所以这段时间里候选变化要立刻处理，不能走 800ms 的打字 debounce。
+    property bool recentSelect: false
+    // 主键区行数，候选列表页的滚动区高度按它算
+    readonly property int keyRowCount: Layout.pageRows("page1").length
+
+    // 候选列表页的数据源：真实全量候选优先；调试注入的 {i,t} 兜底
+    // 调试候选的 {i,t} 形态缓存：debugCandItems 每变一次才重建，
+    // 不用每次读 candListModel 都 map 一遍（1000 词就是 1000 个对象）。
+    property var debugCandModel: []
+
+    // addon 推的顶部候选也是纯字符串数组，同样要缓存成 {i,t}，
+    // 否则 candListModel 每次求值都要 map 一遍（18 个对象/次）。
+    property var fcitxModel: []
+
+    onDebugCandItemsChanged: {
+        debugCandModel = root.debugCandItems.map(
+            (t, n) => ({ i: n, t: String(t) }))
+        root.recomputeCandBar()
+    }
+
+    onFcitxCandidatesChanged: {
+        fcitxModel = root.fcitxCandidates.map(
+            (t, n) => ({ i: n, t: String(t) }))
+        // 候选栏的数据源就是 fcitxModel，它一变就要重算容量 + 重排。
+        // 以前这两件事挂在 candListModel 上，但那个属性现在只服务列表页
+        // （全量懒加载），打字时的实时更新根本到不了它。
+        root.recomputeCandBar()
+        root.candDataSeq++
+    }
+
+    // 候选**列表页**的数据源：全量优先。
+    //
+    // 注意它不能拿来喂候选栏：allCandidates 是懒加载的（只有展开列表时
+    // 才拉一次），一旦它非空，items 的实时更新就再也传不进来了 ——
+    // 这就是「输入长串 → 展开 → 选词 → 收起后候选栏不更新」的 100% 复现。
+    // 候选栏走下面的 candBarSource。
+    readonly property var candListModel: {
+        if (root.allCandidates.length > 0)
+            return root.allCandidates
+        if (root.debugCandModel.length > 0)
+            return root.debugCandModel
+        return root.fcitxModel
+    }
+
+    // 候选**栏**的数据源：永远用 items（addon 每 40ms 推的实时顶部候选）。
+    // 调试注入时用调试数据。
+    readonly property var candBarSource: {
+        if (root.debugCandModel.length > 0)
+            return root.debugCandModel
+        return root.fcitxModel
+    }
+
+    // 候选栏能装下 candListModel 的前几项。
+    //
+    // 语义：候选栏和候选列表是**同一个列表的两段** —— 前面装进顶栏，
+    // 剩下的进列表页，两边不重复。所以容量必须按同一份数据算，
+    // 而且要用列表**前面的项**去量宽度（而不是拿一个假想的平均数）。
+    //
+    // 不能写成 property 绑定：量文字要改 measure.text，而结果又依赖
+    // measure.advanceWidth，Qt 会判定成绑定循环（实测狂刷 Binding loop）。
+    property int candBarCount: 0
+
+    // 顶栏词区的可用宽度：卡片宽减去两侧内边距，再减右侧那一列
+    readonly property real candBarAvail:
+        Math.max(0, root.width - root.pad * 2 - (root.unit + root.gap))
+
+    TextMetrics {
+        id: candMeasure
+        font.pixelSize: Math.round(root.keyH * 0.42)
+        font.weight: Font.Normal
+    }
+
+    function recomputeCandBar() {
+        const list = root.candBarSource
+        if (!list || list.length === 0 || root.candBarAvail <= 0) {
+            root.candBarCount = 0
+            return
+        }
+        const avail = root.candBarAvail
+        // 首项最多占候选栏的三分之二，再长就省略前面（见 CandidateBar）
+        const firstMax = avail * 2 / 3
+        let used = 0
+        let n = 0
+        for (let i = 0; i < list.length; i++) {
+            const t = list[i] && list[i].t !== undefined
+                      ? String(list[i].t) : String(list[i] || "")
+            candMeasure.text = t
+            let w = candMeasure.advanceWidth + root.unit * 2 / 3 + root.gap
+            if (i === 0 && w > firstMax)
+                w = firstMax
+            if (used + w > avail)
+                break
+            used += w
+            n++
+        }
+
+        root.candBarCount = n
+        // 只有这里才切一次数组，下游读的是稳定引用
+        root.candBarItems = n <= 0 ? [] : list.slice(0, n)
+        // 列表页从候选栏之后开始，避免和顶栏重复。
+        // 两边数据源不同（栏是实时 items，列表是懒加载的全量），但顺序
+        // 由 rime 保证一致：全量的前 n 个就是 items 的前 n 个。
+        //
+        // 全量还没回来的这一小段（展开后几十毫秒）先留空：回落数据源是
+        // 顶部那 18 项 items，用它渲染只会显示残缺的十来个，
+        // 等全量到了再变长 —— 看起来就是「要展开两次才完整」。
+        const waiting = root.candListOpen && root.candLoading
+            && root.allCandidates.length === 0
+        root.candListItems = waiting ? []
+            : (n >= root.candListModel.length
+               ? [] : root.candListModel.slice(n))
+    }
+
+    onWidthChanged: recomputeCandBar()
+    onUnitChanged: recomputeCandBar()
+    onGapChanged: recomputeCandBar()
+    Component.onCompleted: recomputeCandBar()
+
+    // 候选栏显示前一段
+    // 候选栏实际显示的项，以及列表页的输入（不含顶栏部分）。
+    // 都在 recomputeCandBar() 里一次性存好：slice 每次调用都会新建数组，
+    // 让下游 Repeater 误以为数据全换了，跟着重建 delegate。
+    property var candBarItems: []
+    property var candListItems: []
+    readonly property var candBarSlice: candBarItems
+
+    // 候选列表页显示后一段（不含顶栏已有的，避免重复）。
+    //
+    // 只切「现在要画的那一窗」，不是整个后段：候选页每换一次候选都会
+    // 重建 Repeater，切 2000 个再截断比切 400 个慢三倍多
+    // （实测展开状态连续换候选：57ms -> 预计 20ms 以内）。
+    // candListTotal 给面板算滚动位置和「还有多少」用。
+    readonly property int candListTotal:
+        Math.max(0, root.candListModel.length - Math.max(0, root.candBarCount))
+
+    // 候选数据的版本号：candListModel 的任何来源变了都 ++。
+    // 不能只靠 candRevision（那是 FcitxBridge 的推送计数，debugCand
+    // 这种直接改属性的路径根本不经过它，面板就永远不重排）。
+    property int candDataSeq: 0
+
+    onCandListModelChanged: {
+        // 顺序很重要：先重算切分，再发版本号。反过来的话面板收到
+        // candDataSeq 变化时 candListSlice 还是旧的，要等下一个节流窗口
+        // 才纠正 —— 表现就是「展开两次才对」。
+        root.recomputeCandBar()
+        root.candDataSeq++
+    }
+
+    // 全量回来了就结束载入态。之前只有 1200ms 的超时兜底会复位，
+    // 数据早就到了却还在显示「载入中」。
+    onAllCandidatesChanged: {
+        if (root.allCandidates.length > 0)
+            root.candLoading = false
+    }
+
+    // 预编辑字符串一消失，列表页就自动收起。
+    //
+    // 判据只看 fcitxPreedit：那是 fcitx5 当前正在组词的那串（拼音/预编辑），
+    // 它空掉就意味着这一轮输入结束了，列表再留着也没有内容可变。
+    // 不看候选项数量——rime 提交后候选可能还剩一页残留，但用户已经选完了。
+    //
+    // 80ms 防抖：连续选字时 rime 可能刚清空又立刻给出下一串，
+    // 期间只要 preedit 重新有内容，条件就不成立、定时器不触发。
+    // 调试注入不算结束，否则 debugCand 模式下 fcitxPreedit 恒空、一展开就被收起。
+    readonly property bool candsFinished:
+        candListOpen
+        && fcitxPreedit === ""
+        && debugCandItems.length === 0
+
+    onCandsFinishedChanged: if (candsFinished) autoCollapseTimer.restart()
+
+    Timer {
+        id: autoCollapseTimer
+        interval: 80
+        repeat: false
+        onTriggered: {
+            if (!root.candsFinished)
+                return
+            root.candListOpen = false
+            root.recentSelect = false
+        }
+    }
+
+    // 候选列表页拿全量后段。渲染量由 CandidatePanel 自己虚拟化控制
+    // （只实例化可视行），所以这里不需要再切窗口。
+    readonly property var candListSlice: root.candListItems
+
+    // 展开 / 收起候选列表页。打开时顺手要一次全量候选：
+    // addon 只在收到 expand 时才遍历 BulkCandidateList（rime 懒加载，
+    // 取第 7 个得先生成下一页，有成本），不能每次状态推送都拉。
+    function toggleCandList() {
+        root.candListOpen = !root.candListOpen
+        if (root.candListOpen) {
+            root.candLoading = true
+            root.allCandidatesRequested()
+            // addon 正常几十毫秒就回包；这里只是兜底，避免没装 addon 时
+            // 面板永远停在「载入中」
+            candLoadGuard.restart()
+        } else {
+            candLoadGuard.stop()
+            root.candLoading = false
+        }
+    }
+
+    // 展开状态下候选变了 → 重新拉全量。
+    // 加 debounce：打字时每次按键都会 ++，等停手再拉，
+    // 否则每打一个字就遍历一遍 BulkCandidateList（rime 懒加载，有成本）。
+    Timer {
+        id: candReloadTimer
+        // 800ms：rime 的 BulkCandidateList 是懒加载，取一次要跨页生成，
+        // 展开状态下每打几个字就重拉太贵（实测是主要的 CPU 抖动来源）。
+        interval: 800
+        repeat: false
+        onTriggered: {
+            if (root.candListOpen) {
+                root.candLoading = true
+                root.allCandidatesRequested()
+                candLoadGuard.restart()
+            }
+        }
+    }
+
+    Timer {
+        id: candLoadGuard
+        interval: 1200
+        repeat: false
+        onTriggered: root.candLoading = false
+    }
+
+    signal allCandidatesRequested()
     // 当前输入法是否纯键盘布局（这类输入法没有候选，不显示候选栏）
     property bool fcitxImKeyboard: false
     // 还有没显示的候选（addon 算的，不是 hasNext）
@@ -697,11 +992,37 @@ Rectangle {
                 return lines * root.keyH + Math.max(0, lines - 1) * root.gap
             }
 
+            // ---- 候选列表页 ----
+            // 必须用 Loader 的 active 而不是 visible：visible: false 的子项
+            // 仍然会被实例化（Repeater 把上千个 delegate 全建出来），
+            // 而 active: false 时整棵子树根本不存在。
+            // 实测 2000 个候选、未展开时 RSS 只多 40KB 是因为 Qt 延迟分配，
+            // 但对象确实都建了，反复开关会累积。
+            // 一直持有，只切可见性。
+            // 之前用 Loader active 控制「未展开时完全不创建」，但实测反复
+            // 展开/收起会在销毁那一刻把内存冲到 6GB 并搞崩 qs —— 大子树
+            // 的销毁/重建比一直持有贵得多。现在改成常驻 + 隐藏，内部
+            // 靠 shownCount 控制实际实例化数量（默认一屏 60 项）。
+            CandidatePanel {
+                id: candListPanel
+                Component.onCompleted: root.candListPanel = candListPanel
+
+                // 度量（unit/keyH/gap/rowCount）和候选数据全从卡片拿，
+                // 漏了这一行会导致 unit/gap 取默认兜底值，列表宽度算错
+                controller: root
+
+                anchors.fill: parent
+                visible: root.candListOpen
+                // 收起时把渲染量归零，避免隐藏状态下仍持有几百个 delegate
+                shownCountOverride: root.candListOpen ? -1 : 0
+            }
+
             // ---- 键区 ----
             KeyGrid {
                 controller: root
                 anchors.fill: parent
                 visible: root.mode === "keys" && root.page !== "emoji"
+                         && !root.candListOpen
             }
 
             // ---- 表情 / 符号页 ----
@@ -709,6 +1030,7 @@ Rectangle {
                 controller: root
                 anchors.fill: parent
                 visible: root.mode === "keys" && root.page === "emoji"
+                         && !root.candListOpen
             }
 
             // ---- 透明度调整面板 ----

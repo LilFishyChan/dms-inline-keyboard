@@ -2,7 +2,7 @@
     "id": "inlineKeyboard",
     "name": "Inline Keyboard",
     "description": "Touch keyboard for DMS with fcitx5-backed candidates (kimpanel)",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "license": "GPL-3.0-only",
     "author": "LilFishyChan",
     "icon": "keyboard",

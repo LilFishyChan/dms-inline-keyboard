@@ -23,6 +23,12 @@ PanelWindow {
     property var fcitxCandidates: []
     // 当前输入法是否纯键盘布局（无候选能力）
     property bool fcitxImKeyboard: false
+    // 调试候选（daemon 的 debugCand 注入），非空时优先显示
+    property var debugCandItems: []
+    // 全量候选（daemon 从 FcitxBridge 转发）
+    property var allCandidates: []
+    property int candRevision: 0
+    signal allCandidatesRequested()
     property bool fcitxHasMore: false
     property string fcitxImIcon: ""
     property string fcitxImLabel: ""
@@ -43,8 +49,8 @@ PanelWindow {
     //   · rime abc：英文直接上屏，fcitx5 不弹候选窗 → 不显示
     //   · keyboard-us：纯键盘布局 → 不显示
     // 高度由 topArea 固定预留（candH），所以显隐不会让键盘跳动。
-    property bool showCandBar: root.fcitxCandidates.length > 0
-        && !root.fcitxImKeyboard
+    property bool showCandBar:
+        root.fcitxCandidates.length > 0 || root.debugCandItems.length > 0
 
     // 由 daemon 托管的键盘状态
     property bool fnActive: false
@@ -154,6 +160,9 @@ PanelWindow {
         pad: metrics.pad
         candH: root.candH
         showCandBar: root.showCandBar
+        debugCandItems: root.debugCandItems
+        allCandidates: root.allCandidates
+        candRevision: root.candRevision
         handleH: metrics.handleH
         quickH: metrics.quickH
         showHandle: true
@@ -196,5 +205,6 @@ PanelWindow {
         onModifierPressed: keyData => root.modifierPressed(keyData)
         onModifierReleased: keyData => root.modifierReleased(keyData)
         onTextCommitRequested: text => root.textCommitRequested(text)
+        onAllCandidatesRequested: root.allCandidatesRequested()
     }
 }

@@ -5,4 +5,7 @@ __pycache__/
 *.log
 build/
 
+# gen-emoji.py 的 Unicode 原始数据缓存（生成产物 layouts/emoji.js 是提交的）
+tools/.cache/
+
 # addon 是 submodule（独立仓库，AUR 用）

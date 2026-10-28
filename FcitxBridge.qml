@@ -46,9 +46,25 @@ Item {
     // 这个字段由 addon 另外算（第 19 个候选还取不取得到）。
     property bool hasMore: false
 
+    // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，
+    // 带下标是为了让显示层做去重/剔除时不破坏选词准确性。
+    property var allCandidates: []
+
+    // 候选内容真的变了才加一。
+    //
+    // 不能直接监听 candidates：addon 每 40ms 推一次状态、每次都是新数组，
+    // 数组替换会触发 onChanged，定时器被无限重启、永远到不了头（踩过）。
+    // int 是值类型，只在「数量 / 首项 / 预编辑」真的变了时才 ++。
+    property int candRevision: 0
+
     // ---- 输入法清单 ----
 
     property var imList: []
+
+    // 每个输入法上一次见到的子模式标签（rime 中文是「万」这种）。
+    // 输入法清单里只有它自己的标识（rime 是「ㄓ」），切过去的瞬间
+    // addon 还没来得及推子模式，直接用清单值就会先闪一下「ㄓ」再变「万」。
+    property var imLabelCache: ({})
 
     // ---- 诊断 ----
     // socket 是否连着。断开说明 fcitx5 重启了或 addon 没加载。
@@ -57,14 +73,61 @@ Item {
     // 不认识的指令、内部异常都会走到这里，不再静默丢弃。
     property string lastError: ""
 
+    // fcitx5 当前正在用的 UI 实现名（addon 的 state.ui）。
+    // 键盘开着但这个值不等于 selfUi，说明 UI 被 classicui 顶掉了。
+    property string currentUi: ""
+
+    // addon 自己的 UI 名（由 addon 在 state 里给出），用来判断 UI 是否被顶掉
+    property string selfUi: ""
+
+    // 应用是否已把预编辑渲染进自己的输入框（true 时键盘不再重复显示）
+    property bool preeditEmbedded: false
+
+    // 上次 reclaim 的时间戳（ms），用来做 5 秒限流
+    property double lastReclaimAt: 0
+
     // 平铺的「输入法 + 子模式」列表：地球键循环和下拉菜单共用同一份数据。
     // 构造逻辑在 data.js（有单测覆盖 current 唯一性）。
-    readonly property var imRows: Data.buildImRows(imList, imName, imLabel)
+    // 把缓存过的子模式标签补进清单，再交给 buildImRows。
+    // 只补键盘型之外的输入法：keyboard-us 的 label 就是「en」，不该被覆盖。
+    readonly property var imListForRows: {
+        // 不要写 root.*：本文件的 id 是 bridge，root 会解析到外层组件上去，
+        // 拿到 undefined（实测报 "Cannot read property 'keyboard-us' of undefined"）
+        const cache = bridge.imLabelCache
+        const src = bridge.imList
+        if (!src || src.length === 0)
+            return src
+        const out = []
+        for (let i = 0; i < src.length; i++) {
+            const im = src[i]
+            const cached = cache[im.name]
+            out.push((im.keyboard || !cached)
+                     ? im : Object.assign({}, im, { label: cached }))
+        }
+        return out
+    }
+
+    readonly property var imRows: Data.buildImRows(imListForRows, imName, imLabel)
 
     // 当前是否英文字模式（按子模式标签是否为纯 ASCII 字母判断）
     readonly property bool isAsciiMode: Data.isAsciiMode(imLabel)
 
     // ------------------------------------------------------------------
+
+    // 逐项比较两个字符串数组。用来判断 addon 这次推的 items 和上次是不是
+    // 真的不一样 —— parseStatus 每次都 JSON.parse 出新数组，哪怕内容相同，
+    // 直接赋值也会让下游的 candListModel / 重排全部重跑一遍。
+    function sameStrings(a, b) {
+        if (a === b)
+            return true
+        if (!a || !b || a.length !== b.length)
+            return false
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] !== b[i])
+                return false
+        }
+        return true
+    }
 
     function applyStatus(raw) {
         // data.js 的 parseStatus 解析失败时返回上一次的副本，
@@ -75,16 +138,61 @@ Item {
             imLabel: imLabel, imIcon: imIcon,
             hasPrev: hasPrev, hasNext: hasNext, hasMore: hasMore,
         })
-        candidates = st.items
-        preedit = st.preedit
+        const prevLen = candidates.length
+        const prevFirst = prevLen > 0 ? String(candidates[0]) : ""
+        const prevPre = preedit
+
+        // 只在内容真的变了才赋值。这一句挡住的是「数组对象换了但内容一样」
+        // 的推送（打字时很常见：每次按键 addon 都会给一份新 items）。
+        const itemsChanged = !sameStrings(candidates, st.items)
+        if (itemsChanged)
+            candidates = st.items
+        if (preedit !== st.preedit)
+            preedit = st.preedit
+        if (itemsChanged
+                || (candidates.length > 0 && String(candidates[0]) !== prevFirst)
+                || preedit !== prevPre)
+            candRevision++
         panelVisible = st.visible
         imKeyboard = st.keyboard
         imName = st.im
         imLabel = st.imLabel
         imIcon = st.imIcon
+
+        // 记住这个输入法的中文子模式标签，供下次切换时先显示。
+        // 同样不能写 root.*（那份是外层组件），否则缓存永远是空的。
+        if (st.im !== "" && st.imLabel !== "" && !Data.isAsciiMode(st.imLabel)) {
+            if (bridge.imLabelCache[st.im] !== st.imLabel) {
+                const next = Object.assign({}, bridge.imLabelCache)
+                next[st.im] = st.imLabel
+                bridge.imLabelCache = next
+            }
+        }
         hasPrev = st.hasPrev
         hasNext = st.hasNext
         hasMore = st.hasMore
+        currentUi = st.ui
+        selfUi = st.self
+        preeditEmbedded = st.embedded
+
+        // UI 被 classicui 顶掉时自己抢回来。
+        //
+        // addon 那边完全按 fcitx5 官方语义走：InputContextFocusOut 会调
+        // hideVirtualKeyboard()，它就把 shown_ 置 false 并把 UI 交还 classicui。
+        // 但失焦不等于用户收起键盘（截图、切窗口都会失焦），键盘是否真的
+        // 还开着只有插件知道，所以「要不要抢回来」在这里判断。
+        //
+        // 限流 5 秒：reclaim 会触发 setInputMethodMode -> updateAvailability，
+        // 本身又会发一次 UIChanged，不限流会绕着回调链打转。
+        if (bridge.keyboardOpen && st.ui !== "" && st.self !== ""
+                && st.ui !== st.self) {
+            const nowMs = Date.now()
+            if (nowMs - bridge.lastReclaimAt >= 5000) {
+                bridge.lastReclaimAt = nowMs
+                console.error("[inline-keyboard/fcitx] ui=" + st.ui + " 不是自己，reclaim")
+                sendFcitx("reclaim")
+            }
+        }
     }
 
     function applyImList(raw) {
@@ -98,6 +206,17 @@ Item {
             applyStatus(line.substring(6))
         } else if (line.startsWith("imlist:")) {
             applyImList(line.substring(7))
+        } else if (line.startsWith("allcand:")) {
+            try {
+                const arr = JSON.parse(line.substring(8))
+                if (Array.isArray(arr)) {
+                    // 新格式 [{i,t}]；旧 addon 给纯字符串数组，补上下标
+                    allCandidates = arr.map((x, n) => (x && typeof x === "object")
+                        ? x : { i: n, t: String(x == null ? "" : x) })
+                }
+            } catch (e) {
+                console.error("[inline-keyboard/fcitx] 全量候选解析失败: " + e)
+            }
         } else if (line.startsWith("error:")) {
             lastError = line.substring(6)
             // addon 不认 text:（还没升级）→ 以后直接走剪贴板
@@ -143,6 +262,12 @@ Item {
         return true
     }
 
+    // 向 addon 要全量候选。addon 用 BulkCandidateList::candidateFromAll
+    // 一次取完，直接推 allcand:[{i,t}...]，不写文件也不轮询。
+    function requestAllCandidates() {
+        return sendFcitx("expand")
+    }
+
     // 选第 N 个候选。index 是 addon 的 candidateFromAll 全局下标。
     // 走 socket 的 select: 命令——addon 重写后不再读 inline-keyboard-select 文件，
     // 之前写文件的做法会让选词静默失效（点了没反应，也不报错）。
@@ -157,6 +282,13 @@ Item {
     Socket {
         id: socket
         path: bridge.socketPath
+
+        // Quickshell 的 Socket 只暴露 connected，没有 onDisconnected /
+        // onSocketError 可接（查 qmltypes 确认：这两个是 C++ 侧槽名，QML 里
+        // 写上去会直接 "Cannot assign to non-existent property"，整个
+        // FcitxBridge 加载失败、插件变 disabled）。所以掉线只能靠
+        // connected 属性变化 + 重连 Timer 兜，别指望事件通知。
+
         // DataStream 不设 parser 就永远不会触发 read —— 连上了也收不到字节。
         parser: SplitParser {
             splitMarker: "\n"
@@ -180,9 +312,16 @@ Item {
         }
     }
 
-    // 键盘收起就把连接还回去，别赖着
-    onKeyboardOpenChanged: if (!keyboardOpen && socket.connected)
-                               socket.connected = false
+    // 键盘收起就把连接还回去，别赖着。
+    //
+    // 打开这一侧不用做任何事：addon 在 acceptClient 里就把 shown_ 置 true
+    // 并切到 OnScreenKeyboard 了（socket 连上 = 键盘开了，这是它唯一的
+    // 开关信号）。这里如果也发 mode:osk，会和 addon 内部的
+    // setInputMethodMode -> hide/showVirtualKeyboard 回调链撞在一起。
+    onKeyboardOpenChanged: {
+        if (!keyboardOpen && socket.connected)
+            socket.connected = false
+    }
 
     // 剪贴板兜底：wl-copy 直接吃文本参数，不经过 shell，省掉转义问题
     Process {

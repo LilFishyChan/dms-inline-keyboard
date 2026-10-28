@@ -105,10 +105,11 @@ Item {
             height: quickBar.cellH
             radius: quickBar.cellH / 2
             // 非编辑态普通动作不要底色（只图标）；编辑态给 surfaceContainer 方便拖；
-            // 激活态一律主题色实心
+            // 激活态和右侧动作槽统一：surfaceContainerHigh 底 + primary 图标。
+            // 不用主题色实心 —— 那一排里两个"选中"用两种画法会显得像两套设计。
             color: controller.editing
                    ? Theme.surfaceContainer
-                   : (isActive ? Theme.primary : "transparent")
+                   : (isActive ? Theme.surfaceContainerHigh : "transparent")
             opacity: leaving ? 0 : (isDisabled ? 0.5 : 1)
             z: leaving ? 0 : 1
             Behavior on x {
@@ -123,7 +124,11 @@ Item {
                 anchors.centerIn: parent
                 action: modelData
                 size: Math.round(controller.quickH * 0.5)
-                color: isActive ? Theme.onPrimary : Theme.withAlpha(controller.fg, 0.85)
+                // 编辑态下所有动作都按默认形态显示：那是在排布动作，
+                // 不是在看状态，染色只会干扰对「拖哪个」的判断。
+                color: (!controller.editing && isActive)
+                       ? Theme.primary
+                       : Theme.withAlpha(controller.fg, 0.85)
             }
 
             MouseArea {
@@ -197,6 +202,10 @@ Item {
             // 右侧槽用 rightSlot 的内容（可被拖动替换）
             readonly property var slotData: isSlot
                 ? controller.rightSlot : ({icon: "", action: ""})
+            // 槽里动作的状态提到外层：底色和图标颜色都要用，之前只在
+            // ActionIcon 内部算了一份
+            readonly property string slotState: isSlot && slotData
+                ? (controller.actionStates[slotData.id] || "default") : "default"
 
             // 第一个按钮在"确认"场景（编辑态 / 透明度面板）都是主题色底 + 白色对钩
             readonly property bool isConfirm: index === 0
@@ -221,7 +230,9 @@ Item {
             width: quickBar.btnW
             height: quickBar.btnW
             radius: width / 2
-            // 固定按钮常驻一点底色，编辑态换成主题色底
+            // 固定按钮常驻一点底色，编辑态换成拖动提示底色。
+            // 激活态就是默认底色（surfaceContainerHigh）+ primary 图标，
+            // 和顶部动作栏一致；只有「确认」按钮是主题色实心。
             color: isConfirm
                    ? Theme.primary
                    : (controller.editing && isSlot
@@ -259,11 +270,11 @@ Item {
                 visible: isSlot && controller.mode !== "transparency" && slotShow !== null
                 action: slotShow
                 size: Math.round(controller.quickH * 0.5)
-                readonly property string slotState: isSlot && slotShow
-                    ? (controller.actionStates[slotShow.id] || "default") : "default"
+                readonly property string slotState: parent.slotState
+                // 编辑态下统一显示默认形态（见顶部动作块的同款说明）
                 color: slotGhost ? Theme.primary
                                  : (isConfirm ? Theme.surface
-                                              : (slotState === "active"
+                                              : ((!controller.editing && slotState === "active")
                                                  ? Theme.primary
                                                  : Theme.withAlpha(controller.fg,
                                                                    slotState === "disabled" ? 0.4 : 0.8)))

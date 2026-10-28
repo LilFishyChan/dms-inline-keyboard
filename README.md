@@ -80,12 +80,16 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `ImPicker.qml` | Input-method picker shown on long-press of the globe |
 | `DragGhost.qml` | Follow-the-finger block while dragging an action |
 | `BottomBar.qml` | Bottom handle row: collapse, input method, fcitx5 tray icon |
+| `EmojiPanel.qml` | Emoji / symbol grid + the bottom row (back / emoji·symbols / backspace) |
+| `EmojiCategoryBar.qml` | Category chips shown in the top bar on the emoji page |
 | `Key.qml` | One key: two-line cap, Fn layer substitution, ripple |
 | `ActionIcon.qml` | One action icon — shared by list / quick bar / slot / drag ghost |
 | `Ripple.qml`, `Slider.qml` | Small widgets used by keys, buttons and the opacity panel |
 | `InlineKeyboardWidget.qml` | Optional DankBar pill that toggles the same global "open" var |
 | `actions.js` | **Pure** action-list logic (sanitize, move, filter, hit-test). Unit-tested |
 | `layouts/phone.js` | Layout data: rows, units, key maps, function-key pages |
+| `layouts/emoji.js` | **Generated**: emoji groups (Unicode 16) + symbol groups |
+| `tools/gen-emoji.py` | Regenerates `layouts/emoji.js` from Unicode's `emoji-test.txt` |
 | `scripts/im-icon.py` | Reads the fcitx5 tray `IconPixmap` and writes a PNG for the key |
 | `scripts/im-list.py` | Lists installed input methods (name \| label) for the picker |
 | `translations/` | Per-locale strings (`zh_CN.json`); source strings stay English |
@@ -100,7 +104,8 @@ node --test tests/        # pure logic: actions.js
 qmllint *.qml             # static check (qs.* imports resolve only inside DMS)
 
 # deploy to this machine and to the tablet, then restart DMS
-rsync -a --exclude=.git --exclude=prototype --exclude=docs --exclude=tests ./ \
+rsync -a --exclude=.git --exclude=prototype --exclude=docs --exclude=tests \
+      --exclude=fcitx5-addon ./ \
       ~/.config/dms/plugins/inlineKeyboard/
 rm -rf ~/.cache/quickshell/qmlcache          # QML disk cache must be cleared
 systemctl --user restart dms
@@ -119,7 +124,10 @@ longer exist. A change inside a nested component sometimes survives
 | `dms ipc call inlineKeyboard open` / `close` / `toggle` | Show / hide / toggle the keyboard |
 | `dms ipc call inlineKeyboard toggleFloat` | Switch docked ↔ floating |
 | `dms ipc call inlineKeyboard setMode <keys\|functions\|transparency>` | Switch page |
-| `dms ipc call inlineKeyboard setPage <page1\|page2>` | Key page |
+| `dms ipc call inlineKeyboard setPage <page1\|page2\|emoji>` | Key page |
+| `dms ipc call inlineKeyboard pressPageKey <page1\|page2\|emoji>` | Press a page key (same path as a touch) — debugging aid |
+| `dms ipc call inlineKeyboard setEmojiFilter <emoji\|symbol\|\"\"> <category\|all>` | Emoji page segment / category — debugging aid |
+| `dms ipc call inlineKeyboard typeText <text>` | Insert text exactly like tapping an emoji — debugging aid |
 | `dms ipc call inlineKeyboard setEditing <bool>` | Edit mode (drag to reorder / move to the quick bar) |
 | `dms ipc call inlineKeyboard setQuickBar <id,id,...>` | Put these actions in the quick bar (`""` to clear) — debugging aid |
 | `dms ipc call inlineKeyboard toggleFn` | Toggle the Fn layer |
@@ -129,6 +137,33 @@ longer exist. A change inside a nested component sometimes survives
 | `dms ipc call inlineKeyboard setModifierMode <noLock\|toggle\|tapLock\|doubleTapLock>` | Switch the modifier behaviour at runtime — debugging aid |
 | `dms ipc call inlineKeyboard modifierStates` / `pressDebugKey <code>` | Dump modifier states / press a normal key by keycode — debugging aid |
 | `dms ipc call inlineKeyboard resetActions` | Restore the default action set |
+
+## Emoji & symbols
+
+The mood key in the bottom row of the first key page opens the emoji page. It
+lives inside the same card (same height, same top/bottom bars), switched by
+`page: "emoji"` rather than by `mode`.
+
+- **Top bar** — category chips: `All` plus the nine Unicode groups on the emoji
+  side, and eight symbol groups (math, punctuation, arrows, currency, shapes,
+  box drawing, numbers, misc) on the symbol side. The bar scrolls sideways when
+  it does not fit.
+- **Middle** — a scrolling grid, four rows high, the column count follows the
+  card width.
+- **Bottom row** — `Back`, the `Emoji | Symbols` segment switch, and backspace
+  (hold to repeat).
+
+Insertion does **not** go through the key-injection path. `EmojiPanel` only
+reports the character; the daemon hands it to the fcitx5 addon, which calls
+`InputContext::commitString()` in-process. A ZWJ emoji (`👨‍👩‍👧`) is several code
+points and cannot be expressed as keycodes, so this is the only path that
+works. Without the addon the character is copied to the clipboard instead; if
+`wl-copy` is missing as well, a toast says so rather than pretending it worked.
+
+`layouts/emoji.js` is **generated**: `python3 tools/gen-emoji.py` reads
+Unicode 16's `emoji-test.txt` (cached under `tools/.cache/`) and writes 1900
+emoji — skin-tone variants are deliberately left out — plus the symbol tables.
+The generated file is committed, so users never need Python at runtime.
 
 ## Edit mode
 
