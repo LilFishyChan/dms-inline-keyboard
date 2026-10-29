@@ -5,34 +5,48 @@ A DMS plugin: on-screen keyboard laid out like a phone IME (Gboard-ish), with
 fcitx5's **kimpanel** DBus protocol and be drawn inside the keyboard, so Chinese
 input no longer needs a separate popup window.
 
-> Status: the layout and the whole interaction surface are done (two key pages,
-> Fn layer, action grid with drag-to-reorder, floating mode, opacity panel).
-> **Key injection is not wired yet** — pressing a letter only reports
-> `keyPressed` from the card; the daemon does not send it to `ydotool` yet.
-> What already really runs: the fcitx5 tray icon, input-method switching and the
-> picker, undo/redo (via `ydotool`), settings/ clipboard actions.
-> The kimpanel candidate bridge is also still open — `CandidateBar.qml` shows
-> demo data.
+> Status: feature-complete and in daily use on two devices (a desktop and a
+> Xiaomi Pad 5 running Arch Linux ARM). Everything below works end to end:
+> key injection through `ydotool`, fcitx5 candidates drawn inside the keyboard,
+> candidate list page, two key pages + Fn layer, action grid with
+> drag-to-reorder, docked and floating modes with position dragging, opacity
+> panel, resize panel, emoji/symbol page, per-locale strings.
+>
+> See [Verified in practice](#verified-in-practice) for what was actually
+> exercised on hardware, and [AI assistance](#ai-assistance) for how this was
+> built.
 
 ## Design
 
 ```text
  key press ──ydotool──▶ compositor ──▶ focused app ──text-input──▶ fcitx5
-                                                                      │
-         keyboard surface (QML)  ◀────────candidates────── kimpanel ◀──┘
-                │                                    (org.kde.impanel)
-                └── click candidate ──SelectCandidate──▶ fcitx5 ──▶ commit
+                                                                     │
+                                                        fcitx5 addon │
+                                                     (inline-keyboard-status)
+                                                                     │
+ keyboard surface (QML)  ◀────────state / candidates─── Unix socket ──┘
+                │
+                └── key / select / commit ──▶ addon ──▶ fcitx5
 ```
 
-- Keys are meant to be injected as Linux input-event keycodes via `ydotool`
-  (`ydotoold` required), consumed through `uinput`. No input-method protocol is
-  taken over, so fcitx5 keeps serving the physical keyboard as usual.
-- Candidates are meant to arrive as a DBus method call (`SetLookupTable`) on a
-  small helper process that registers `org.kde.impanel`.
+- **Keys go out through `ydotool`** (`ydotoold` required, `uinput`-backed). To
+  the compositor they are a real keyboard, so modifiers, Alt+Tab, Mod+number and
+  `Print` behave natively. No virtual-keyboard protocol is involved.
+- **Candidates come from a purpose-built fcitx5 addon**, not kimpanel. The addon
+  (`fcitx5-addon/`, a separate repository, also packaged as a submodule here)
+  is a `UserInterface` implementation: it claims the `OnScreenKeyboard` role
+  while the keyboard is open, pushes `{preedit, candidates, im, imlabel, …}` as
+  one JSON line per update over a Unix socket, and accepts
+  `key:` / `select:` / `text:` / `expand` / `reclaim` / `release` back. Push
+  only — there is no polling.
+- Keys **short-circuit into fcitx5** instead of going through `ydotool` when the
+  current input method has an engine and no Ctrl/Alt/Super is held. Digits,
+  ASCII mode, and backspace-with-empty-preedit always fall back to `ydotool`.
 - The surface is a layer-shell `PanelWindow` with `keyboardFocus: None`, so
-  injected keys land on the app, not on the keyboard.
-- The floating window opts out of exclusive zones (`exclusionMode: Ignore`), so
-  it can be dragged over the bar instead of being pushed under it.
+  injected keys land on the app, never on the keyboard.
+- Docked mode sizes the window to the keyboard plus the preedit reserve and sets
+  `exclusiveZone`, so other windows are pushed up. Floating mode opts out
+  (`exclusionMode: Ignore`) so it can be dragged over the bar.
 
 Verified constraints and the full interface table: `docs/fcitx5-kimpanel.md`.
 Geometry and layout rules: `docs/layout.md`.
@@ -47,8 +61,16 @@ Geometry and layout rules: `docs/layout.md`.
   compositor. That is why typing, modifiers and compositor shortcuts (Alt+Tab, Mod+number,
   `Print`) all behave natively — no virtual-keyboard protocol, no binding lookup.
 - `fcitx5` with an active input method (pinyin/rime)
-- Python 3 with **`python-dbus`** and **`python-pillow`** (tray-icon / input-method
-  scripts). `StartupCheck.qml` refuses to enable the plugin without them.
+- The **`inline-keyboard-status` fcitx5 addon** — the keyboard only gets candidates and
+  input-method state through it. Without the addon the keyboard still types, but
+  the candidate strip stays empty and the globe key cannot switch context:
+  ```sh
+  cd fcitx5-addon && cmake -B build && ninja -C build
+  cp build/inline-keyboard-status.so ~/.local/lib/fcitx5/
+  # the .conf must carry the real library path, not @LIBDIR@
+  cp src/inline-keyboard-status.conf ~/.local/share/fcitx5/addon/
+  systemctl --user restart 'app-org.fcitx.Fcitx5@autostart.service'
+  ```
 - DMS ≥ 2.0 (`~/.config/dms/plugins/`; 1.6.x uses `~/.config/DankMaterialShell/plugins/`)
 
 ## Install
@@ -75,7 +97,7 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `KeyboardCard.qml` | Card shell: shared state, drag state machine, page switching, composition |
 | `QuickBar.qml` | Top quick bar: nav button, quick actions, circular slot |
 | `ActionList.qml` | Function action grid, edit mode, drag-to-reorder |
-| `CandidateBar.qml` | Candidate strip (demo data until the kimpanel bridge lands) |
+| `CandidateBar.qml` | Candidate strip — first item elided from the left, the rest from the right |
 | `TransparencyPanel.qml`, `OpacitySliderRow.qml` | The two-slider opacity panel |
 | `ImPicker.qml` | Input-method picker shown on long-press of the globe |
 | `DragGhost.qml` | Follow-the-finger block while dragging an action |
@@ -90,8 +112,8 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `layouts/phone.js` | Layout data: rows, units, key maps, function-key pages |
 | `layouts/emoji.js` | **Generated**: emoji groups (Unicode 16) + symbol groups |
 | `tools/gen-emoji.py` | Regenerates `layouts/emoji.js` from Unicode's `emoji-test.txt` |
-| `scripts/im-icon.py` | Reads the fcitx5 tray `IconPixmap` and writes a PNG for the key |
-| `scripts/im-list.py` | Lists installed input methods (name \| label) for the picker |
+| `fcitx5-addon/` | The fcitx5 addon (own git repo + submodule): state push, candidate bulk list, key/select/commit commands |
+| `scripts/` | Legacy helpers kept for the tray icon / input-method list fallbacks |
 | `translations/` | Per-locale strings (`zh_CN.json`); source strings stay English |
 | `icons/` | Hand-drawn SVG (the "floating" glyph) |
 | `prototype/` | HTML mockups used before writing QML (not deployed) |
@@ -123,7 +145,7 @@ longer exist. A change inside a nested component sometimes survives
 |---|---|
 | `dms ipc call inlineKeyboard open` / `close` / `toggle` | Show / hide / toggle the keyboard |
 | `dms ipc call inlineKeyboard toggleFloat` | Switch docked ↔ floating |
-| `dms ipc call inlineKeyboard setMode <keys\|functions\|transparency>` | Switch page |
+| `dms ipc call inlineKeyboard setMode <keys\|functions\|transparency\|resize>` | Switch page |
 | `dms ipc call inlineKeyboard setPage <page1\|page2\|emoji>` | Key page |
 | `dms ipc call inlineKeyboard pressPageKey <page1\|page2\|emoji>` | Press a page key (same path as a touch) — debugging aid |
 | `dms ipc call inlineKeyboard setEmojiFilter <emoji\|symbol\|\"\"> <category\|all>` | Emoji page segment / category — debugging aid |
@@ -271,16 +293,58 @@ QML is constructed**, and only on `I18n.onLocaleApplied` (i.e. at DMS start):
   error in the journal — the failure mode looks exactly like "translation not
   loaded".
 
+## Verified in practice
+
+Not "written and assumed to work" — the items below were exercised on real
+hardware (desktop + Xiaomi Pad 5 with a touchscreen), with either unit tests or
+IPC/diagnostic output backing the claim:
+
+| Area | How it was verified |
+|---|---|
+| Pure logic (action list, drag plans, modifier state machine, candidate slicing, resize arithmetic, special-key tables) | `node --test tests/` — **188 assertions** |
+| Addon protocol (state push, bulk candidate list, key/select/commit) | round-tripped against a live fcitx5; journal shows one line per state change |
+| Key injection | real typing into applications through `ydotool`, on both devices |
+| Candidates + preedit drawn in-keyboard | live rime 万象 input, candidate list opened/closed/scrolled |
+| Input-method switching (globe key, long-press picker) | tapped on the tablet; the label on the space bar follows every tap |
+| Docked / floating switch, position dragging, resize panel, opacity panel | used on the tablet; geometry confirmed from IPC values, not screenshots |
+| Emoji / symbol insertion | tapped on hardware; falls back to `wl-copy` without the addon |
+| Translations (zh_CN) | strings switched at runtime and compared on screen |
+
+Regressions found this way are listed as commits against the source, not as
+claims in this README.
+
+## AI assistance
+
+This plugin was **built with substantial AI assistance** — pair-programmed
+through Hermes Agent (an AI coding agent) together with the author, who drove
+the design decisions, tested every build on real devices, and rejected plenty
+of wrong turns along the way.
+
+Being explicit about that, because it matters for anyone evaluating the code:
+
+- **Every claim in "Verified in practice" was actually executed.** The test suite
+  runs; the addon round-trips against a live fcitx5; the keyboard was typed on
+  in real applications on two machines. Nothing here rests on "the code looks
+  right".
+- **AI-written code is reviewed like any other code.** Naming, duplication,
+  comment accuracy and error handling follow the repository's own standards;
+  `qmllint` and the unit tests gate every change.
+- **Known weak spot, stated openly:** the QML surface layer (layout, gesture
+  feel, visual alignment) is the part AI is worst at. Those pieces were tuned
+  through many iterations against real touch input, and the diagnostic IPC
+  commands under `### IPC` exist partly because that loop is where bugs kept
+  hiding. Expect the pure-logic modules to be the most dependable and the
+  gesture/animation polish to be the most "hand-tuned".
+- **No AI-generated code was merged without running it.** If you find something
+  that contradicts the table above, that is a bug — please open an issue.
+
 ## Roadmap
 
-1. Key injection: `keyPressed` → `ydotool` keycodes (incl. modifiers, long-press
-   repeat on backspace)
-2. Candidate bar: `SetLookupTable` → QML, tap to commit, page up/down,
-   in-keyboard preedit
-3. Space commits the first candidate when a candidate list is open
-4. Modifier behaviour: double-tap / long-press lock (settings-driven)
-5. Long-press alternate characters
-6. Rime 万象 integration, and reconciling fcitx5's own status window with DMS
+1. Splitting `KeyboardCard.qml` (~1400 lines / 130 properties) into smaller
+   components — the resize panel and candidate panel are the obvious first cuts
+2. Long-press alternate characters on the letter keys
+3. Optional: space commits the first candidate while a candidate list is open
+4. More layouts beyond the current phone-style pages
 
 ## License
 

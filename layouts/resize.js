@@ -39,7 +39,7 @@ function clamp(value, low, high) {
 //   start:     { w, h },        按下时的尺寸
 //   dx, dy:    相对按下点的位移（屏幕坐标）
 //   minW/minH/maxW/maxH:        上下限
-//   symmetric: 左右对称调整（停靠模式拖两侧时 true）
+//   symmetric:  横轴对称（拖左边时右边等量跟进）
 //   aspect:    宽高比（> 0 时四角按它等比缩放；<= 0 表示不锁比例）
 // }
 // 返回 { w, h }，已经 clamp 到上下限内。

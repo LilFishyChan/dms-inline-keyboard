@@ -57,6 +57,32 @@ Item {
     readonly property int columns: controller.actionListColumns
     readonly property real cellW: (fnScroll.width - (columns - 1) * controller.gap) / columns
 
+    // 拖到了「无效位置」：既不在列表里，也不在快捷栏 / 右上角槽上。
+    // 这时松手不会调整任何顺序，所以列表要保持原样、幽灵回到它自己那一格 ——
+    // 否则整列前移，看着像要把这一项删掉。
+    readonly property bool dropNoop: controller !== null && controller.dragActive
+        && controller.dragIndex >= 0
+        && controller.dragTarget < 0
+        && !controller.dragOverBar && !controller.dragOverSlot
+
+    // 幽灵块该画在第几格 —— 必须是「松手后这一项实际会落到的格子」：
+    //   · 无效落点：留在原格（dropNoop）
+    //   · 列表内拖动：取出再插回，总数不变，所以最后能占的格子是 count-1。
+    //     不夹的话，拖最后一项到末尾时幽灵会多占一格，它自己原来的格子空出来
+    //     （看着就是「幽灵前面空一列」）。
+    //   · 从快捷栏 / 右上角槽拖进来：列表会多一项，真的落在 dragTarget
+    //     （可能等于 count，即新的一格）。
+    readonly property int ghostPlaceIndex: {
+        if (!controller)
+            return -1
+        if (controller.dragTarget < 0)
+            return functionsArea.dropNoop ? controller.dragIndex : -1
+        const count = (controller.availableActions || []).length
+        if (controller.dragIndex < 0)
+            return controller.dragTarget
+        return Math.min(controller.dragTarget, Math.max(0, count - 1))
+    }
+
     // 编辑态顶部空出的一行：拖动提示
     Item {
         id: editHint
@@ -108,20 +134,28 @@ Item {
         Item {
             id: fnGrid
             width: fnScroll.width
-            height: Math.max(1, Math.ceil((controller.availableActions || []).length
-                                          / functionsArea.columns))
+            readonly property int count: (controller.availableActions || []).length
+            // 幽灵落在 count 格（只可能发生在「从快捷栏拖进来」），而 count 又正好
+            // 是列数的整数倍时，那一格在下一行 —— 得把网格临时撑高一行才看得见。
+            readonly property bool extraRow: controller.ghostAction !== null
+                && count > 0 && functionsArea.ghostPlaceIndex >= count
+                && count % Math.max(1, functionsArea.columns) === 0
+            height: (Math.max(1, Math.ceil(count / functionsArea.columns)) + (extraRow ? 1 : 0))
                     * (controller.keyH + controller.gap) - controller.gap
 
             // 目标位置：松开后动作会落到这里（幽灵块样式，和固定栏一致）
             GhostBlock {
                 id: dropShadow
-                active: controller.ghostAction !== null && controller.dragTarget >= 0
+                active: controller.ghostAction !== null
+                        && (controller.dragTarget >= 0 || functionsArea.dropNoop)
                         && !controller.dragOverSlot && !controller.dragOverBar
                 action: controller.ghostAction
                 label: controller.ghostAction ? controller.tr(controller.ghostAction.label) : ""
-                x: (controller.dragTarget % functionsArea.columns)
+                // 位置来自 functionsArea.ghostPlaceIndex（松手后实际落到的格子），
+                // 不是 dragTarget 原值 —— 见那边注释
+                x: (functionsArea.ghostPlaceIndex % functionsArea.columns)
                    * (functionsArea.cellW + controller.gap)
-                y: Math.floor(controller.dragTarget / functionsArea.columns)
+                y: Math.floor(functionsArea.ghostPlaceIndex / functionsArea.columns)
                    * (controller.keyH + controller.gap)
                 width: functionsArea.cellW
                 height: controller.keyH
@@ -161,10 +195,12 @@ Item {
                     readonly property int shift: {
                         if (!controller.editing || !controller.dragActive)
                             return 0
-                        // 拖出列表（去固定栏 / 槽）：源格之后整体前移一格，
-                        // 源格自己已经 opacity 0，不能留一个空位
+                        // 拖出列表、落在有效目标（固定栏 / 槽）：源格之后整体前移一格，
+                        // 源格自己已经 opacity 0，不能留一个空位。
+                        // 落在无效位置（键盘外）：什么都不动 —— 松手后顺序也不会调整。
                         if (controller.dragIndex >= 0 && controller.dragTarget < 0)
-                            return index > controller.dragIndex ? -1 : 0
+                            return functionsArea.dropNoop
+                                ? 0 : (index > controller.dragIndex ? -1 : 0)
                         if (controller.dragTarget < 0)
                             return 0
                         // 从快捷栏/槽拖进列表：没有源索引，target 之后的全部后移一位

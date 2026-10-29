@@ -14,7 +14,10 @@ Item {
     // KeyboardCard 根
     property var controller: null
 
-    readonly property var groups: controller.emojiSegment === "symbol"
+    // 符号页（± × ÷ § ¶）和表情页共用一个网格，但符号字形本身比 emoji
+    // 高得多，用同一个缩放系数会显得过大，所以分开算
+    readonly property bool isSymbolPage: controller.emojiSegment === "symbol"
+    readonly property var groups: panel.isSymbolPage
                                   ? Emoji.symbolGroups : Emoji.emojiGroups
 
     // 当前分类的字符表；"all" = 该段所有分组顺次拼起来
@@ -84,16 +87,41 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: cell.modelData
-                    // 表情字形本身有留白，乘 0.62 之后视觉大小才和键帽文字接近
-                    font.pixelSize: Math.round(Math.min(cell.width, cell.height) * 0.62)
+                    // 表情字形本身有留白，乘 0.62 之后视觉大小才和键帽文字接近；
+                    // 符号没有这层留白，同一系数会顶满格子，用小一号
+                    font.pixelSize: Math.round(Math.min(cell.width, cell.height)
+                                               * (panel.isSymbolPage ? 0.48 : 0.62))
                     color: panel.controller.fg
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
 
+                // 涟漪：由 TapHandler 的 pressed 驱动 —— 这里不能挂 MouseArea，
+                // 那会抢走 GridView 的拖动，表情列表就滑不动了
+                Ripple {
+                    id: cellRipple
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    cornerRadius: Theme.cornerRadius
+                }
+
                 TapHandler {
                     id: tap
                     onTapped: panel.controller.textCommitRequested(cell.modelData)
+                    onPressedChanged: {
+                        // 诊断：centroid 在这个 Qt 版本里是 null，point 才是当前触点
+                        const p = tap.point ? tap.point.position : null
+                        console.error("[emoji/ripple] pressed=" + pressed
+                                      + " point=" + (p ? (p.x + "," + p.y) : "null")
+                                      + " cell=" + Math.round(cell.width) + "x" + Math.round(cell.height))
+                        if (pressed) {
+                            const pt = (p && !isNaN(p.x) && !isNaN(p.y))
+                                       ? p : Qt.point(cell.width / 2, cell.height / 2)
+                            cellRipple.press(pt.x, pt.y)
+                        } else {
+                            cellRipple.release()
+                        }
+                    }
                 }
             }
         }
@@ -149,9 +177,25 @@ Item {
                 font.pixelSize: Math.round(parent.height * 0.34)
             }
 
+            // 涟漪：和格子一样挂在 TapHandler 上（centroid 这版是 null，用 point）
+            Ripple {
+                id: backRipple
+                anchors.fill: parent
+                cornerRadius: height / 2
+            }
+
             TapHandler {
                 id: backTap
                 onTapped: panel.controller.goPage("page1")
+                onPressedChanged: {
+                    if (pressed) {
+                        const p = backTap.point ? backTap.point.position : null
+                        backRipple.press(p && !isNaN(p.x) ? p.x : backBtn.width / 2,
+                                         p && !isNaN(p.y) ? p.y : backBtn.height / 2)
+                    } else {
+                        backRipple.release()
+                    }
+                }
             }
         }
 
@@ -199,7 +243,15 @@ Item {
                             font.weight: parent.active ? Font.DemiBold : Font.Normal
                         }
 
+                        Ripple {
+                            id: segRipple
+                            anchors.fill: parent
+                            cornerRadius: height / 2
+                            rippleColor: active ? Theme.onPrimary : Theme.primary
+                        }
+
                         TapHandler {
+                            id: segTap
                             onTapped: {
                                 if (panel.controller.emojiSegment === modelData.id)
                                     return
@@ -207,6 +259,16 @@ Item {
                                 // 留着旧的会落到「找不到 → 回全部」的隐式兜底，不如显式清掉
                                 panel.controller.emojiSegment = modelData.id
                                 panel.controller.emojiCategory = "all"
+                            }
+                            onPressedChanged: {
+                                if (pressed) {
+                                    const p = segTap.point ? segTap.point.position : null
+                                    const w = segLabel.width + segmentBox.height * 0.70
+                                    segRipple.press(p && !isNaN(p.x) ? p.x : w / 2,
+                                                    p && !isNaN(p.y) ? p.y : segmentBox.height * 0.41)
+                                } else {
+                                    segRipple.release()
+                                }
                             }
                         }
                     }
@@ -232,13 +294,23 @@ Item {
                 color: Theme.withAlpha(panel.controller.fg, 0.85)
             }
 
+            Ripple {
+                id: bsRipple
+                anchors.fill: parent
+                cornerRadius: height / 2
+            }
+
             TapHandler {
                 id: bsTap
                 onPressedChanged: {
                     if (pressed) {
+                        const p = bsTap.point ? bsTap.point.position : null
+                        bsRipple.press(p && !isNaN(p.x) ? p.x : backspaceBtn.width / 2,
+                                       p && !isNaN(p.y) ? p.y : backspaceBtn.height / 2)
                         panel.didRepeat = false
                         backDelay.start()
                     } else {
+                        bsRipple.release()
                         backDelay.stop()
                         backRepeat.stop()
                     }

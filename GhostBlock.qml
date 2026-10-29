@@ -38,6 +38,12 @@ Rectangle {
         color: Theme.primary
         iconSize: root.iconSize
         pixelSize: Math.max(12, Math.round(root.height * 0.29))
+        // 不给上限时 ActionLabel 用 implicitWidth，elide 又是 ElideNone，
+        // 名字一长就直接冲出幽灵块右边界。给宽后它自动切 HorizontalFit。
+        // 可用宽 = 块宽 − 左内边距 − 图标 − 图标右侧留白
+        maxLabelWidth: Math.max(24, root.width
+                                - Math.round(root.height * 0.34) * 2
+                                - root.iconSize * 2 - 1)
         dividerOpacity: 0.45
     }
 

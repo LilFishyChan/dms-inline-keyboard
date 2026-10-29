@@ -15,12 +15,20 @@ PanelWindow {
 
     property bool keyboardVisible: false
     property bool avoidWindows: true
+    // 语音输入是否在录音（决定顶部是否切到语音行）
+    property bool voiceActive: false
+    // 语音模式：只留顶部语音行
+    property bool voiceMinimal: false
+    signal voiceMicRequested()
+    // vinput 是否可用（可选扩展，没装就禁用语音动作）
+    property bool voiceAvailable: false
     property real bgOpacity: 1.0
     property int repeatInterval: 60
     property real keyOpacity: 1.0
     // 特殊键形态设置（见 layouts/special-keys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
+    property string winKeyCustomIcon: ""
     // 调整大小：预览尺寸 / 名义尺寸 / 屏幕尺寸
     property real resizeW: 1050
     property real resizeH: 444
@@ -77,6 +85,7 @@ PanelWindow {
     property string mode: "keys"
     property bool editing: false
     signal quickAction(string action)
+    signal voiceMinimalRequested()
     property var imList: []
     signal imSwitchRequested()
     signal imListRequested()
@@ -116,7 +125,8 @@ PanelWindow {
         keyboardClosed()
     }
 
-    visible: keyboardVisible
+    visible: keyboardVisible && !root.voiceMinimal
+
     color: "transparent"
 
     anchors {
@@ -145,7 +155,7 @@ PanelWindow {
     // 关键：**恒定预留**。原来按「当前有没有 preedit」动态加减 42px，
     // 打字时整个键盘（连 exclusiveZone）会忽高忽低，下面的窗口跟着抖。
     readonly property real preeditReserve: Math.round(root.candH * 0.95)
-    implicitHeight: root.kbHeight + preeditReserve
+    implicitHeight: metrics.cardHeight + preeditReserve
 
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
@@ -166,9 +176,12 @@ PanelWindow {
     mask: Region {
         x: Math.round(card.x)
         y: Math.max(0, Math.round(card.y - root.preeditReserve))
-        width: Math.round(card.width)
-        height: Math.max(0, Math.round(root.height - Math.max(0,
-                Math.round(card.y - root.preeditReserve))))
+        // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，
+        // layer surface 的 mask 还留在屏幕上继续吃点击
+        //（语音模式下主键盘隐藏，但它的 mask 正好盖住胶囊，按钮全点不动）
+        width: root.visible ? Math.round(card.width) : 0
+        height: root.visible ? Math.max(0, Math.round(root.height - Math.max(0,
+                Math.round(card.y - root.preeditReserve)))) : 0
     }
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
@@ -204,10 +217,14 @@ PanelWindow {
         mode: root.mode
         editing: root.editing
         avoidWindows: root.avoidWindows
+        voiceActive: root.voiceActive
+        voiceMinimal: root.voiceMinimal
+        voiceAvailable: root.voiceAvailable
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
         specialKeyStyle: root.specialKeyStyle
         winKeyStyle: root.winKeyStyle
+        winKeyCustomIcon: root.winKeyCustomIcon
         resizeW: root.resizeW
         resizeH: root.resizeH
         baseKbWidth: root.baseKbWidth
@@ -219,6 +236,8 @@ PanelWindow {
         onResizeCancelRequested: root.resizeCancelRequested()
         onResizeResetRequested: root.resizeResetRequested()
         onResizeFillToggleRequested: root.resizeFillToggleRequested()
+        onVoiceMinimalRequested: root.voiceMinimalRequested()
+        onVoiceMicRequested: root.voiceMicRequested()
         onModeChangeRequested: mode => root.modeChangeRequested(mode)
         dockFill: root.dockFill
         actionList: root.actionList

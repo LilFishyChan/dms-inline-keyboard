@@ -10,11 +10,14 @@ const {
     planQuickBarDrop,
     toArray,
     quickBarViewActions,
-    markBuiltin, removeAction, updateAction, appendAction, moveActionToEndById
+    markBuiltin, removeAction, updateAction, appendAction, moveActionToEndById,
+    mergeNewBuiltins, defaultActions
 } = require("../actions.js");
 
+// 测试用的动作工厂：字段要和 sanitizeActions 的输出完全一致，
+// 多一个少一个 deepEqual 都会失败（加了 kind 后就要同步补上）
 const A = (id, label = id, icon = "") =>
-    ({ id, label, icon, hidden: false, builtin: false, cmd: "" });
+    ({ id, label, icon, hidden: false, builtin: false, kind: "builtin", cmd: "" });
 
 test("sanitizeActions: 非数组返回 fallback 副本", () => {
     const fallback = [A("undo")];
@@ -449,4 +452,56 @@ test("moveActionToEndById: 挪到末尾", () => {
 test("moveActionToEndById: 已在末尾 / id 不存在时原样返回", () => {
     assert.deepEqual(moveActionToEndById(L("a", "b"), "b").map(x => x.id), ["a", "b"]);
     assert.deepEqual(moveActionToEndById(L("a", "b"), "zz").map(x => x.id), ["a", "b"]);
+});
+
+test("sanitizeActions: kind 按 cmd 有无推断（老配置没有 kind 字段）", () => {
+    const result = sanitizeActions([
+        { id: "withCmd", cmd: "notify-send hi" },
+        { id: "noCmd" },
+        { id: "explicitCmd", kind: "cmd", cmd: "echo x" }
+    ], []);
+    const byId = {};
+    for (const a of result)
+        byId[a.id] = a;
+    assert.equal(byId.withCmd.kind, "cmd", "有 cmd 的命令动作应为 cmd");
+    assert.equal(byId.noCmd.kind, "builtin", "没有 cmd 的应为内置动作");
+    assert.equal(byId.explicitCmd.kind, "cmd", "显式 kind 优先");
+});
+
+test("defaultActions: 全部内置动作都标了 kind=builtin", () => {
+    const { defaultActions } = require("../actions.js");
+    const list = defaultActions();
+    assert.ok(list.length > 0);
+    for (const a of list)
+        assert.equal(a.kind, "builtin", a.id + " 应该标成 builtin");
+});
+
+test("mergeNewBuiltins: 补上老配置缺失的内置动作，已有项顺序不变", () => {
+    const kept = { id: "float", label: "浮动", icon: "x", hidden: false, builtin: true, kind: "builtin", cmd: "" };
+    const saved = [kept];
+    const merged = mergeNewBuiltins(saved, defaultActions());
+    // 原有项仍在第一个，引用顺序不变
+    assert.equal(merged[0].id, "float");
+    assert.equal(merged[0].label, "浮动", "不能覆盖用户改过的名字");
+    // 默认表里每个 id 都在结果中，且只出现一次
+    const ids = merged.map(a => a.id);
+    assert.equal(new Set(ids).size, ids.length, "不能重复");
+    for (const d of defaultActions())
+        assert.ok(ids.includes(d.id), "缺了 " + d.id);
+});
+
+test("mergeNewBuiltins: 新补的动作默认 hidden，不进功能页", () => {
+    const merged = mergeNewBuiltins([{ id: "undo", label: "u", icon: "", hidden: false, builtin: true, kind: "builtin", cmd: "" }], defaultActions());
+    const added = merged.filter(a => a.id !== "undo");
+    assert.ok(added.length > 0);
+    for (const a of added) {
+        assert.equal(a.hidden, true, a.id + " 应该默认隐藏");
+        assert.equal(a.builtin, true);
+        assert.equal(a.kind, "builtin");
+    }
+});
+
+test("mergeNewBuiltins: minimize 在默认动作表里", () => {
+    const ids = defaultActions().map(a => a.id);
+    assert.ok(ids.includes("minimize"), "默认动作表应包含 minimize");
 });

@@ -40,7 +40,9 @@ Item {
 
     // 动作块比槽位小一圈：上下左右各留几像素，免得贴住编辑态的边框
     readonly property real cellH: Math.round(height * 0.84)
-    readonly property real cellW: Math.round(slotW * 0.94)
+    // 图标容器做成正圆：宽 = 高。slotW 是布局步长（间距），保持不变，
+    // 靠 slotX 的居中偏移把圆放进每一格。
+    readonly property real cellW: cellH
 
     // 第 index 个槽位的左沿
     function slotX(index) {
@@ -55,7 +57,12 @@ Item {
         opacity: controller.editing ? 1 : 0
         visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-        Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
+        // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
+        Behavior on x {
+            enabled: controller.animateCells
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        }
         Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         x: quickBar.midX + (hasItems ? quickBar.frameX : 0)
         y: 0
@@ -70,7 +77,12 @@ Item {
         opacity: controller.editing && quickBar.slotCount > 0 ? 1 : 0
         visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-        Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
+        // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
+        Behavior on x {
+            enabled: controller.animateCells
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        }
         Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         x: quickBar.midX + quickBar.frameX
         y: 0
@@ -243,14 +255,16 @@ Item {
             height: quickBar.btnW
             radius: width / 2
             // 固定按钮常驻一点底色，编辑态换成拖动提示底色。
-            // 激活态就是默认底色（surfaceContainerHigh）+ primary 图标，
-            // 和顶部动作栏一致；只有「确认」按钮是主题色实心。
-            color: isConfirm
+            // 激活态用**主色实心**（图标转 onPrimary）—— 只描边区分不够明显。
+            readonly property bool slotActive: !controller.editing && isSlot
+                                               && slotState === "active"
+            color: (isConfirm || slotActive)
                    ? Theme.primary
                    : (controller.editing && isSlot
                       ? (slotGhost ? Theme.surfaceContainerLow : Theme.surfaceContainer)
                       : Theme.surfaceContainerHigh)
-            // 动作槽在编辑态高亮描边，表示可以拖东西进来替换
+            // 动作槽在编辑态高亮描边，表示可以拖东西进来替换。
+            // 非编辑态的激活态改用主色实心底，不需要描边
             border.width: controller.editing && isSlot
                           ? (controller.dragOverSlot ? 3 : 2) : 0
             border.color: Theme.primary
@@ -285,11 +299,9 @@ Item {
                 readonly property string slotState: parent.slotState
                 // 编辑态下统一显示默认形态（见顶部动作块的同款说明）
                 color: slotGhost ? Theme.primary
-                                 : (isConfirm ? Theme.surface
-                                              : ((!controller.editing && slotState === "active")
-                                                 ? Theme.primary
-                                                 : Theme.withAlpha(controller.fg,
-                                                                   slotState === "disabled" ? 0.4 : 0.8)))
+                                 : ((isConfirm || slotActive) ? Theme.onPrimary
+                                    : Theme.withAlpha(controller.fg,
+                                                      slotState === "disabled" ? 0.4 : 0.8))
             }
 
             // 空槽 / 透明度面板的占位图标（编辑态被拖走时也走这里，预览"变空"）。

@@ -140,6 +140,19 @@ Rectangle {
     property real ghostX: 0
     property real ghostY: 0
     property var ghostAction: null
+    // 语音输入是否在录音（daemon 传下来，决定顶部是否切到语音行）
+    property bool voiceActive: false
+    // 语音模式：只留顶部语音行。由 daemon 传下来（daemon 负责切浮动），
+    // 卡片只负责按它隐藏主区和底栏。
+    property bool voiceMinimal: false
+    // vinput 是否可用：没装时语音动作禁用，键盘其它功能不变
+    property bool voiceAvailable: false
+
+    // 左键点击 → 交给 daemon 切模式
+    function toggleVoiceMinimal() {
+        root.voiceMinimalRequested()
+    }
+
     // 拖动是否进行中（DragHandler.active 的镜像，用来兜底清理）
     property bool dragActive: false
     // 拖动锁：多点触控时只认第一个开始拖的，避免新触点把状态覆盖
@@ -510,9 +523,13 @@ Rectangle {
     // 特殊键的表现形式（见 layouts/special-keys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
+    property string winKeyCustomIcon: ""
 
     // 调整大小面板：预览尺寸 / 名义尺寸 / 屏幕尺寸 / 停靠是否铺满
     property real resizeW: 1050
+    // 正在拖的把手（"n"/"s"/"e"/"w"…，空串=没在拖）。
+    // 预览框必须靠它决定钉住哪条边：原来 x 死写居中，拖 w 时两边一起扩。
+    property string resizeHandle: ""
     property real resizeH: 444
     property real baseKbWidth: 1050
     property real baseKbHeight: 444
@@ -520,6 +537,9 @@ Rectangle {
     property real screenH: 1080
     property bool dockFill: true
     signal resizeCommitRequested()
+    // 松手落盘时用：键盘尺寸变成新值后，卡片位置要补偿多少，
+    // 才能让「拖的那条边」的对侧保持不动。拖动过程中不移动键盘。
+    signal resizeOriginShift(real dx, real dy)
     signal resizeCloseRequested()
     signal resizeCancelRequested()
     signal resizeResetRequested()
@@ -783,7 +803,10 @@ Rectangle {
     // QML 绑定跟踪，状态变了图标也不会重算（踩过：固定栏的激活态一直不亮）
     readonly property var actionStates: ({
         float: root.isFloating ? "active" : "default",
-        avoid: root.isFloating ? "disabled" : (root.avoidWindows ? "active" : "default")
+        avoid: root.isFloating ? "disabled" : (root.avoidWindows ? "active" : "default"),
+        // 没装 vinput 就是禁用态；装了也是普通态 ——
+        // 语音是否在录由语音行自己表达，动作图标不需要激活态
+        mic: root.voiceAvailable ? "default" : "disabled"
     })
 
     // ---- 拖动预览：编辑态显示「松手后会变成的样子」 ----
@@ -846,8 +869,14 @@ Rectangle {
     // 拖到固定栏时被挤出来的那个动作（列表里用幽灵块表示，不塞进 model）
     readonly property var listEjected: root.barDropPlan ? root.barDropPlan.ejected : null
 
-    // 功能列表的列数（列表布局与落点计算共用）
-    readonly property int actionListColumns: 4
+    // 功能列表的列数（列表布局与落点计算共用）。
+    // 由键盘宽度决定：按「一格至少能放下图标 + 四五个汉字」的最小宽度去排，
+    // 宽键盘多排几列、窄键盘少排几列。写死 4 列时窄键盘字被挤成省略号、
+    // 宽键盘又浪费一片空白。
+    readonly property real actionMinCellW: 240
+    readonly property int actionListColumns: Math.max(2,
+        Math.floor((root.width - root.pad * 2 + root.gap)
+                   / (root.actionMinCellW + root.gap)))
 
     // 列表视图引用：动作列表拆成 ActionList 组件后，拖动落点计算仍需要它
     property var actionListRef: null
@@ -879,6 +908,11 @@ Rectangle {
     signal modifierPressed(var keyData)
     signal modifierReleased(var keyData)
     signal quickAction(string action)
+    signal voiceMinimalRequested()
+    // 语音行里两个按钮的点击请求：卡片自己不处理，转发给窗口 → daemon。
+    // 之前 VoiceBar 直接调 controller.voiceMicPressed()，但卡片没有这个方法，
+    // 点了就抛 ReferenceError，表现就是「点了没反应」。
+    signal voiceMicRequested()
     // 浮动模式拖把手用：开始拖 / 拖了多少（像素）
     signal dragStarted()
     // 动作顺序变了 / 槽里的动作变了（交由 daemon 持久化）
@@ -934,7 +968,13 @@ Rectangle {
     // 候选栏和快捷栏叠在同一个 topArea 里（二选一覆盖），不额外占高度，
     // 所以这里也不能加 candH。
     readonly property int layoutRowCount: Layout.pageRows("page1").length
-    height: pad * 2 + quickH + gap
+    // 和 Column 的结构逐项对齐，一项都不能少：
+    //   pad | topArea | gap | 键区 | BottomBar
+    // 底部把手行上下都不留白（贴键区、贴卡片底），所以只有一个顶部 pad、
+    // 一段 gap，把手前那段和底部 pad 都没有。
+    // topArea 用的是 max(quickH, candH)（候选栏可能比快捷栏高），
+    // 这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
+    height: pad + Math.max(quickH, candH) + gap
             + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap
             + handleH
 
@@ -960,7 +1000,11 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: root.pad
-        spacing: root.gap
+        // 底部不留 pad：把手行要贴到卡片底边
+        anchors.bottomMargin: 0
+        // 间距改由显式 spacer 控制 —— Column 的 spacing 对所有子项一律生效，
+        // 没法只去掉「键区 ↔ 把手」那一段。
+        spacing: 0
 
         // ---------------- 顶部区域：快捷栏 / 候选栏二选一 ----------------
         // 候选出现时覆盖快捷栏（同一块高度，不是上下共存）。
@@ -978,8 +1022,20 @@ Rectangle {
                 anchors.fill: parent
                 // 用 opacity 而不是 visible：visible:false 期间内部几何不重算，
                 // 切回主页面时槽会被摆到错误的键位上（踩过）
-                opacity: (root.page === "emoji" || root.showCandBar) ? 0 : 1
-                enabled: root.page !== "emoji" && !root.showCandBar
+                opacity: (root.page === "emoji" || root.showCandBar
+                          || root.voiceActive) ? 0 : 1
+                enabled: root.page !== "emoji" && !root.showCandBar && !root.voiceActive
+            }
+
+            // 语音行：录音时占掉这一整行，优先级 语音 > 候选 > 功能
+            VoiceBar {
+                id: voiceRow
+                controller: root
+                anchors.fill: parent
+                // 语音模式下即使暂停也要留在屏幕上 —— 否则麦克风一进未激活态
+                // 整行就没了，用户看不到「点它可以继续」这个提示
+                visible: root.voiceActive || root.voiceMinimal
+                z: 20
             }
 
             // 候选栏：盖在快捷栏上面。
@@ -989,7 +1045,7 @@ Rectangle {
                 id: candBar
                 controller: root
                 anchors.fill: parent
-                visible: root.showCandBar && root.page !== "emoji"
+                visible: root.showCandBar && root.page !== "emoji" && !root.voiceActive
                 z: 10
             }
 
@@ -1003,6 +1059,12 @@ Rectangle {
         }
 
         // ---------------- 主区：键区 / 功能列表 ----------------
+        // 顶栏与键区之间的留白（把手行那边不加）
+        Item {
+            width: 1
+            height: root.gap
+        }
+
         // 两个子页共用同一块高度，靠 visible 切换，外层高度恒定
         Item {
             id: mainArea
@@ -1010,13 +1072,10 @@ Rectangle {
             // 展开候选列表时整块键区让位：它是「换页」不是「盖一层」，
             // 按键必须真正隐藏，否则下面的按键还能被点到。
             // 高度取所有页里最多的行数：切到空页（表情）也不会让键盘缩水
-            height: {
-                let lines = root.rows.length
-                const main = Layout.pageRows("keys").length
-                if (main > lines)
-                    lines = main
-                return lines * root.keyH + Math.max(0, lines - 1) * root.gap
-            }
+            // 行数和卡片高度公式用同一个来源（layoutRowCount = 主键区行数），
+            // 这样 Column 各项之和正好等于 card height，底部不会多出一截
+            height: root.layoutRowCount * root.keyH
+                    + Math.max(0, root.layoutRowCount - 1) * root.gap
 
             // ---- 候选列表页 ----
             // 必须用 Loader 的 active 而不是 visible：visible: false 的子项
@@ -1080,9 +1139,8 @@ Rectangle {
         }
 
         // ---------------- 底部把手条 ----------------
-        // 就排在键区下面，位置完全由这个 Column 决定，不再单独算中点。
-        // 之前那套「居中于最后一行按键与卡片底部之间」的算法要在卡片里
-        // 重复算一遍键区高度，两处几何一旦不同步就会错位。
+        // 放在 Column 末尾：它高度是 handleH、和卡片高度公式里的同一项，
+        // Column 各子项加起来正好等于 card height，不需要额外让位也不需要贴底。
         BottomBar {
             controller: root
         }
@@ -1161,9 +1219,11 @@ Rectangle {
         // 盖在把手条（z 200）和所有页之上
         z: 300
 
-        // 把手的**命中区**厚度 = 键盘底部拖动行的高度（handleH = keyH × 0.75），
-        // 视觉上仍是一条细线，但可触控范围有整行那么厚，好点得多。
-        readonly property real grip: root.handleH
+        // 把手的**命中区**厚度固定，不跟键盘尺寸走。
+        // 原来用 root.handleH（= keyH × 0.75），键盘一调大调小，可拖区域跟着
+        // 变粗变细，手感完全不一样 —— 而用户是在调整尺寸的过程中拖它，
+        // 等于一边拖一边改命中区，非常难用。视觉线条长度仍随框走。
+        readonly property real grip: 46
 
         // 停靠且铺满时宽度没得调 → 只剩顶边；否则按模式给对应把手
         // 三个方向：上、左、右。
@@ -1199,14 +1259,33 @@ Rectangle {
             readonly property real outerW: (!root.isFloating && root.dockFill)
                 ? resizeArea.width
                 : Math.round(root.resizeW)
+            // resizeH 是从窗口拖出来的名义高度，仍含底部 pad 和把手前的 gap；
+            // 卡片实际比它矮这两项，预览框要跟着矮，否则框比卡片高出一截。
             readonly property real outerH: Math.round(root.resizeH)
+                                           - root.pad - root.gap
             // 描边宽度：按键高取比例，比边框线粗一档才看得出是「可拖区域」
             readonly property real bw: Math.max(4, Math.round(root.keyH * 0.07))
 
             // 矩形按半个描边内缩：内层描边骑在自己的边界上，
             // 内缩后外沿正好压在 outerW/outerH 这条线上，全部朝内长。
-            x: Math.round((resizeArea.width - outerW) / 2) + bw / 2
-            y: Math.round(resizeArea.height - outerH) + bw / 2
+            //
+            // 水平定位分两种情况：
+            //   停靠模式：键盘本来就水平居中，拖左右必须**两边一起收/放**
+            //             （planResize 的 symmetric 已把宽度按 2× 位移算），
+            //             所以这里的框也要保持居中。
+            //   浮动模式：拖哪边只动哪边，框要钉住**正在拖的那条边**的对侧
+            //             （拖 w → 右边界不动，拖 e → 左边界不动）。
+            // 之前一刀切钉对侧，把停靠的左右联动弄没了。
+            readonly property bool symmetricX: !root.isFloating
+                && (root.resizeHandle === ""
+                    || root.resizeHandle === "e"
+                    || root.resizeHandle === "w")
+            x: Math.round(symmetricX
+                          ? (resizeArea.width - outerW) / 2
+                          : (root.resizeHandle.indexOf("w") >= 0
+                             ? resizeArea.width - outerW : 0)) + bw / 2
+            y: Math.round(root.resizeHandle.indexOf("n") >= 0
+                          ? resizeArea.height - outerH : 0) + bw / 2
             width: Math.max(0, outerW - bw)
             height: Math.max(0, outerH - bw)
             color: "transparent"
@@ -1273,10 +1352,19 @@ Rectangle {
                         if (active) {
                             startW = root.resizeW
                             startH = root.resizeH
+                            root.resizeHandle = handleItem.h
                         } else {
-                            // 松手即生效：把当前预览尺寸写进设置，
-                            // 键盘当场变成新大小，不用再点确定
+                            // 松手即生效：把当前预览尺寸写进设置，键盘当场变成新大小。
+                            // 尺寸变了但位置不动的话，卡片会继续锚在左上角 ——
+                            // 拖左边却看到右边在长。这里把差值补进位置：
+                            //   拖 w → 左边界左移 (startW - newW)
+                            //   拖 n → 上边界上移 (startH - newH)
+                            const dx = handleItem.h.indexOf("w") >= 0 ? startW - root.resizeW : 0
+                            const dy = handleItem.h.indexOf("n") >= 0 ? startH - root.resizeH : 0
+                            root.resizeHandle = ""
                             root.resizeCommitRequested()
+                            if (dx !== 0 || dy !== 0)
+                                root.resizeOriginShift(dx, dy)
                         }
                     }
 
@@ -1291,6 +1379,9 @@ Rectangle {
                             maxW: root.screenW,
                             // 最高只到屏幕 2/3，再高就把应用内容压没了
                             maxH: Math.round(root.screenH * 2 / 3),
+                            // 只有**停靠**模式拖左右时是对称的（键盘水平居中、
+                            // 两边一起收才不跑位）。浮动模式下四个方向都是单边的：
+                            // 拖哪边就只动哪边，宽高互不影响。
                             symmetric: !root.isFloating
                                 && (handleItem.h === "e" || handleItem.h === "w"),
                             // 角落始终按当前宽高比缩放
@@ -1326,9 +1417,18 @@ Rectangle {
                     size: Math.round(root.keyH * 0.42)
                     color: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, 0.85)
                 }
+                Ripple {
+                    id: fillRipple
+                    anchors.fill: parent
+                    cornerRadius: width / 2
+                    rippleColor: root.dockFill ? Theme.onPrimary : Theme.primary
+                }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onPressed: mouse => fillRipple.press(mouse.x, mouse.y)
+                    onReleased: fillRipple.release()
+                    onCanceled: fillRipple.release()
                     onClicked: root.resizeFillToggleRequested()
                 }
             }
@@ -1345,9 +1445,17 @@ Rectangle {
                     size: Math.round(root.keyH * 0.42)
                     color: Theme.withAlpha(root.fg, 0.85)
                 }
+                Ripple {
+                    id: resetRipple
+                    anchors.fill: parent
+                    cornerRadius: width / 2
+                }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onPressed: mouse => resetRipple.press(mouse.x, mouse.y)
+                    onReleased: resetRipple.release()
+                    onCanceled: resetRipple.release()
                     onClicked: root.resizeResetRequested()
                 }
             }
@@ -1364,9 +1472,17 @@ Rectangle {
                     size: Math.round(root.keyH * 0.42)
                     color: Theme.withAlpha(root.fg, 0.85)
                 }
+                Ripple {
+                    id: cancelRipple
+                    anchors.fill: parent
+                    cornerRadius: width / 2
+                }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onPressed: mouse => cancelRipple.press(mouse.x, mouse.y)
+                    onReleased: cancelRipple.release()
+                    onCanceled: cancelRipple.release()
                     onClicked: root.resizeCancelRequested()
                 }
             }
@@ -1383,9 +1499,18 @@ Rectangle {
                     size: Math.round(root.keyH * 0.42)
                     color: Theme.onPrimary
                 }
+                Ripple {
+                    id: okRipple
+                    anchors.fill: parent
+                    cornerRadius: width / 2
+                    rippleColor: Theme.onPrimary
+                }
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onPressed: mouse => okRipple.press(mouse.x, mouse.y)
+                    onReleased: okRipple.release()
+                    onCanceled: okRipple.release()
                     onClicked: root.resizeCloseRequested()
                 }
             }

@@ -68,8 +68,29 @@ Item {
                         font.weight: parent.active ? Font.DemiBold : Font.Normal
                     }
 
+                    // 涟漪：同样挂在 TapHandler 上（它在横滑列表里才能既滚动又点击）
+                    Ripple {
+                        id: chipRipple
+                        anchors.fill: parent
+                        cornerRadius: height / 2
+                        rippleColor: active ? Theme.onPrimary : Theme.primary
+                    }
+
                     TapHandler {
+                        id: chipTap
                         onTapped: bar.controller.emojiCategory = modelData.id
+                        onPressedChanged: {
+                            const p = chipTap.point ? chipTap.point.position : null
+                            console.error("[emoji/chip] pressed=" + pressed
+                                          + " point=" + (p ? (p.x + "," + p.y) : "null"))
+                            if (pressed) {
+                                const pt = (p && !isNaN(p.x) && !isNaN(p.y))
+                                           ? p : Qt.point(chip.width / 2, chip.height / 2)
+                                chipRipple.press(pt.x, pt.y)
+                            } else {
+                                chipRipple.release()
+                            }
+                        }
                     }
                 }
             }

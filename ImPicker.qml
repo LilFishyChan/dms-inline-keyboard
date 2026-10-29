@@ -125,10 +125,22 @@ Item {
                     font.weight: modelData.current ? Font.DemiBold : Font.Normal
                 }
 
+                // 涟漪：输入法行没有底色，扩散范围留一点内边距
+                Ripple {
+                    id: rowRipple
+                    anchors.fill: parent
+                    anchors.margins: Math.round(root.controller.gap * 0.4)
+                    cornerRadius: Theme.cornerRadius
+                    rippleColor: modelData.current ? Theme.onPrimary : Theme.primary
+                }
+
                 MouseArea {
                     id: rowMouse
                     anchors.fill: parent
                     hoverEnabled: true
+                    onPressed: mouse => rowRipple.press(mouse.x, mouse.y)
+                    onReleased: rowRipple.release()
+                    onCanceled: rowRipple.release()
                     onClicked: {
                         // 纯键盘布局直接切；拼音类输入法走 selectImMode，
                         // 它会在切换生效后再校正中英文状态

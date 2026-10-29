@@ -70,3 +70,42 @@ test("layout: 摊平后的键位不互相覆盖", () => {
         }
     }
 });
+
+test("两页的翻页键宽度一致（否则切页时那颗键会变窄）", () => {
+    const widths = {};
+    for (const page of ["page1", "page2"]) {
+        for (const entry of Layout.layoutFlat(page)) {
+            const key = entry.key;
+            if (key && key.k === "page" && key.icon === "layers")
+                widths[page] = key.w === undefined ? 1 : key.w;
+        }
+    }
+    assert.ok(widths.page1 !== undefined, "page1 应有 layers 翻页键");
+    assert.ok(widths.page2 !== undefined, "page2 应有 layers 翻页键");
+    assert.equal(widths.page2, widths.page1,
+                 "page2 翻页键宽 " + widths.page2 + " 与 page1 的 " + widths.page1 + " 不一致");
+});
+
+test("所有 pageRows 的字面量参数都是真实页名", () => {
+    // pageRows 对未知页名静默回落到 page1，写错一个字都看不出来
+    // （踩过：mainArea 用了 Layout.pageRows("keys")，一直拿到主键区的行数）
+    const valid = Object.keys(Layout.rows);
+    const files = ["../KeyboardCard.qml", "../KeyboardMetrics.qml",
+                   "../KeyboardWindow.qml", "../FloatingKeyboardWindow.qml"];
+    const bad = [];
+    for (const rel of files) {
+        const abs = path.join(__dirname, rel);
+        if (!fs.existsSync(abs))
+            continue;
+        const src = fs.readFileSync(abs, "utf8");
+        // 只查字符串字面量调用；传变量的那种（pageRows(page)）由页名白名单保证
+        const re = /pageRows\(\s*(["'])([^"']+)\1\s*\)/g;
+        let m;
+        while ((m = re.exec(src)) !== null) {
+            const name = m[2];
+            if (valid.indexOf(name) < 0)
+                bad.push(rel + " 里的 pageRows(\"" + name + "\")");
+        }
+    }
+    assert.deepEqual(bad, [], "存在不合法的页名：" + bad.join(", "));
+});

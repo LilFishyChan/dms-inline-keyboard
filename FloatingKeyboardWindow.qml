@@ -34,12 +34,20 @@ PanelWindow {
     property string mode: "keys"
     property bool editing: false
     property bool avoidWindows: true
+    // 语音输入是否在录音（决定顶部是否切到语音行）
+    property bool voiceActive: false
+    // 语音模式：只留顶部语音行
+    property bool voiceMinimal: false
+    signal voiceMicRequested()
+    // vinput 是否可用（可选扩展，没装就禁用语音动作）
+    property bool voiceAvailable: false
     property real bgOpacity: 1.0
     property int repeatInterval: 60
     property real keyOpacity: 1.0
     // 特殊键形态设置（见 layouts/special-keys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
+    property string winKeyCustomIcon: ""
     // 调整大小：预览尺寸 / 名义尺寸 / 屏幕尺寸
     property real resizeW: 1050
     property real resizeH: 444
@@ -74,6 +82,7 @@ PanelWindow {
     property var quickBarActions: []
     signal quickBarChanged(var list)
     signal quickAction(string action)
+    signal voiceMinimalRequested()
     property var imList: []
     signal imSwitchRequested()
     signal imListRequested()
@@ -128,29 +137,29 @@ PanelWindow {
         keyboardClosed()
     }
 
-    visible: keyboardVisible
+    visible: keyboardVisible && !root.voiceMinimal
     color: "transparent"
 
-    // 从底部锚定：顶部锚定的 margin 是相对"可用区域"（DMS 条栏的独占区）算的，
-    // 那样 posY 永远到不了 0，键盘也就压不住条栏
+    // 窗口**必须铺满整屏**。浮在屏幕上的键盘不能用一个「和键盘一样大」的窗口：
+    // 调整尺寸时窗口尺寸跟着变，margins 重算，键盘位置就会漂；
+    // 而且窗口边缘之外的点按和拖拽全落在窗口外，表现很怪。
+    // 触控范围交给下面的 mask 精确限定在卡片上。
     anchors {
+        top: true
         bottom: true
         left: true
-    }
-    margins {
-        bottom: Math.round(metrics.screenH - root.posY - root.kbHeight)
-        left: Math.round(root.posX)
+        right: true
     }
 
-    implicitWidth: metrics.cardW
-    // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
-    // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），
-    // 标签不会被窗口裁掉。
-    // 预编辑标签浮在卡片上方，所以窗口要预留它的高度。
-    // 关键：**恒定预留**。原来按「当前有没有 preedit」动态加减 42px，
-    // 打字时整个键盘（连 exclusiveZone）会忽高忽低，下面的窗口跟着抖。
+    implicitWidth: metrics.screenW
+    implicitHeight: metrics.screenH
     readonly property real preeditReserve: Math.round(root.candH * 0.95)
-    implicitHeight: root.kbHeight + preeditReserve
+    // 卡片位置在这里统一算，mask 和卡片本体共用。
+    // mask 声明在 card 之前，直接读 card.x/card.y 会拿到 undefined（输入区变 0、点不动）
+    readonly property real cardX: Math.round(Math.max(0, root.posX))
+    readonly property real cardY: Math.round(Math.max(0, root.posY))
+    readonly property real preeditTop: Math.max(0, cardY - root.preeditReserve)
+
 
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:floating"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
@@ -162,15 +171,18 @@ PanelWindow {
     // 永远压不到条栏上面，而且条栏换到底部时同样会被推
     WlrLayershell.exclusionMode: WlrLayershell.Ignore
 
-    // 不要用 Region { item: card }：card 之外的部分会被裁掉，
-    // 而 preedit 标签正是浮在 card 上方那 42px 里。
+    // 输入区 = 卡片 + 卡片上方那条预编辑标签，其余整屏穿透。
+    // 窗口铺满整屏，这里漏设或算 0 的话，要么全屏点不动、要么挡住桌面。
     mask: Region {
-        item: maskArea
-    }
-
-    Item {
-        id: maskArea
-        anchors.fill: parent
+        x: cardX
+        y: preeditTop
+        // 读卡片自己的宽高：metric 算出来的值取整后才是真实边界
+        //（踩过的坑是 mask 里读 card.y —— 那要求构造期就有值，结果输入区变 0、点不动）
+        width: root.visible ? Math.round(card.width) : 0
+        height: root.visible ? Math.round(cardY + card.height - preeditTop) : 0
+        // 注意：resize 拖动中卡片尺寸并不会变（卡片宽高由 metrics 算，而 metrics
+        // 的输入是 daemon 的 savedW/H，松手落盘后才更新），所以拖动中 mask 也不变，
+        // 指针移出输入区靠隐式 grab 维持；松手后这里自然重算。
     }
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
@@ -182,13 +194,10 @@ PanelWindow {
     KeyboardCard {
         id: card
 
-        // 卡片按**自己的高度**（= kbHeight）底部对齐，不能 anchors.fill 拉满窗口：
-        // 窗口比卡片高 preeditReserve，那是留给浮在卡片上方那条原文标签的。
-        // fill 会把卡片拉到 486px，内容却仍按 kbHeight 排 → 把手条下面多出一条空白，
-        // 原文标签也被顶到窗口外裁掉。停靠窗口一直是 bottom 锚定，所以没这问题。
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        // 窗口是全屏的，卡片绝对定位。宽高不在这里设 ——
+        // 卡片自己绑了 resizeW/H，拖动时才会实时跟着变
+        x: root.cardX
+        y: root.cardY
 
         unit: metrics.unit
         keyH: metrics.keyH
@@ -211,10 +220,14 @@ PanelWindow {
         mode: root.mode
         editing: root.editing
         avoidWindows: root.avoidWindows
+        voiceActive: root.voiceActive
+        voiceMinimal: root.voiceMinimal
+        voiceAvailable: root.voiceAvailable
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
         specialKeyStyle: root.specialKeyStyle
         winKeyStyle: root.winKeyStyle
+        winKeyCustomIcon: root.winKeyCustomIcon
         resizeW: root.resizeW
         resizeH: root.resizeH
         baseKbWidth: root.baseKbWidth
@@ -222,10 +235,21 @@ PanelWindow {
         screenW: root.screen ? root.screen.width : 1920
         screenH: root.screen ? root.screen.height : 1080
         onResizeCommitRequested: root.resizeCommitRequested()
+        // 落盘后尺寸变了，位置补一下：拖左边/上边时对侧要钉住不动。
+        // 补偿完再统一夹回屏幕：新尺寸可能把卡片顶出右/下沿，而别处没有
+        // 位置 clamp 把它拉回来（拖动改位置那条路径只在自己那条链里夹）。
+        onResizeOriginShift: (dx, dy) => {
+            const maxX = Math.max(0, metrics.screenW - metrics.cardW)
+            const maxY = Math.max(0, metrics.screenH - Math.round(card.height))
+            root.posX = Math.max(0, Math.min(maxX, root.posX + dx))
+            root.posY = Math.max(0, Math.min(maxY, root.posY + dy))
+        }
         onResizeCloseRequested: root.resizeCloseRequested()
         onResizeCancelRequested: root.resizeCancelRequested()
         onResizeResetRequested: root.resizeResetRequested()
         onResizeFillToggleRequested: root.resizeFillToggleRequested()
+        onVoiceMinimalRequested: root.voiceMinimalRequested()
+        onVoiceMicRequested: root.voiceMicRequested()
         onModeChangeRequested: mode => root.modeChangeRequested(mode)
         dockFill: root.dockFill
         actionList: root.actionList

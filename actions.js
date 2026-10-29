@@ -1,10 +1,13 @@
 // 动作列表的纯逻辑：清洗、排序、可见性拆分。
 // 不依赖 QML，可用 node --test 直接测试（见 tests/actions.test.js）。
 //
-// 数据结构：动作 = { id, label, icon, hidden?, builtin? }
+// 数据结构：动作 = { id, label, icon, hidden?, builtin?, kind, cmd }
 //   hidden  —— 列表里不显示（固定栏/槽里已放的不受影响），内置动作只能隐藏不能删
 //   builtin —— 来自默认动作表，设置页不允许删除
-//   cmd     —— 自定义动作要执行的 shell 命令（内置动作没有，走插件内部逻辑）
+//   kind    —— 执行方式，决定点击时怎么跑（InlineKeyboardDaemon.handleQuick 只看这个）：
+//                "builtin" → 内置逻辑，按 id 查处理函数表
+//                "cmd"     → 跑 cmd 里的 shell 命令
+//   cmd     —— kind="cmd" 时要执行的 shell 命令
 //
 // ⚠ 所有对外函数的第一步都要过 toArray()。QML 会把 .js 模块返回的数组、
 // 以及 property var 里存的数组包成「类数组对象」，此时 Array.isArray() 是 false ——
@@ -68,6 +71,12 @@ function sanitizeActions(raw, fallback) {
                   : (typeof action.icon === "string" ? action.icon : ""),
             hidden: action.hidden === true,
             builtin: action.builtin === true || builtinIds[id] === true,
+            // kind 决定点击时怎么执行；老配置没有这个字段，
+            // 有 cmd 的按 cmd 跑，其余当内置动作
+            kind: typeof action.kind === "string"
+                  ? action.kind
+                  : (typeof action.cmd === "string" && action.cmd.trim() !== ""
+                     ? "cmd" : "builtin"),
             cmd: typeof action.cmd === "string" ? action.cmd : ""
         })
     }
@@ -309,16 +318,17 @@ function quickBarViewActions(opts) {
  */
 function defaultActions() {
     return markBuiltin([
-        { id: "undo", label: "Undo", icon: "undo" },
-        { id: "redo", label: "Redo", icon: "redo" },
-        { id: "settings", label: "Settings", icon: "settings" },
-        { id: "float", label: "Float", icon: "icons/keyboard-float.svg" },
-        { id: "size", label: "Size", icon: "aspect_ratio" },
-        { id: "opacity", label: "Opacity", icon: "opacity" },
-        { id: "nextIm", label: "Next input method", icon: "language" },
-        { id: "clipboard", label: "Clipboard", icon: "content_paste" },
-        { id: "avoid", label: "Avoid windows", icon: "unfold_more" },
-        { id: "mic", label: "Voice input", icon: "mic" }
+        { id: "undo", label: "Undo", icon: "undo", kind: "builtin" },
+        { id: "redo", label: "Redo", icon: "redo", kind: "builtin" },
+        { id: "settings", label: "Settings", icon: "settings", kind: "builtin" },
+        { id: "float", label: "Float", icon: "icons/keyboard-float.svg", kind: "builtin" },
+        { id: "size", label: "Size", icon: "aspect_ratio", kind: "builtin" },
+        { id: "opacity", label: "Opacity", icon: "opacity", kind: "builtin" },
+        { id: "nextIm", label: "Next input method", icon: "language", kind: "builtin" },
+        { id: "clipboard", label: "Clipboard", icon: "content_paste", kind: "builtin" },
+        { id: "avoid", label: "Avoid windows", icon: "unfold_more", kind: "builtin" },
+        { id: "mic", label: "Voice input", icon: "mic", kind: "builtin" },
+        { id: "minimize", label: "Minimize", icon: "keyboard_hide", kind: "builtin" }
     ])
 }
 
@@ -339,7 +349,10 @@ function markBuiltin(list) {
             label: a.label || a.id,
             icon: a.icon || "",
             hidden: a.hidden === true,
-            builtin: true
+            builtin: true,
+            // 默认动作表里没写 kind 的一律当内置动作
+            kind: typeof a.kind === "string" ? a.kind : "builtin",
+            cmd: typeof a.cmd === "string" ? a.cmd : ""
         })
     }
     return out
@@ -430,8 +443,46 @@ function appendAction(list, action, seed) {
 // node 测试用；QML 的 import "actions.js" 不读这里
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
+    mergeNewBuiltins,
         toArray, sanitizeActions, moveActionById, visibleActions, dropIndexAt,
         quickBarInsertIndex, planQuickBarDrop, quickBarViewActions, moveActionToEndById,
         defaultActions, markBuiltin, removeAction, updateAction, appendAction
     }
+}
+
+/**
+ * 把默认动作表里「用户配置中完全没有」的条目不声不响地补到末尾。
+ *
+ * 用户配置是快照式的：插件后来新增的内置动作不会自动出现在老配置里，
+ * 导致「设置页看不到、动作表也调不到」。这里只补缺失的 id，
+ * 不改变已有项的顺序，也不会把手动删除的内置动作加回来
+ * （手动删除的内置动作会被记进 hidden，仍然在列表里）。
+ * @param {Array} saved 用户保存的动作
+ * @param {Array} defaults 默认动作表
+ * @returns {Array} 补全后的新数组
+ */
+function mergeNewBuiltins(saved, defaults) {
+    const list = toArray(saved).slice()
+    const present = {}
+    for (let i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id)
+            present[list[i].id] = true
+    }
+    const defs = toArray(defaults)
+    for (let i = 0; i < defs.length; i++) {
+        const d = defs[i]
+        if (d && d.id && !present[d.id]) {
+            list.push({
+                id: d.id,
+                label: d.label || d.id,
+                icon: d.icon || "",
+                hidden: true,          // 新动作默认收在列表里，不挤进功能页
+                builtin: true,
+                kind: typeof d.kind === "string" ? d.kind : "builtin",
+                cmd: ""
+            })
+            present[d.id] = true
+        }
+    }
+    return list
 }

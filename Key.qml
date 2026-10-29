@@ -31,6 +31,8 @@ Item {
     property string specialKeyStyle: "full"
     // Win 键单独的表现（mod / system / windows），不受上面那个影响
     property string winKeyStyle: "mod"
+    // winKeyStyle === "custom" 时用这个图标（Material Symbols 名或图片路径）
+    property string winKeyCustomIcon: ""
 
     readonly property string kind: keyData.k || "char"
     readonly property real wUnits: keyData.w || 1
@@ -106,7 +108,8 @@ Item {
     // 那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
     readonly property var specialLook: (!hasShiftVariant
                                         && SpecialKeys.isSpecialKey(keyData.l))
-        ? SpecialKeys.resolve(keyData.l, root.specialKeyStyle, root.winKeyStyle)
+        ? SpecialKeys.resolve(keyData.l, root.specialKeyStyle, root.winKeyStyle,
+                                 root.winKeyCustomIcon)
         : null
     readonly property string effectiveLabel: hasShiftVariant ? keyData.shift.l : mainLabel
     // 真正要注入的键码：Fn 层的键（F1-F12）和 Shift 变体（Enter→Del）都在这儿定

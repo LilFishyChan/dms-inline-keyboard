@@ -1,0 +1,23 @@
+{
+  "id": "inlineKeyboard",
+  "name": "Inline Keyboard",
+  "capabilities": [
+    "daemon",
+    "ipc",
+    "dankbar-widget"
+  ],
+  "category": "utilities",
+  "repo": "https://github.com/LilFishyChan/dms-inline-keyboard",
+  "author": "LilFishyChan",
+  "description": "On-screen touch keyboard with fcitx5 candidates drawn inside the keyboard. Phone-style layout, docked and floating modes, action grid with drag-to-reorder.",
+  "dependencies": [
+    "ydotool",
+    "fcitx5"
+  ],
+  "compositors": [
+    "any"
+  ],
+  "distro": [
+    "any"
+  ]
+}

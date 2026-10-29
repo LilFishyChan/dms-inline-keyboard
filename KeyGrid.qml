@@ -38,6 +38,7 @@ Item {
             modifierState: grid.c.modifierStateFor(modelData.key)
             specialKeyStyle: grid.c.specialKeyStyle
             winKeyStyle: grid.c.winKeyStyle
+            winKeyCustomIcon: grid.c.winKeyCustomIcon
             keyOpacity: grid.c.keyOpacity
             active: modelData.key.active === true
             x: modelData.col * (grid.c.unit + grid.c.gap)

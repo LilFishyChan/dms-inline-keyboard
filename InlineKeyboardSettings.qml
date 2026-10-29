@@ -142,8 +142,52 @@ PluginSettings {
     property bool pickingIcon: false
     property string iconQuery: ""
     property bool pickForDraft: false          // 选择器当前服务于「添加表单」而不是某个已有动作
+    property bool pickForWin: false             // 选择器当前服务于 Win 键的自定义图标
+
+    // 用户可能输入的是目录路径（/home/x/icons 或 ~/icons），这时不搜图标名，
+    // 直接把那个目录里的 svg / png 列出来让他挑。
+    readonly property string queryPath: {
+        const q = root.iconQuery.trim()
+        if (q === "")
+            return ""
+        // 含路径分隔符或以 ~ 开头才算路径，避免把普通搜索词误判
+        return (q.indexOf("/") >= 0 || q.charAt(0) === "~") ? q : ""
+    }
+    property var iconFiles: []
+
+    Process {
+        id: iconDirLister
+        running: false
+        command: ["sh", "-c",
+                  // $1 走位置参数，避免把用户输入拼进脚本（不经过二次解析）
+                  'd="$1"; case "$d" in "~"*) d="$HOME${d#"~"}";; esac; ' +
+                  '[ -d "$d" ] && find "$d" -maxdepth 1 -type f ' +
+                  '\( -iname "*.svg" -o -iname "*.png" \) 2>/dev/null | sort | head -300',
+                  "sh", root.queryPath]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = String(text || "").split("\n").filter(l => l.length > 0)
+                root.iconFiles = lines
+            }
+        }
+    }
+
+    // 路径变了就重新列目录
+    onQueryPathChanged: {
+        if (root.queryPath === "") {
+            root.iconFiles = []
+            iconDirLister.running = false
+            return
+        }
+        root.iconFiles = []
+        iconDirLister.running = false
+        iconDirLister.running = true
+    }
 
     readonly property var filteredIcons: {
+        // 输入是路径：只显示那个目录里的图片文件
+        if (root.queryPath !== "")
+            return root.iconFiles
         const q = root.iconQuery.trim().toLowerCase()
         if (q === "")
             return root.iconChoices
@@ -220,6 +264,7 @@ PluginSettings {
     function openIconPicker(index) {
         const list = Actions.toArray(actionList.items)
         root.pickForDraft = false
+        root.pickForWin = false
         root.pickerIndex = (index >= 0 && index < list.length) ? index : -1
         root.iconQuery = ""
         if (root.pickerIndex >= 0) {
@@ -228,8 +273,17 @@ PluginSettings {
         }
     }
 
+    function openIconPickerForWin() {
+        root.pickForWin = true
+        root.pickForDraft = false
+        root.pickerIndex = -1
+        root.pickingIcon = true
+        iconPopup.open()
+    }
+
     function openIconPickerForDraft() {
         root.pickForDraft = true
+        root.pickForWin = false
         root.pickerIndex = -1
         root.iconQuery = ""
         root.pickingIcon = true
@@ -240,7 +294,13 @@ PluginSettings {
         const value = (name || "").trim()
         if (value === "")
             return
-        if (root.pickForDraft) {
+        if (root.pickForWin) {
+            winIconSetting.value = value
+            // ⚠ DMS 的 StringSetting 只在输入框 commit()（回车/失焦）时写盘，
+            // 这个值走的是图标选择器、没有输入框参与，只赋值不会持久化。
+            // 表现就是「选完图标当时看着对了，重开设置又变回未设置」。
+            root.saveValue("winKeyCustomIcon", value)
+        } else if (root.pickForDraft) {
             root.draftIcon = value
         } else {
             const list = Actions.toArray(actionList.items)
@@ -442,15 +502,94 @@ PluginSettings {
 
     // Win 键实际发的是 Super_L，叫 Win 只对 Windows 用户成立，默认显示 Mod
     SelectionSetting {
+        id: winLookSetting
         settingKey: "winKeyStyle"
         label: root.tr("Win key label")
-        description: root.tr("This key sends Super. Show it as Mod, or as an icon.")
+        description: root.tr("This key sends Super. Show it as text or an icon.")
         defaultValue: "mod"
         options: [
-            { label: root.tr("Mod"), value: "mod" },
-            { label: root.tr("System icon"), value: "system" },
-            { label: root.tr("Windows icon"), value: "windows" }
+            { label: "Mod", value: "mod" },
+            { label: "Super", value: "super" },
+            // 系统图标直接显示它本身（keyboard_command_key 渲出来就是 ⌘）
+            { label: "⌘", value: "system" },
+            { label: root.tr("Custom icon"), value: "custom" }
         ]
+    }
+
+    // 自定义图标：点按钮打开和动作编辑同一个图标选择器
+    Rectangle {
+        visible: winLookSetting.value === "custom"
+        width: parent ? parent.width : 0
+        height: 64
+        radius: Theme.cornerRadius
+        color: "transparent"
+
+        Row {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Math.round(Theme.spacingM)
+
+            // 当前选中图标的预览：有值就渲染（图标名走 DankIcon，路径走 Image）
+            Rectangle {
+                width: 44
+                height: 44
+                radius: width / 2
+                color: Theme.surfaceContainer
+
+                DankIcon {
+                    visible: !String(winIconSetting.value || "").startsWith("/")
+                    anchors.centerIn: parent
+                    name: String(winIconSetting.value || "") || "keyboard_command_key"
+                    size: 20
+                    color: Theme.surfaceText
+                }
+
+                Image {
+                    visible: String(winIconSetting.value || "").startsWith("/")
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
+                    source: visible ? "file://" + winIconSetting.value : ""
+                    sourceSize.width: 52
+                    sourceSize.height: 52
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openIconPickerForWin()
+                }
+            }
+
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+
+                StyledText {
+                    text: root.tr("Custom icon")
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.surfaceText
+                }
+
+                StyledText {
+                    text: String(winIconSetting.value || "") || root.tr("Not set — tap the icon to choose")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.withAlpha(Theme.surfaceVariantText, 0.9)
+                }
+            }
+        }
+    }
+
+    // 值的持有者（设置项的读写都靠它），界面由上面那块负责
+    StringSetting {
+        visible: false
+        id: winIconSetting
+        settingKey: "winKeyCustomIcon"
+        label: root.tr("Custom icon")
+        description: ""
+        defaultValue: ""
     }
 
     // ---------------- 动作 ----------------
@@ -821,6 +960,7 @@ PluginSettings {
             root.pickingIcon = false
             root.pickerIndex = -1
             root.pickForDraft = false
+            root.pickForWin = false
         }
 
         background: Rectangle {
@@ -887,23 +1027,42 @@ PluginSettings {
                 delegate: Rectangle {
                     required property string modelData
                     readonly property bool selected: {
+                        if (root.pickForWin)
+                            return String(winIconSetting.value || "") === modelData
                         if (root.pickForDraft)
                             return root.draftIcon === modelData
                         const list = Actions.toArray(actionList.items)
                         const current = root.pickerIndex >= 0 ? list[root.pickerIndex] : null
                         return !!current && current.icon === modelData
                     }
+                    // 以 / 开头的是搜出来的图片文件，其余是 Material Symbols 图标名
+                    readonly property bool isFile: modelData.charAt(0) === "/"
 
                     width: 44
                     height: 44
                     radius: width / 2
                     color: selected ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
 
+                    // 图标字体
                     DankIcon {
+                        visible: !parent.isFile
                         anchors.centerIn: parent
-                        name: modelData
+                        name: parent.isFile ? "" : parent.modelData
                         size: 20
-                        color: selected ? Theme.primary : Theme.surfaceText
+                        color: parent.selected ? Theme.primary : Theme.surfaceText
+                    }
+
+                    // 目录里找到的 svg / png 直接渲染缩略图
+                    Image {
+                        visible: parent.isFile
+                        anchors.centerIn: parent
+                        width: 26
+                        height: 26
+                        source: parent.isFile ? "file://" + parent.modelData : ""
+                        sourceSize.width: 52
+                        sourceSize.height: 52
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
                     }
 
                     MouseArea {
@@ -916,7 +1075,9 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: root.tr("Material Symbols names, or a path to your own image (/home/you/icon.svg). Press Enter to use what you typed.")
+                text: root.queryPath !== ""
+                      ? root.tr("Showing image files in that folder. Pick one, or press Enter to use the path itself.")
+                      : root.tr("Material Symbols names, or a path to your own image (/home/you/icon.svg). Press Enter to use what you typed.")
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.withAlpha(Theme.surfaceVariantText, 0.9)
                 wrapMode: Text.WordWrap

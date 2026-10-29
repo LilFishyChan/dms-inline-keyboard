@@ -269,62 +269,70 @@ PluginComponent {
         root.mode = "transparency"
     }
 
-    function handleQuick(action) {
-        // 自定义动作：跑它自己的命令（用户自己写的，等同桌面启动器）
-        const custom = root.actionById(action)
-        if (custom && custom.cmd && custom.cmd.trim() !== "") {
-            root.runCommand(["sh", "-c", custom.cmd])
-            return
-        }
-        switch (action) {
-        case "close":
-            root.hideKeyboard()
-            return
-        case "float":
-            root.toggleFloating()
-            return
-        case "settings":
-            // 直接打开本插件的设置页（tab 名是 "plugin:<id>"）
+    // 内置动作的处理函数表：id → 要执行的插件内部逻辑。
+    // 新增内置动作只需要在 actions.js 里加一条（带 kind: "builtin"）再加上这里的函数，
+    // 不用再动 UI —— 三个入口都只发 id，执行永远走 handleQuick 这一条路。
+    readonly property var builtinHandlers: ({
+        "close": function() { root.hideKeyboard() },
+        "float": function() { root.toggleFloating() },
+        "settings": function() {
             root.runCommand(["dms", "ipc", "call", "settings", "openWith", "plugin:inlineKeyboard"])
-            return
-        case "nextIm":
-            root.cycleIm()
-            return
-        case "clipboard":
+        },
+        "nextIm": function() { root.cycleIm() },
+        "clipboard": function() {
             root.runCommand(["dms", "ipc", "call", "clipboard", "toggle"])
-            return
-        case "mic":
-            root.notifyUnimplemented("Voice input")
-            return
-        case "size":
-            root.beginResize()
-            return
-        case "opacity":
-            // 固定栏（QuickBar）走的是 quickAction -> handleQuick，
-            // 而 ActionList 里那段独立分支只覆盖列表页。少了这一条，
-            // 固定栏点击会掉进 default，什么都不发生。
-            root.enterTransparency()
-            return
-        case "avoid":
-            // 停靠模式下是否让其它窗口避让键盘（改 layer-shell 的独占区）
+        },
+        "mic": function() {
+            // 语音行占的是顶部那一行，先回主页面才看得到
+            root.mode = "keys"
+            root.toggleVoice()
+        },
+        "minimize": function() { root.minimizeKeyboard() },
+        "size": function() { root.beginResize() },
+        "opacity": function() { root.enterTransparency() },
+        "avoid": function() {
             root.avoidWindows = !root.avoidWindows
             PluginService.savePluginData(root.pluginId, "avoidWindows", root.avoidWindows)
-            return
-        case "undo":
+        },
+        "undo": function() {
             root.runCommand(["ydotool", "key", "29:1", "44:1", "44:0", "29:0"])
-            return
-        case "redo":
+        },
+        "redo": function() {
             root.runCommand(["ydotool", "key", "29:1", "42:1", "44:1", "44:0", "42:0", "29:0"])
-            return
-        default: {
-            const def = root.findAction(action)
-            if (def && def.cmd) {
+        }
+    })
+
+    /**
+     * 动作的唯一执行入口。动作列表、顶部固定栏、右上角固定框都只发 id 到这里。
+     *
+     * 怎么执行完全由动作数据决定（kind）：
+     *   kind === "cmd"      → 跑动作自己的 cmd
+     *   kind === "builtin"  → 查 builtinHandlers
+     * 不按 id 写 switch，新增动作不用改这里。
+     */
+    function handleQuick(action) {
+        const def = root.actionById(action)
+        // kind === "cmd" 的动作跑自己的命令；这类动作必然在动作表里
+        if (def && def.kind === "cmd") {
+            if (def.cmd && def.cmd.trim() !== "")
                 root.runCommand(["sh", "-c", def.cmd])
-                return
-            }
-            console.error("[Inline Keyboard] quick action 未实现:", action)
+            else
+                console.error("[Inline Keyboard] cmd 类动作缺少命令:", action)
+            return
         }
+        // 内置逻辑不要求动作表里有这一项：右上角 ✕、空白区的 Enter 这类
+        // 固定按钮不在动作表里，但同样走这一条路
+        const handler = root.builtinHandlers[action]
+        if (handler) {
+            handler()
+            return
         }
+        // 动作表里有 cmd 但 kind 没标对的老配置，兜底按命令跑
+        if (def && def.cmd && def.cmd.trim() !== "") {
+            root.runCommand(["sh", "-c", def.cmd])
+            return
+        }
+        console.error("[Inline Keyboard] 动作没有处理函数:", action)
     }
 
     // ---- 尺寸设置（设置页可调）----
@@ -342,7 +350,12 @@ PluginComponent {
 
     property var actions: {
         const v = PluginService.loadPluginData(root.pluginId, "actions", null)
-        return (v && v.length) ? root.sanitizeActions(v) : root.defaultActions
+        if (!v || !v.length)
+            return root.defaultActions
+        // 插件升级后新增的内置动作不会自动出现在老配置里，
+        // 这里补到末尾（hidden: true，不挤进功能页），
+        // 否则「设置页看不到、动作表也调不到」
+        return Actions.mergeNewBuiltins(root.sanitizeActions(v), root.defaultActions)
     }
 
     // 按 id 去重（避免拖动过程中重复写入）
@@ -357,6 +370,201 @@ PluginComponent {
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     // 表现成「点透明度没反应」，很容易误判成面板本身坏了。
+    // vinput 是**可选**扩展：没装的时候语音动作显示为禁用，
+    // 键盘其它功能完全不受影响。探测一次即可（不装/装了不会在运行中变）。
+    property bool voiceAvailable: false
+
+    Process {
+        id: vinputProbe
+        running: true
+        command: ["sh", "-c", "command -v vinput >/dev/null && echo yes || echo no"]
+        stdout: StdioCollector {
+            onStreamFinished: root.voiceAvailable = String(text || "").trim() === "yes"
+        }
+    }
+
+    // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
+    // （只有 daemon status，那是服务本身的状态），所以这里记一份乐观状态：
+    // 点一次开始、再点一次停止，键盘关闭时兜底停掉。
+    property bool voiceActive: false
+
+    // 动作列表 / 固定槽里的麦克风：开始或结束语音输入。
+    // 这是唯一的「开始」入口 —— 语音行里的按钮只负责结束或暂停。
+    function toggleVoice() {
+        if (!root.voiceAvailable)
+            return
+        if (root.voiceActive) {
+            root.stopVoice()
+            return
+        }
+        root.voiceActive = true
+        root.runCommand(["vinput", "recording", "start"])
+    }
+
+    // 语音行右侧的麦克风：按当前显示方式分流
+    //   普通模式（全键盘）  → 结束语音输入，语音行一起退掉
+    //   语音模式（只剩语音行）→ 暂停 / 继续，语音行留着
+    function voiceMicPressed() {
+        if (!root.voiceAvailable)
+            return
+        if (root.voiceMinimal) {
+            // 语音模式下是「暂停 / 继续」：状态要跟着翻，
+            // 否则麦克风的激活态（图标色 + 描边）不会变
+            root.voiceActive = !root.voiceActive
+            root.runCommand(["vinput", "recording", "toggle"])
+            return
+        }
+        root.stopVoice()
+    }
+
+    // 最小化：整个键盘收成屏幕角上一个浮动的小按钮
+    property bool minimized: false
+    // 小圆按钮的位置（距右/下边缘的像素；-1 = 还没拖过，由窗口用默认边距）
+    property real miniPosRight: PluginService.loadPluginData(root.pluginId, "miniPosRight", -1)
+    property real miniPosBottom: PluginService.loadPluginData(root.pluginId, "miniPosBottom", -1)
+
+    /** 小圆按钮拖完落盘：下次最小化回到同一个地方。 */
+    function saveMiniPos(right, bottom) {
+        root.miniPosRight = right
+        root.miniPosBottom = bottom
+        root.lastSelfSaveAt = Date.now()
+        PluginService.savePluginData(root.pluginId, "miniPosRight", right)
+        PluginService.savePluginData(root.pluginId, "miniPosBottom", bottom)
+    }
+
+    // 语音模式：切浮动 + 只显示顶部语音行
+    property bool voiceMinimal: false
+
+    // VoiceBar 的两个按钮统一调 controller.voiceMicRequested() /
+    // controller.voiceMinimalRequested()。主键盘里 controller 是卡片（信号），
+    // 胶囊里 controller 是 daemon，所以这里补同名方法，让两种宿主都能调。
+    function voiceMicRequested() {
+        root.voiceMicPressed()
+    }
+
+    function voiceMinimalRequested() {
+        root.toggleVoiceMinimal()
+    }
+
+    function toggleVoiceMinimal() {
+        root.voiceMinimal = !root.voiceMinimal
+        root.syncVoiceWindows()
+    }
+
+    /**
+     * 把默认动作表里新增的内置动作写回用户配置。
+     *
+     * actions 是快照式存储：保存过之后就再也不会跟默认表合并。
+     * 只做运行时合并（mergeNewBuiltins）的话 daemon 能调到，但设置页
+     * 读的是保存值，用户看不到这些新动作，也就没法把它们拖到功能页。
+     * 所以启动时补一次并落盘，判据是「合并后变长了」。
+     */
+    function migrateBuiltinActions() {
+        const saved = PluginService.loadPluginData(root.pluginId, "actions", null)
+        if (!saved || !saved.length)
+            return                       // 空配置直接用默认表，不需要迁移
+        const merged = Actions.mergeNewBuiltins(root.sanitizeActions(saved), root.defaultActions)
+        if (merged.length > Actions.toArray(saved).length) {
+            PluginService.savePluginData(root.pluginId, "actions", merged)
+            root.actions = merged
+            console.error("[Inline Keyboard] 动作表补入 " + (merged.length - Actions.toArray(saved).length) + " 个新内置动作")
+        }
+    }
+
+    /**
+     * 老的 Win 键形态 "windows" 已从选项里移除（和 system 是同一个 ⌘ 图标），
+     * 归一成 "system" 并落盘。
+     *
+     * daemon 自己的 winKeyStyle 已经过 normalizeWinLook（windows→system），
+     * 但设置页的 SelectionSetting 直接读原始保存值 —— 不清掉这份老值的话，
+     * 下拉框会显示 "windows" 这个不在选项里的裸字符串。
+     */
+    function migrateWinKeyStyle() {
+        const raw = PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod")
+        if (raw !== "windows")
+            return
+        root.lastSelfSaveAt = Date.now()
+        PluginService.savePluginData(root.pluginId, "winKeyStyle", "system")
+    }
+
+    /**
+     * 销毁两个键盘窗口实例（停靠 / 浮动）。
+     *
+     * 必须销毁而不是 visible = false：layer surface 隐藏后输入区域还留在屏幕上，
+     * 会把语音胶囊、最小化按钮这些浮层的点击全吃掉。
+     */
+    function destroyKeyboards() {
+        dockedLoader.active = false
+        floatingLoader.active = false
+    }
+
+    /**
+     * 最小化：键盘整个收起，只留一个浮动的圆按钮。点按钮恢复。
+     *
+     * 和语音模式一样，主键盘窗口要**销毁**而不是隐藏 —— layer surface 隐藏后
+     * 输入区域还在屏幕上，会把小按钮的点击吃掉。
+     */
+    function minimizeKeyboard() {
+        if (root.minimized)
+            return
+        // 先标记再收语音：stopVoice() 内部会调 syncVoiceWindows()，它看到键盘
+        // 窗口已经销毁会 showKeyboard() 重建一整套窗口，紧接着又被下面
+        // destroyKeyboards() 拆掉 —— 白建一次、界面上还会闪一下。
+        // minimized 先置 true，syncVoiceWindows 就不会再重建。
+        root.minimized = true
+        root.stopVoice()
+        root.destroyKeyboards()
+        // 最小化**仍然算键盘开着**（open 保持 true），所以不能走 open=false：
+        // 那会连带触发「关闭」语义。但输入法 UI 不该被一个看不见的键盘占着，
+        // 这里只让 syncKeyboardFlag 把 flag 撤掉 → addon setShown(false)
+        // → classicui 拿回候选窗。onMinimizedChanged 负责触发。
+    }
+
+    function restoreFromMinimize() {
+        if (!root.minimized)
+            return
+        root.minimized = false
+        // showKeyboard 会把 open 置 true，onMinimizedChanged 重新 touch flag
+        root.showKeyboard()
+    }
+
+    function toggleMinimize() {
+        if (root.minimized)
+            root.restoreFromMinimize()
+        else
+            root.minimizeKeyboard()
+    }
+
+    /**
+     * 语音模式和全键盘是两套窗口，同一时刻只有一套存在。
+     *
+     * 进语音模式要**销毁**主键盘窗口，不能只 visible=false：layer surface
+     * 隐藏后输入区域仍然留在屏幕上，胶囊正好落在它里面，按钮全被吃掉
+     * （实测：点了只有主键盘那份 VoiceBar 收到事件）。
+     *
+     * 注意不能调 hideKeyboard() 来收窗口：它内部有 stopVoice() 兜底，
+     * 会把正在进行的录音一起掐掉。
+     */
+    function syncVoiceWindows() {
+        if (root.voiceMinimal) {
+            root.destroyKeyboards()
+        } else if (!root.keyboardVisible) {
+            root.showKeyboard()
+        }
+    }
+
+    function stopVoice() {
+        // 无论是否在录音，都把界面收回全键盘形态
+        const wasMinimal = root.voiceMinimal
+        root.voiceMinimal = false
+        if (wasMinimal)
+            root.syncVoiceWindows()
+        if (!root.voiceActive)
+            return
+        root.voiceActive = false
+        root.runCommand(["vinput", "recording", "stop"])
+    }
+
     property real prevBgOpacity: 1.0
     property real prevKeyOpacity: 1.0
 
@@ -368,6 +576,10 @@ PluginComponent {
     // Win 键单独的表现：mod（默认，显示「Mod」）/ system / windows
     property string winKeyStyle: SpecialKeys.normalizeWinLook(
         PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod"))
+
+    // winKeyStyle === "custom" 时使用的图标名
+    property string winKeyCustomIcon: PluginService.loadPluginData(
+        root.pluginId, "winKeyCustomIcon", "")
     property bool defaultFloating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // Esc 与 \`~ 键对调（想要 Esc 在左上角的人用）
     property bool escSwap: PluginService.loadPluginData(root.pluginId, "escSwap", false)
@@ -396,8 +608,10 @@ PluginComponent {
     readonly property real kbHeight: root.savedH
 
     // ---- 调整大小：拖拽中的预览值，确认后写进 savedW/savedH ----
-    property real resizeW: baseKbWidth
-    property real resizeH: baseKbHeight
+    // 初值必须是**已保存的尺寸**，不能是名义尺寸：键盘可能已被拖成 840×355，
+    // 而名义是 1050×444，用名义值会让预览框一进调整态就跳一大截
+    property real resizeW: root.savedW
+    property real resizeH: root.savedH
     // 进入调整态时的尺寸，取消要用它还原
     property real resizeOrigW: baseKbWidth
     property real resizeOrigH: baseKbHeight
@@ -478,8 +692,10 @@ PluginComponent {
             const want = PluginService.getGlobalVar(root.pluginId, "open", false)
             if (want && !root.keyboardVisible)
                 root.showKeyboard()
-            else if (!want && root.keyboardVisible)
+            else if (!want && root.keyboardVisible && !root.minimized)
                 root.hideKeyboard()
+            // 最小化时不走 hideKeyboard：它会清掉 minimized，
+            // 而且 UI 交还已经由 open=false 那条链路完成了
         }
         function onPluginDataChanged(pluginId) {
             if (pluginId !== root.pluginId)
@@ -511,6 +727,28 @@ PluginComponent {
             if (!root.keyboardVisible)
                 root.floating = nextDefaultFloating
         }
+        // 外观类设置：这些属性都是「构造时读一次」（loadPluginData 不是通知属性），
+        // 不在这里显式重读的话，设置页改完键盘一点反应都没有 —— 要重开才生效。
+        // 踩过：Win 键选「自定义图标」后键盘还是老样子。
+        const nextSpecialKeyStyle = SpecialKeys.normalizeStyle(
+            PluginService.loadPluginData(root.pluginId, "specialKeyStyle", "full"))
+        if (nextSpecialKeyStyle !== root.specialKeyStyle)
+            root.specialKeyStyle = nextSpecialKeyStyle
+        const nextWinKeyStyle = SpecialKeys.normalizeWinLook(
+            PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod"))
+        if (nextWinKeyStyle !== root.winKeyStyle)
+            root.winKeyStyle = nextWinKeyStyle
+        const nextWinCustomIcon = PluginService.loadPluginData(
+            root.pluginId, "winKeyCustomIcon", "")
+        if (nextWinCustomIcon !== root.winKeyCustomIcon)
+            root.winKeyCustomIcon = nextWinCustomIcon
+        const nextEscSwap = PluginService.loadPluginData(root.pluginId, "escSwap", false)
+        if (nextEscSwap !== root.escSwap)
+            root.escSwap = nextEscSwap
+        const nextRepeat = PluginService.loadPluginData(root.pluginId, "repeatInterval", 60)
+        if (nextRepeat !== root.repeatInterval)
+            root.repeatInterval = nextRepeat
+
         root.applyActionSettings()
         const nextModifierMode = PluginService.loadPluginData(root.pluginId, "modifierMode", "doubleTapLock")
         if (nextModifierMode !== root.modifierMode) {
@@ -539,10 +777,17 @@ PluginComponent {
     }
 
     readonly property bool keyboardVisible:
-        (dockedLoader.item && dockedLoader.item.keyboardVisible) ||
-        (floatingLoader.item && floatingLoader.item.keyboardVisible)
+        // 语音模式下主键盘窗口被销毁（item 为 null），但键盘在用户眼里是开着的。
+        // 不算进来的话，状态栏小部件 / ipc toggle 会以为键盘没开、
+        // 反而去 showKeyboard()，永远收不起来。
+        root.voiceMinimal || root.minimized
+        || (dockedLoader.item && dockedLoader.item.keyboardVisible)
+        || (floatingLoader.item && floatingLoader.item.keyboardVisible)
 
     function showKeyboard() {
+        // 从最小化恢复（或任何途径打开键盘）都要退出最小化，
+        // 否则小圆按钮会和键盘同时在场
+        root.minimized = false
         const loader = root.floating ? floatingLoader : dockedLoader
         if (!loader.item)
             loader.active = true
@@ -574,18 +819,36 @@ PluginComponent {
         command: ["true"]
     }
 
+    /**
+     * 写 addon 读的那个 flag 文件（决定它是否接管输入法 UI）。
+     *
+     * 判据是 open && !minimized，不是单独的 open：
+     *   · open=false            → 键盘关掉，交还 UI
+     *   · open=true  + 最小化   → 键盘逻辑上开着，但界面上只剩一个小按钮，
+     *                             同样要交还 UI，否则候选窗被一个看不见的键盘占着
+     *   · open=true  + 正常     → 接管 UI
+     */
     function syncKeyboardFlag() {
-        flagWriter.command = ["sh", "-c", root.open
+        const ownsUi = root.open && !root.minimized
+        flagWriter.command = ["sh", "-c", ownsUi
             ? "touch \"$XDG_RUNTIME_DIR/inline-keyboard-active\""
             : "rm -f \"$XDG_RUNTIME_DIR/inline-keyboard-active\""]
         flagWriter.running = true
     }
 
     onOpenChanged: syncKeyboardFlag()
+    onMinimizedChanged: syncKeyboardFlag()
 
-    Component.onCompleted: syncKeyboardFlag()
+    Component.onCompleted: {
+        root.migrateBuiltinActions()
+        root.migrateWinKeyStyle()
+        root.syncKeyboardFlag()
+    }
 
     function hideKeyboard() {
+        // 键盘关掉就别让麦克风继续录
+        root.stopVoice()
+        root.minimized = false
         if (dockedLoader.item)
             dockedLoader.item.hide()
         if (floatingLoader.item)
@@ -618,8 +881,7 @@ PluginComponent {
     function releaseIdleWindows() {
         if (root.keyboardVisible)
             return
-        dockedLoader.active = false
-        floatingLoader.active = false
+        root.destroyKeyboards()
     }
 
     // ---- 修饰键：状态机和流转都在 KeyRouter ----
@@ -776,10 +1038,14 @@ PluginComponent {
             kbWidth: root.kbWidth
             kbHeight: root.kbHeight
             avoidWindows: root.avoidWindows
+            voiceActive: root.voiceActive
+            voiceMinimal: root.voiceMinimal
+            voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
             specialKeyStyle: root.specialKeyStyle
             winKeyStyle: root.winKeyStyle
+            winKeyCustomIcon: root.winKeyCustomIcon
             resizeW: root.resizeW
             resizeH: root.resizeH
             baseKbWidth: root.baseKbWidth
@@ -789,6 +1055,8 @@ PluginComponent {
             onResizeCancelRequested: root.cancelResize()
             onResizeResetRequested: root.resetResize()
             onResizeFillToggleRequested: root.toggleDockFill()
+            onVoiceMinimalRequested: root.toggleVoiceMinimal()
+            onVoiceMicRequested: root.voiceMicPressed()
             onModeChangeRequested: mode => {
                 if (mode === "transparency")
                     root.enterTransparency()   // 面板需要进入前的快照
@@ -820,7 +1088,6 @@ PluginComponent {
             imList: root.imList
             // addon 给了图标路径就直接用（内嵌状态没有托盘图标可用），
             // 否则才看托盘抓图是否成功
-
             onQuickBarChanged: list => root.saveQuickBar(list)
             onOrderChanged: list => root.saveOrder(list)
             onSlotChanged: actionId => root.saveSlot(actionId)
@@ -856,10 +1123,14 @@ PluginComponent {
             mode: root.mode
             editing: root.editing
             avoidWindows: root.avoidWindows
+            voiceActive: root.voiceActive
+            voiceMinimal: root.voiceMinimal
+            voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
             specialKeyStyle: root.specialKeyStyle
             winKeyStyle: root.winKeyStyle
+            winKeyCustomIcon: root.winKeyCustomIcon
             resizeW: root.resizeW
             resizeH: root.resizeH
             baseKbWidth: root.baseKbWidth
@@ -869,6 +1140,8 @@ PluginComponent {
             onResizeCancelRequested: root.cancelResize()
             onResizeResetRequested: root.resetResize()
             onResizeFillToggleRequested: root.toggleDockFill()
+            onVoiceMinimalRequested: root.toggleVoiceMinimal()
+            onVoiceMicRequested: root.voiceMicPressed()
             onModeChangeRequested: mode => {
                 if (mode === "transparency")
                     root.enterTransparency()   // 面板需要进入前的快照
@@ -914,6 +1187,17 @@ PluginComponent {
             onAllCandidatesRequested: fcitxBridge.requestAllCandidates()
             onKeyboardClosed: root.onKeyboardClosed()
         }
+    }
+
+    // 语音模式：一条浮动的胶囊，只显示语音行。
+    // 和 FloatingKeyboardWindow 是两种不同布局，不是同一个窗口收窄。
+    VoiceMiniWindow {
+        controller: root
+    }
+
+    // 最小化模式：屏幕角上一个浮动的小圆按钮
+    MiniKeyboardWindow {
+        controller: root
     }
 
     IpcHandler {
@@ -1046,6 +1330,25 @@ PluginComponent {
 
         // 调试用：keys / functions 之间切换
         // 临时：走用户的真实路径（点动作 → handleQuick → beginResize）
+        // 调试：等价于点语音行右侧的麦克风（走 voiceMicPressed 那条路）
+        function debugVoiceMic(): string {
+            root.voiceMicPressed()
+            return "voice=" + (root.voiceActive ? "rec" : "idle")
+                + "/" + (root.voiceMinimal ? "mini" : "full")
+        }
+
+        // 调试：直接切语音模式（等价于点语音行左侧按钮）
+        function debugVoiceMinimal(on: bool): string {
+            if (root.voiceMinimal !== on)
+                root.toggleVoiceMinimal()
+            return "minimal=" + root.voiceMinimal + " floating=" + root.floating
+        }
+
+        function debugMinimize(): string {
+            root.toggleMinimize()
+            return "min=" + (root.minimized ? 1 : 0) + " open=" + root.open
+        }
+
         function debugQuickAction(id: string): string {
             root.handleQuick(id)
             const card = root.activeCard
@@ -1120,6 +1423,10 @@ PluginComponent {
         parts.push("opt=" + (root.optimisticImActive ? "1" : "0"))
         parts.push("saved=" + Math.round(root.savedW) + "x" + Math.round(root.savedH))
         parts.push("dockFill=" + (root.dockFill ? 1 : 0))
+        parts.push("voice=" + (root.voiceActive ? "rec" : "idle")
+                   + "/" + (root.voiceMinimal ? "mini" : "full"))
+        parts.push("vAvail=" + (root.voiceAvailable ? 1 : 0))
+        parts.push("min=" + (root.minimized ? 1 : 0))
         parts.push("cardW=" + Math.round(root.activeCard ? root.activeCard.width : -1))
         parts.push("mode=" + (root.activeCard ? root.activeCard.mode : "-"))
         parts.push("handles=" + (root.activeCard && root.activeCard.candListPanel
@@ -1135,6 +1442,19 @@ PluginComponent {
                        + " all=" + root.allCandidates.length)
             parts.push("preedit=" + JSON.stringify(root.fcitxPreedit))
             parts.push("ydotoold=" + root.ydotooldUp)
+            parts.push("winKey=" + root.winKeyStyle + "/"
+                       + (root.winKeyCustomIcon !== "" ? root.winKeyCustomIcon : "-")
+                       + " special=" + root.specialKeyStyle)
+            // 卡片实际收到的值：daemon → 窗口 → 卡片这条链断一次就白搭
+            // （踩过：窗口声明了 winKeyCustomIcon 却没传给 KeyboardCard）
+            parts.push("cardWin=" + (root.activeCard
+                       ? (root.activeCard.winKeyStyle + "/"
+                          + (root.activeCard.winKeyCustomIcon || "-")) : "-"))
+            parts.push("cardGeom=" + (root.activeCard
+                       ? (Math.round(root.activeCard.width) + "x"
+                          + Math.round(root.activeCard.height)
+                          + "@" + Math.round(root.activeCard.y)
+                          + " page=" + root.activeCard.page) : "-"))
             parts.push("mods=" + root.stateSummary())
             parts.push("lastError=" + (root.lastError || "-"))
             return parts.join(" | ")

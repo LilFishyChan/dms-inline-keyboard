@@ -85,66 +85,78 @@ var rows = {
     ],
 
     page2: [
-        // 列布局（15 列）：
-        //   空0 | 左区 1-4 | 空5 | 中区 6-8（正中） | 空9 | 右区 10-13 | 页面切换 14
+        // 列布局（15 列，整块居中）：
+        //   左距 1.25 | 左区 4 | 0.75 | 中区 3 | 0.75 | 右区 4 | 右距 1.25
+        // 左右边距都取 1.25 —— 和括号里的页面切换键同宽，视觉上对称；
+        // 那两格之间额外留 0.75 当三块之间的分隔。
+        // 三块在 1.25–13.75 这个主要键盘区里靠边平均分布：左区贴左沿、
+        // 右区贴右沿、中区正好居中，每行三块的起点都一致。
         [
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 1.25},
             {k: "key", l: "Esc", c: 1}, {k: "key", l: "Print", c: 99},
-            // ScrLk / Pause 在现代系统没用途，位置留空（保持 15 列不变形）
+            // ScrLk / Pause 在现代系统没用途，位置留空（补满左区 4 列）
             {k: "spacer", l: "", w: 2},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "key", l: "Ins", c: 110}, {k: "key", l: "Home", c: 102},
             {k: "key", l: "PgUp", c: 104},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "key", l: "NumLk", c: 69}, {k: "key", l: "/", c: 98},
             {k: "key", l: "*", c: 55}, {k: "key", l: "-", c: 74},
-            {k: "spacer", l: "", w: 1}
+            {k: "spacer", l: "", w: 1.25}
         ],
         [
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 1.25},
             {k: "spacer", l: "", w: 4},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "key", l: "Del", c: 111}, {k: "key", l: "End", c: 107},
             {k: "key", l: "PgDn", c: 109},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
+            // + 跨两行（rs: 2），占掉下一行右区最右那一格
             {k: "key", l: "7", c: 71}, {k: "key", l: "8", c: 72},
             {k: "key", l: "9", c: 73}, {k: "key", l: "+", c: 78, rs: 2},
-            {k: "spacer", l: "", w: 1}
+            {k: "spacer", l: "", w: 1.25}
         ],
         [
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 1.25},
             {k: "key", l: "F1", c: 59}, {k: "key", l: "F2", c: 60},
             {k: "key", l: "F3", c: 61}, {k: "key", l: "F4", c: 62},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "spacer", l: "", w: 3},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "key", l: "4", c: 75}, {k: "key", l: "5", c: 76},
             {k: "key", l: "6", c: 77},
-            {k: "spacer", l: "", w: 1}
+            // 右区第 4 格由上一行的 + 跨行占着，这里不写东西，
+            // layoutFlat 会跳过它，收尾 spacer 自然落到右沿
+            {k: "spacer", l: "", w: 1.25}
         ],
         [
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 1.25},
             {k: "key", l: "F5", c: 63}, {k: "key", l: "F6", c: 64},
             {k: "key", l: "F7", c: 65}, {k: "key", l: "F8", c: 66},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "spacer", l: "", w: 1},
             {k: "key", l: "↑", c: 103},
             {k: "spacer", l: "", w: 1},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
+            // Enter 跨两行（和 + 一致）：0 和 . 左移一格后，右区最右那一列
+            // 在最后一行是空的，正好给 Enter 的下半截用
             {k: "key", l: "1", c: 79}, {k: "key", l: "2", c: 80},
             {k: "key", l: "3", c: 81}, {k: "key", l: "Enter", c: 96, rs: 2},
-            {k: "spacer", l: "", w: 1}
+            {k: "spacer", l: "", w: 1.25}
         ],
         [
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 1.25},
             {k: "key", l: "F9", c: 67}, {k: "key", l: "F10", c: 68},
             {k: "key", l: "F11", c: 87}, {k: "key", l: "F12", c: 88},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
             {k: "key", l: "←", c: 105}, {k: "key", l: "↓", c: 108},
             {k: "key", l: "→", c: 106},
-            {k: "spacer", l: "", w: 1},
+            {k: "spacer", l: "", w: 0.75},
+            // 0 贴右区左沿（横跨两格，落在 1、2 下面），. 落在 3 下面；
+            // 最右那一列留给上面跨行下来的 Enter
             {k: "key", l: "0", c: 82, w: 2}, {k: "key", l: ".", c: 83},
-            {k: "page", l: "", to: "page1", icon: "layers", active: true}
+            // 右边距那格就是页面切换键本身（1.25 = 左右边距宽度）
+            {k: "page", l: "", to: "page1", icon: "layers", w: 1.25, active: true}
         ]
     ]
 }

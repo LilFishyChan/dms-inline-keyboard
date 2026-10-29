@@ -159,3 +159,16 @@ test("resize: normalizeSize 的下限也有 80% 保护", () => {
     assert.equal(got.w, 840, "1050 * 0.8");
     assert.equal(got.h, Math.round(444 * 0.8));
 });
+
+test("planResize: 纵向只动被拖的那条边（没有对称模式）", () => {
+    // 拖上边向上 50px：只把上边往上推，高度 +50
+    assert.equal(plan("n", 0, -50).h, 450);
+    // 拖下边向下 50px：同样只 +50
+    assert.equal(plan("s", 0, 50).h, 450);
+});
+
+test("planResize: symmetric 只管横轴", () => {
+    const onlyX = plan("e", 100, 0, { symmetric: true });
+    assert.equal(onlyX.w, 1200);
+    assert.equal(onlyX.h, 400, "横轴对称不该影响高度");
+});

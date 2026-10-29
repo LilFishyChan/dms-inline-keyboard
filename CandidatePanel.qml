@@ -87,7 +87,9 @@ Item {
             measure.text = text
             // 容器宽 = 文字 + 左右各 ⅓ 键宽；上限是整行宽度，
             // 再长就独占一行，文字由 delegate 用省略号截断
-            const w = Math.min(measure.advanceWidth + pad, availW)
+            // ceil 掉小数：小数宽度交给渲染层会各自舍入，
+            // 累加几格之后右边界就和 availW 对不上
+            const w = Math.min(Math.ceil(measure.advanceWidth + pad), availW)
 
             if (x > 0 && x + w > availW) {
                 // 换行：把上一行最后一项的 sep 关掉
@@ -253,13 +255,25 @@ Item {
                     id: labelText
 
                     anchors.centerIn: parent
+                    // cell.width = 文字宽 + pad，减掉 pad 就正好等于文字宽，
+                    // 一点余量都没有；implicitWidth 因抗锯齿常比 advanceWidth
+                    // 大零点几像素，Math.min 取到那个值就会把整词省略成「砰...」。
+                    // 加 1px 余量（和 CandidateBar 首项同一处理），ceil 掉小数。
                     width: Math.min(implicitWidth,
-                                    Math.max(0, cell.width - candList.unit * 2 / 3))
+                                    Math.max(0, Math.ceil(cell.width - candList.unit * 2 / 3) + 1))
                     elide: Text.ElideRight
                     text: cell.modelData.t
                     color: candList.fgColor
                     font.pixelSize: candList.candFontSize
                     font.weight: Font.Normal
+                }
+
+                // 涟漪：用现有 MouseArea 的按下/松开驱动，不改事件模型
+                Ripple {
+                    id: cellRipple
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    cornerRadius: 7
                 }
 
                 MouseArea {
@@ -268,6 +282,9 @@ Item {
                     hoverEnabled: true
                     // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
                     onClicked: candList.controller.selectCandidate(cell.modelData.i)
+                    onPressed: mouse => cellRipple.press(mouse.x, mouse.y)
+                    onReleased: cellRipple.release()
+                    onCanceled: cellRipple.release()
                 }
 
                 // 分隔线：竖在容器右侧空隙正中，行末不画
