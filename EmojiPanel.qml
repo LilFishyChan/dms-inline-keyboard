@@ -109,11 +109,9 @@ Item {
                     id: tap
                     onTapped: panel.controller.textCommitRequested(cell.modelData)
                     onPressedChanged: {
-                        // 诊断：centroid 在这个 Qt 版本里是 null，point 才是当前触点
+                        // 圆心取当前触点：本机 Qt 版本里 centroid 恒为 null，只有 point 有效；
+                        // 两个都拿不到就退回格子中心，至少还有涟漪
                         const p = tap.point ? tap.point.position : null
-                        console.error("[emoji/ripple] pressed=" + pressed
-                                      + " point=" + (p ? (p.x + "," + p.y) : "null")
-                                      + " cell=" + Math.round(cell.width) + "x" + Math.round(cell.height))
                         if (pressed) {
                             const pt = (p && !isNaN(p.x) && !isNaN(p.y))
                                        ? p : Qt.point(cell.width / 2, cell.height / 2)

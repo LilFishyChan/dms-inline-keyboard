@@ -1,6 +1,6 @@
 .pragma library
 
-// Inline Keyboard 布局数据。与 prototype/layout.js 同构（HTML 原型验证过的定稿）。
+// Inline Keyboard 布局数据。
 // 行宽统一 15 单位（真键盘主键区宽度）。
 //
 // 键字段：

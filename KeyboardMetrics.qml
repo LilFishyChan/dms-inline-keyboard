@@ -49,7 +49,6 @@ QtObject {
     // 调整大小时的预览框就对不上卡片（踩过：444 名义、实际 450）。
     //
     // 直接解出 keyH，避免「keyH 依赖 handleH、handleH 依赖 keyH」的循环绑定。
-    // 卡片实际高度：底部两项留白已去掉
     readonly property real cardHeight: kbHeight - pad - gap
     readonly property real verticalSlack:
         cardHeight - pad - gap - (keyRowCount - 1) * gap

@@ -8,14 +8,14 @@
 //   inline-keyboard-status.json   面板状态，每 200ms 刷新
 //   inline-keyboard-imlist.json   键盘打开时刷新的输入法清单
 
-/// 解析面板状态。
-///
-/// 解析失败（文件半写、还没生成、字段缺失）时**保留上一次的值**：
-/// 直接清空会让候选栏和空格键标识闪一下，体验很差。
-///
-/// @param {string} raw  addon 写出的 JSON 文本
-/// @param {object} prev 上一次解析结果（可为 null）
-/// @returns {object} 归一化后的状态
+// 解析面板状态。
+//
+// 解析失败（文件半写、还没生成、字段缺失）时**保留上一次的值**：
+// 直接清空会让候选栏和空格键标识闪一下，体验很差。
+//
+// @param {string} raw  addon 写出的 JSON 文本
+// @param {object} prev 上一次解析结果（可为 null）
+// @returns {object} 归一化后的状态
 function parseStatus(raw, prev) {
     // 失败路径返回副本：直接返回 prev 会让调用方拿到同一个对象，
     // 后续一旦原地改字段，上次的状态就被污染了（单测抓到的真实问题）。
@@ -88,10 +88,10 @@ function emptyStatus() {
     };
 }
 
-/// 解析输入法清单。
-///
-/// 空数组 / 非法内容都保留上一次：清单只在键盘打开时刷新，
-/// 中间态不该把长按菜单打空。
+// 解析输入法清单。
+//
+// 空数组 / 非法内容都保留上一次：清单只在键盘打开时刷新，
+// 中间态不该把长按菜单打空。
 function cloneIm(x) {
     return {
         name: x.name, title: x.title, label: x.label,
@@ -127,11 +127,11 @@ function parseImList(raw, prev) {
     return out.length > 0 ? out : keep;
 }
 
-/// 输入法是否处于「英文字模式」。
-///
-/// fcitx5 的 inputMethodLabel() 给的是子模式标签：rime 中文是「万」、
-/// 英文是「abc」，键盘布局是「en」。判断依据是标签是否为纯 ASCII 字母
-/// （"abc"/"en" → 英文；"万"/"中"/"ㄓ" → 中文），比硬编码具体字串通用。
+// 输入法是否处于「英文字模式」。
+//
+// fcitx5 的 inputMethodLabel() 给的是子模式标签：rime 中文是「万」、
+// 英文是「abc」，键盘布局是「en」。判断依据是标签是否为纯 ASCII 字母
+// （"abc"/"en" → 英文；"万"/"中"/"ㄓ" → 中文），比硬编码具体字串通用。
 function isAsciiMode(imLabel) {
     if (typeof imLabel !== "string" || imLabel === "") {
         return false;
@@ -139,11 +139,11 @@ function isAsciiMode(imLabel) {
     return /^[A-Za-z]+$/.test(imLabel);
 }
 
-/// 输入法清单 + 当前状态 → 地球键循环用的平铺行。
-///
-/// 拼音类输入法会拆成「中文」「英文」两行，点哪行就切到哪个状态；
-/// 纯键盘布局只有一行。current 只标一行——地球键靠它算下一项，
-/// 标错就会出现「点了没反应」。
+// 输入法清单 + 当前状态 → 地球键循环用的平铺行。
+//
+// 拼音类输入法会拆成「中文」「英文」两行，点哪行就切到哪个状态；
+// 纯键盘布局只有一行。current 只标一行——地球键靠它算下一项，
+// 标错就会出现「点了没反应」。
 function buildImRows(imList, currentIm, imLabel) {
     const out = [];
     const list = Array.isArray(imList) ? imList : [];
@@ -179,9 +179,9 @@ function buildImRows(imList, currentIm, imLabel) {
     return out;
 }
 
-/// 地球键单击：算出下一个要切到哪一项。
-///
-/// @returns {object|null} 下一项；清单为空时返回 null
+// 地球键单击：算出下一个要切到哪一项。
+//
+// @returns {object|null} 下一项；清单为空时返回 null
 function nextImRow(rows) {
     const list = Array.isArray(rows) ? rows : [];
     if (list.length === 0) {
@@ -198,28 +198,28 @@ function nextImRow(rows) {
     return list[nextIdx];
 }
 
-/// 展开列表要显示的候选：跳过顶栏已经显示的那几个。
-///
-/// @param {string[]} all  全量候选
-/// @param {number} shownInBar 顶栏已显示的个数
+// 展开列表要显示的候选：跳过顶栏已经显示的那几个。
+//
+// @param {string[]} all  全量候选
+// @param {number} shownInBar 顶栏已显示的个数
 function expandedCandidates(all, shownInBar) {
     const list = Array.isArray(all) ? all : [];
     const n = Number.isInteger(shownInBar) && shownInBar > 0 ? shownInBar : 0;
     return n > 0 ? list.slice(n) : list.slice();
 }
 
-/// 顶栏显示几个候选：固定从头开始，最多 max 个。
-/// 用户要求「固定第一页，不跟随翻页」，所以不做分页偏移。
+// 顶栏显示几个候选：固定从头开始，最多 max 个。
+// 用户要求「固定第一页，不跟随翻页」，所以不做分页偏移。
 function barCandidates(all, max) {
     const list = Array.isArray(all) ? all : [];
     const n = Number.isInteger(max) && max > 0 ? max : list.length;
     return list.slice(0, n);
 }
 
-/// Esc 与 `` ` ``/`~` 对调：把布局里 keycode 41（反引号）那格换成 Esc。
-///
-/// 想按习惯把 Esc 放左上角的人用（设置项 escSwap）。只换显示和键码，
-/// 宽度、Fn 层都跟着原位置走。
+// Esc 与 `` ` ``/`~` 对调：把布局里 keycode 41（反引号）那格换成 Esc。
+//
+// 想按习惯把 Esc 放左上角的人用（设置项 escSwap）。只换显示和键码，
+// 宽度、Fn 层都跟着原位置走。
 function swapEscTilde(layoutRows) {
     const rows = Array.isArray(layoutRows) ? layoutRows : []
     const out = []
@@ -239,7 +239,7 @@ function swapEscTilde(layoutRows) {
     return out
 }
 
-/// 动作表里有没有这个 id。用于拖动落盘前判断目标还在不在。
+// 动作表里有没有这个 id。用于拖动落盘前判断目标还在不在。
 function actionExists(actions, id) {
     const list = Array.isArray(actions) ? actions : []
     for (const a of list) {
@@ -250,8 +250,8 @@ function actionExists(actions, id) {
     return false
 }
 
-/// 某个动作在快捷栏里的索引，找不到返回 -1。
-/// 拖动落点与「哪一格让位」都靠它换算。
+// 某个动作在快捷栏里的索引，找不到返回 -1。
+// 拖动落点与「哪一格让位」都靠它换算。
 function quickBarIndexFor(quickBarResolved, id) {
     const list = Array.isArray(quickBarResolved) ? quickBarResolved : []
     for (let i = 0; i < list.length; i++) {

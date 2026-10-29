@@ -1,7 +1,11 @@
 {
   "Inline Keyboard": {
-    "Touch keyboard for DMS with fcitx5-backed candidates (kimpanel)": "DMS 上的触摸键盘，候选词走 fcitx5 kimpanel",
+    "On-screen touch keyboard for DMS with fcitx5 candidates drawn in-keyboard.": "DMS 上的屏幕触摸键盘，候选词直接画在键盘里。",
     "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": "键盘用 `dms ipc call inlineKeyboard toggle` 开合，也可以把 DankBar 上的小部件加进来。",
+    "Optional: fcitx5 bridge": "可选扩展：fcitx5 桥接",
+    "Connected — candidates, preedit and the globe switcher are live.": "已连接 —— 候选、拼音串和地球键切换都可用。",
+    "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": "候选、拼音串和地球键切换都来自一个 fcitx5 小扩展。没装它也能打字（按键走 ydotool），只是候选栏一直是空的。",
+    "Copy install commands": "复制安装命令",
     "Appearance": "外观",
     "Background opacity": "背景透明度",
     "Opacity of the keyboard panel itself.": "键盘面板本身的透明度",

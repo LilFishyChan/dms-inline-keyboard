@@ -80,9 +80,8 @@ Item {
                         id: chipTap
                         onTapped: bar.controller.emojiCategory = modelData.id
                         onPressedChanged: {
+                            // 圆心取触点（centroid 在本机 Qt 版本里恒为 null，用 point）
                             const p = chipTap.point ? chipTap.point.position : null
-                            console.error("[emoji/chip] pressed=" + pressed
-                                          + " point=" + (p ? (p.x + "," + p.y) : "null"))
                             if (pressed) {
                                 const pt = (p && !isNaN(p.x) && !isNaN(p.y))
                                            ? p : Qt.point(chip.width / 2, chip.height / 2)

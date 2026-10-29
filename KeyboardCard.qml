@@ -32,15 +32,12 @@ Rectangle {
     property bool dragEnabled: false
     // 长按自动重复的间隔（毫秒），由设置页配置
     property int repeatInterval: 60
-    // 候选/快捷栏：接入 fcitx5 之前先不显示
-    // 候选栏整行的开关：有候选才占位显示
-    // 显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，不是当前有没有词。
-    // 纯键盘布局（keyboard-us 这类）没有候选能力，不显示；
+    // 候选栏整行的开关：显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，
+    // 不是当前有没有词。纯键盘布局（keyboard-us 这类）没有候选能力，不显示；
     // rime 的中英文模式都会出候选，所以即使这一刻 items 还空着也占位。
     //
     // 注意写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成
     // 「第一行求值 + 第二行变成独立语句」，值悄悄算错（踩过）。
-    // 由窗口赋值（窗口按输入法判据算），默认不显示。
     property bool showCandBar: false
 
     // 状态
@@ -1078,16 +1075,10 @@ Rectangle {
                     + Math.max(0, root.layoutRowCount - 1) * root.gap
 
             // ---- 候选列表页 ----
-            // 必须用 Loader 的 active 而不是 visible：visible: false 的子项
-            // 仍然会被实例化（Repeater 把上千个 delegate 全建出来），
-            // 而 active: false 时整棵子树根本不存在。
-            // 实测 2000 个候选、未展开时 RSS 只多 40KB 是因为 Qt 延迟分配，
-            // 但对象确实都建了，反复开关会累积。
-            // 一直持有，只切可见性。
-            // 之前用 Loader active 控制「未展开时完全不创建」，但实测反复
-            // 展开/收起会在销毁那一刻把内存冲到 6GB 并搞崩 qs —— 大子树
-            // 的销毁/重建比一直持有贵得多。现在改成常驻 + 隐藏，内部
-            // 靠 shownCount 控制实际实例化数量（默认一屏 60 项）。
+            // 常驻实例 + 切可见性，不用 Loader 的 active 来回开关：实测反复
+            // 展开/收起会在销毁那一刻把内存冲到 6GB 并搞崩 qs —— 大子树的
+            // 销毁/重建比一直持有贵得多。实际实例化数量由内部的 shownCount
+            // 控制（默认一屏 60 项），所以「常驻」不等于把上千个 delegate 都建出来。
             CandidatePanel {
                 id: candListPanel
                 Component.onCompleted: root.candListPanel = candListPanel

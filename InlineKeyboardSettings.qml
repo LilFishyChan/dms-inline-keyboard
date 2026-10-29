@@ -71,6 +71,39 @@ PluginSettings {
         }
     }
 
+    // ---- 可选扩展：fcitx5 桥接 ----
+    // 装了 addon 才有候选、拼音串和地球键切换；没装也能打字（按键走 ydotool）
+    property bool bridgeUp: false
+
+    Process {
+        id: bridgeCheck
+        running: false
+        // 和 daemonCheck 同理由：文件残留会误判，所以测的是 socket 本身
+        command: ["sh", "-c", 'test -S "$XDG_RUNTIME_DIR/inline-keyboard.sock"']
+        onExited: code => root.bridgeUp = (code === 0)
+    }
+
+    Timer {
+        interval: 5000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: bridgeCheck.running = true
+    }
+
+    // 安装命令直接摆出来，省得用户回 README 找
+    readonly property string installCommands:
+        "git clone https://github.com/LilFishyChan/fcitx5-inline-keyboard-status\n" +
+        "cd fcitx5-inline-keyboard-status && cmake -B build -G Ninja && ninja -C build\n" +
+        "cmake --install build --prefix ~/.local\n" +
+        "systemctl --user restart 'app-org.fcitx.Fcitx5@autostart.service'"
+
+    Process {
+        id: copyInstall
+        running: false
+        command: ["dms", "cl", "copy", root.installCommands]
+    }
+
     // 正在改图标的动作索引（-1 = 没在选）
     property int pickerIndex: -1
 
@@ -405,6 +438,74 @@ PluginSettings {
         font.pixelSize: Theme.fontSizeMedium
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
+    }
+
+    // ---------------- 可选扩展 ----------------
+    // 装了就收成一行「已连接」，没装才展开安装步骤 —— 已经把说明塞满页面了
+    Column {
+        width: parent.width
+        spacing: Math.round(Theme.spacingS)
+
+        StyledText {
+            width: parent.width
+            text: root.tr("Optional: fcitx5 bridge")
+            font.pixelSize: Theme.fontSizeLarge
+            font.weight: Font.Bold
+            color: Theme.surfaceText
+            topPadding: Theme.spacingL
+        }
+
+        StyledText {
+            width: parent.width
+            text: root.bridgeUp
+                  ? root.tr("Connected — candidates, preedit and the globe switcher are live.")
+                  : root.tr("Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.")
+            font.pixelSize: Theme.fontSizeMedium
+            color: root.bridgeUp ? Theme.primary : Theme.surfaceVariantText
+            wrapMode: Text.WordWrap
+        }
+
+        Rectangle {
+            width: parent.width
+            visible: !root.bridgeUp
+            height: visible ? cmdText.implicitHeight + 28 : 0
+            radius: 10
+            color: Theme.withAlpha(Theme.surfaceText, 0.06)
+
+            Text {
+                id: cmdText
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 14
+                text: root.installCommands
+                color: Theme.surfaceText
+                font.family: "monospace"
+                font.pixelSize: 12
+                wrapMode: Text.WrapAnywhere
+            }
+        }
+
+        Rectangle {
+            width: 190
+            height: 36
+            visible: !root.bridgeUp
+            radius: 18
+            color: Theme.withAlpha(Theme.surfaceText, 0.12)
+
+            Text {
+                anchors.centerIn: parent
+                text: root.tr("Copy install commands")
+                color: Theme.surfaceText
+                font.pixelSize: 14
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: copyInstall.running = true
+            }
+        }
     }
 
     // ---------------- 外观 ----------------

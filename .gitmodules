@@ -1,3 +1,0 @@
-[submodule "fcitx5-addon"]
-	path = fcitx5-addon
-	url = https://github.com/LilFishyChan/fcitx5-inlineKeyboard.git
