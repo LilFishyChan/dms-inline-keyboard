@@ -376,15 +376,6 @@ Being explicit about that, because it matters for anyone evaluating the code:
 - **No AI-generated code was merged without running it.** If you find something
   that contradicts the table above, that is a bug — please open an issue.
 
-## Roadmap
-
-1. Splitting `KeyboardCard.qml` (~1400 lines / 130 properties) into smaller
-   components — the resize panel and candidate panel are the obvious first cuts
-2. Long-press alternate characters on the letter keys
-3. Optional: space commits the first candidate while a candidate list is open
-4. More layouts beyond the current phone-style pages
-
-## License
 
 GPL-3.0-only.
 

@@ -51,7 +51,7 @@ Item {
     // 不加的话这一行是透明的，在表情页 / 功能页上会透过分类条、列表看到重叠的内容。
     Rectangle {
         anchors.fill: parent
-        radius: Theme.cornerRadius
+        radius: height / 2
         color: Theme.withAlpha(Theme.surface,
                                voiceBar.controller ? voiceBar.controller.bgOpacity : 1.0)
     }
@@ -144,14 +144,20 @@ Item {
             color: Theme.surfaceText
             font.pixelSize: Math.max(12, Math.round(voiceBar.mkeyH * 0.3))
             font.weight: Font.Medium
+
+            // 点文字 = 关掉语音
+            TapHandler {
+                enabled: voiceBar.text !== ""
+                onTapped: voiceBar.controller.voiceMicRequested()
+            }
         }
 
-        // 还没识别出文字时给个占位，免得整行空着像坏了
+        // 只在没激活时提示，录音中不占位
         Text {
             anchors.verticalCenter: parent.verticalCenter
             x: label.x
-            visible: voiceBar.text === ""
-            text: I18n.trFor("inlineKeyboard", "Listening…")
+            visible: voiceBar.text === "" && !voiceBar.controller.voiceActive
+            text: I18n.trFor("inlineKeyboard", "Tap the mic on the right to start")
             color: Theme.withAlpha(Theme.surfaceText, 0.55)
             font.pixelSize: label.font.pixelSize
         }

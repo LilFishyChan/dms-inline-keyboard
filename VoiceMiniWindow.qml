@@ -87,15 +87,21 @@ PanelWindow {
     }
 
 
+    // 描边画在背景外面，否则会被 VoiceBar 自己的背景盖住内边缘
+    Rectangle {
+        anchors.fill: parent
+        radius: height / 2
+        color: "transparent"
+        border.width: 2
+        border.color: Theme.withAlpha(Theme.primary, 0.5)
+    }
+
     Rectangle {
         id: capsule
         anchors.fill: parent
+        anchors.margins: 2
         radius: height / 2
         color: Theme.withAlpha(Theme.surface, controller ? controller.bgOpacity : 1.0)
-        // 浮在应用之上，加一圈描边把边界勾出来
-        border.width: 2
-        border.color: Theme.withAlpha(Theme.primary, 0.5)
-
 
         // 一行内容：左缩小 / 中文字 / 右麦克风
         VoiceBar {
