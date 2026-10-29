@@ -1254,6 +1254,7 @@ PluginComponent {
 
         // 调试用：表情页的段 / 分类（写的是卡片上的属性，和点分类条效果一致）
         function setEmojiFilter(segment: string, category: string): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "INLINE_KEYBOARD_EMOJI:no-card"
@@ -1266,6 +1267,7 @@ PluginComponent {
 
         // 调试用：走和点表情一模一样的上屏通路（addon commit / 剪贴板兜底）
         function typeText(text: string): string {
+            if (!root.devMode) return "dev mode off"
             return "INLINE_KEYBOARD_TEXT:" + root.typeText(text)
                    + ":" + root.lastTextCommitVia
         }
@@ -1273,6 +1275,7 @@ PluginComponent {
         // 调试用：走和触摸换页键完全相同的入口（卡片 → handleKey），
         // 验证换页分发而不是绕过它。setPage 是直接赋值，绕过 handleKey。
         function pressPageKey(to: string): string {
+            if (!root.devMode) return "dev mode off"
             root.handleKey({k: "page", to: to})
             return "INLINE_KEYBOARD_PAGE:" + root.page
         }
@@ -1285,23 +1288,27 @@ PluginComponent {
 
         // 调试用：直接设修饰键状态（0 未激活 / 1 一次性 / 2 锁定），自测高亮用
         function setModifier(name: string, state: int): string {
+            if (!root.devMode) return "dev mode off"
             root.setModifierState(name, state)
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
 
         // 调试用：等于点一下某个修饰键（走和触摸完全相同的 cycleModifier）
         function tapModifier(name: string): string {
+            if (!root.devMode) return "dev mode off"
             root.cycleModifier(name)
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
 
         // 调试用：按住 / 松开修饰键（noLock 模式靠这两个）
         function pressModifier(name: string): string {
+            if (!root.devMode) return "dev mode off"
             root.modifierPress(Modifiers.keyDataFor(name))
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
 
         function releaseModifier(name: string): string {
+            if (!root.devMode) return "dev mode off"
             root.modifierRelease(Modifiers.keyDataFor(name))
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
@@ -1311,6 +1318,7 @@ PluginComponent {
 
         // 调试用：模拟按一个普通键（键码），返回所有修饰键状态
         function pressDebugKey(code: int, sym: string): string {
+            if (!root.devMode) return "dev mode off"
             // 带键名才会走 socket 直通；不带时退回 ydotool（和真实按键一致）
             root.handleKey({ k: "char", c: code, l: sym })
             return root.stateSummary()
@@ -1326,11 +1334,13 @@ PluginComponent {
         }
 
         function modifierStates(): string {
+            if (!root.devMode) return "dev mode off"
             return root.stateSummary()
         }
 
         // 调试用：切修饰键切换方式（noLock / toggle / tapLock / doubleTapLock）
         function setModifierMode(mode: string): string {
+            if (!root.devMode) return "dev mode off"
             root.modifierMode = mode
             root.clearModifierStates()
             return "INLINE_KEYBOARD_MODIFIER_MODE:" + root.modifierMode
@@ -1370,12 +1380,14 @@ PluginComponent {
         }
 
         function setMode(m: string): string {
+            if (!root.devMode) return "dev mode off"
             root.mode = m
             return "INLINE_KEYBOARD_MODE:" + m
         }
 
         // 恢复默认动作表
         function resetActions(): string {
+            if (!root.devMode) return "dev mode off"
             root.actions = root.defaultActions
             root.slotActionId = "float"
             PluginService.savePluginData(root.pluginId, "actions", root.defaultActions)
@@ -1385,6 +1397,7 @@ PluginComponent {
 
         // 调试用：动作列表编辑态
         function setEditing(v: bool): string {
+            if (!root.devMode) return "dev mode off"
             root.editing = v
             return "INLINE_KEYBOARD_EDITING:" + v
         }
@@ -1675,6 +1688,7 @@ PluginComponent {
 
         // 调试用：直接设置固定栏动作（逗号分隔的动作 id），验证编辑态视觉用
         function setQuickBar(ids: string): string {
+            if (!root.devMode) return "dev mode off"
             const wanted = String(ids || "").split(",").map(s => s.trim()).filter(s => s !== "")
             const byId = ({})
             const list = root.actions || []

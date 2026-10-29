@@ -194,9 +194,7 @@ longer exist. A change inside a nested component sometimes survives
 |---|---|
 | `dms ipc call inlineKeyboard open` / `close` / `toggle` | Show / hide / toggle the keyboard |
 | `dms ipc call inlineKeyboard toggleFloat` | Switch docked ↔ floating |
-| `dms ipc call inlineKeyboard setMode <keys\|functions\|transparency\|resize>` | Switch panel |
 | `dms ipc call inlineKeyboard setPage <page1\|page2\|emoji>` | Switch key page |
-| `dms ipc call inlineKeyboard resetActions` | Restore the default action set |
 
 ## Emoji & symbols
 

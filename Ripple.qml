@@ -70,7 +70,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: root.cornerRadius
-            color: "#ffffff"
+            color: Theme.onSurface
             antialiasing: true
         }
     }

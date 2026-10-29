@@ -45,7 +45,7 @@ Item {
 
     // controller 在构造期可能还是 null，所有取它的地方都要有兜底，
     // 否则组件直接报 TypeError、整个插件 disabled（实测）。
-    readonly property color fgColor: controller ? controller.fg : "#000000"
+    readonly property color fgColor: controller ? controller.fg : Theme.surfaceText
 
     width: parent ? parent.width : 0
     height: areaH
@@ -308,7 +308,7 @@ Item {
                     ? candList.controller.tr("Loading…")
                     : candList.controller.tr("No candidates")
             }
-            color: Theme.withAlpha(candList.controller ? candList.fgColor : "#000", 0.4)
+            color: Theme.withAlpha(candList.controller ? candList.fgColor : Theme.surfaceText, 0.4)
             font.pixelSize: candList.candFontSize
         }
     }

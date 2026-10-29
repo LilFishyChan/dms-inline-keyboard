@@ -2,6 +2,7 @@
 // 由 TransparencyPanel 实例化两次（背景 / 按键），改值通过 moved 信号交给调用方。
 import QtQuick
 import qs.Common
+import qs.DCommon.Widgets as DCommon
 
 Item {
     id: root
@@ -25,36 +26,28 @@ Item {
         width: parent.width
         spacing: 10
 
-        Row {
+        Item {
             id: labelRow
             width: parent.width
-            spacing: 8
+            height: labelText.implicitHeight
 
             Text {
+                id: labelText
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
                 text: root.label
                 color: root.textColor
                 font.pixelSize: root.labelPixelSize
             }
-            // 把百分比推到右边；数字最宽的「100%」留 60px
-            Item {
-                width: Math.max(0, parent.width - 160 - 60)
-                height: 1
-            }
-            Text {
-                text: Math.round(root.value * 100) + "%"
-                color: Theme.primary
-                font.pixelSize: root.labelPixelSize
-            }
         }
 
-        Slider {
+        DCommon.DSlider {
             id: valueSlider
             width: parent.width
-            height: 28
-            value: root.value
-            from: root.minimum
-            to: root.maximum
-            onMoved: v => root.moved(v)
+            value: Math.round(root.value * 100)
+            minimum: Math.round(root.minimum * 100)
+            maximum: Math.round(root.maximum * 100)
+            onSliderValueChanged: v => root.moved(v / 100.0)
         }
     }
 }

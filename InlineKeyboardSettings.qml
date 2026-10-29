@@ -62,14 +62,11 @@ PluginSettings {
         }
     }
 
-    Timer {
-        interval: 3000
-        running: true
-        repeat: true
-        onTriggered: {
-            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"']
-            daemonCheck.running = true
-        }
+    // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
+    Component.onCompleted: {
+        daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"']
+        daemonCheck.running = true
+        bridgeCheck.running = true
     }
 
     // ---- 可选扩展：fcitx5 桥接 ----
@@ -82,14 +79,6 @@ PluginSettings {
         // 和 daemonCheck 同理由：文件残留会误判，所以测的是 socket 本身
         command: ["sh", "-c", 'test -S "$XDG_RUNTIME_DIR/inline-keyboard.sock"']
         onExited: code => root.bridgeUp = (code === 0)
-    }
-
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: bridgeCheck.running = true
     }
 
     // 安装命令直接摆出来，省得用户回 README 找
@@ -358,34 +347,34 @@ PluginSettings {
         visible: !root.ydotooldUp
         width: parent.width
         height: visible ? 132 : 0
-        radius: 14
+        radius: Theme.cornerRadius
         color: Theme.withAlpha(Theme.surfaceText, 0.07)
 
         Text {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: 16
-            anchors.rightMargin: 16
-            anchors.topMargin: 14
+            anchors.leftMargin: Theme.spacingM
+            anchors.rightMargin: Theme.spacingM
+            anchors.topMargin: Theme.spacingM
             text: root.tr("ydotoold is not running — the keyboard cannot type until it starts.")
             color: Theme.surfaceText
             wrapMode: Text.WordWrap
-            font.pixelSize: 15
+            font.pixelSize: Theme.fontSizeMedium
         }
 
         Text {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: 16
-            anchors.rightMargin: 16
+            anchors.leftMargin: Theme.spacingM
+            anchors.rightMargin: Theme.spacingM
             anchors.topMargin: 40
             text: root.tr("Start it once below, or enable it permanently so it survives a reboot: "
                           + "systemctl --user enable --now ydotool")
             color: Theme.withAlpha(Theme.surfaceText, 0.7)
             wrapMode: Text.WordWrap
-            font.pixelSize: 13
+            font.pixelSize: Theme.fontSizeSmall
         }
 
         Row {
@@ -448,7 +437,7 @@ PluginSettings {
             width: parent.width
             visible: !root.bridgeUp
             height: visible ? cmdText.implicitHeight + 28 : 0
-            radius: 10
+            radius: Theme.cornerRadius
             color: Theme.withAlpha(Theme.surfaceText, 0.06)
 
             Text {
@@ -460,7 +449,7 @@ PluginSettings {
                 text: root.installCommands
                 color: Theme.surfaceText
                 font.family: "monospace"
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.WrapAnywhere
             }
         }
@@ -843,33 +832,11 @@ PluginSettings {
             }
 
             // 名称
-            Rectangle {
+            DCommon.DTextField {
+                id: labelInput
                 width: parent.width
-                height: 36
-                radius: Theme.cornerRadius
-                color: Theme.surfaceContainer
-
-                TextInput {
-                    id: labelInput
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.spacingM
-                    anchors.rightMargin: Theme.spacingM
-                    verticalAlignment: TextInput.AlignVCenter
-                    color: Theme.surfaceText
-                    font.pixelSize: Theme.fontSizeMedium
-                    selectByMouse: true
-                    onTextChanged: root.draftLabel = text
-                }
-
-                StyledText {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingM
-                    verticalAlignment: Text.AlignVCenter
-                    visible: labelInput.text === ""
-                    text: root.tr("Name")
-                    color: Theme.withAlpha(Theme.surfaceVariantText, 0.8)
-                    font.pixelSize: Theme.fontSizeMedium
-                }
+                placeholderText: root.tr("Name")
+                onTextEdited: root.draftLabel = text
             }
 
             // 图标 + 命令
@@ -897,33 +864,11 @@ PluginSettings {
                     }
                 }
 
-                Rectangle {
+                DCommon.DTextField {
+                    id: cmdInput
                     width: parent.width - 36 - Theme.spacingS
-                    height: 36
-                    radius: Theme.cornerRadius
-                    color: Theme.surfaceContainer
-
-                    TextInput {
-                        id: cmdInput
-                        anchors.fill: parent
-                        anchors.leftMargin: Theme.spacingM
-                        anchors.rightMargin: Theme.spacingM
-                        verticalAlignment: TextInput.AlignVCenter
-                        color: Theme.surfaceText
-                        font.pixelSize: Theme.fontSizeMedium
-                        selectByMouse: true
-                        onTextChanged: root.draftCmd = text
-                    }
-
-                    StyledText {
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingM
-                        verticalAlignment: Text.AlignVCenter
-                        visible: cmdInput.text === ""
-                        text: root.tr("Command, e.g. grim -g \"$(slurp)\"")
-                        color: Theme.withAlpha(Theme.surfaceVariantText, 0.8)
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
+                    placeholderText: root.tr("Command, e.g. grim -g \"$(slurp)\"")
+                    onTextEdited: root.draftCmd = text
                 }
             }
 
@@ -1024,34 +969,12 @@ PluginSettings {
             }
 
             // 搜索框：回车直接采用输入的名字（自定义图标名）
-            Rectangle {
+            DCommon.DTextField {
+                id: iconQueryInput
                 width: parent.width
-                height: 36
-                radius: Theme.cornerRadius
-                color: Theme.surfaceContainer
-
-                TextInput {
-                    id: iconQueryInput
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.spacingM
-                    anchors.rightMargin: Theme.spacingM
-                    verticalAlignment: TextInput.AlignVCenter
-                    color: Theme.surfaceText
-                    font.pixelSize: Theme.fontSizeMedium
-                    selectByMouse: true
-                    onTextChanged: root.iconQuery = text
-                    onAccepted: root.applyIcon(text)
-                }
-
-                StyledText {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingM
-                    verticalAlignment: Text.AlignVCenter
-                    visible: iconQueryInput.text === ""
-                    text: root.tr("Search, or type a name and press Enter")
-                    color: Theme.withAlpha(Theme.surfaceVariantText, 0.8)
-                    font.pixelSize: Theme.fontSizeSmall
-                }
+                placeholderText: root.tr("Search, or type a name and press Enter")
+                onTextEdited: root.iconQuery = text
+                onAccepted: root.applyIcon(text)
             }
 
             GridView {
@@ -1063,7 +986,7 @@ PluginSettings {
                 cellHeight: 48
                 clip: true
                 model: root.filteredIcons
-                ScrollBar.vertical: ScrollBar { }
+                ScrollBar.vertical: DCommon.DScrollbar { targetFlickable: iconGrid }
 
                 delegate: Rectangle {
                     required property string modelData

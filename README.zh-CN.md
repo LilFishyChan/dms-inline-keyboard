@@ -178,9 +178,7 @@ QML 按路径缓存编译产物 —— 改完 `.qml` 一定先清 `~/.cache/quic
 |---|---|
 | `dms ipc call inlineKeyboard open` / `close` / `toggle` | 显示 / 隐藏 / 切换键盘 |
 | `dms ipc call inlineKeyboard toggleFloat` | 停靠 ↔ 浮动 |
-| `dms ipc call inlineKeyboard setMode <keys\|functions\|transparency\|resize>` | 切换主区面板 |
 | `dms ipc call inlineKeyboard setPage <page1\|page2\|emoji>` | 切换键页 |
-| `dms ipc call inlineKeyboard resetActions` | 恢复默认动作表 |
 
 ## 表情与符号
 
