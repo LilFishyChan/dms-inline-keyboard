@@ -121,8 +121,8 @@ just get no candidates and no input-method switching)
 
 - `vinput` — voice input. Without it the *Voice input* action and voice mode stay
   greyed out; the rest of the keyboard is unaffected.
-- `wl-clipboard` (`wl-copy`) — copying candidates to the clipboard, and the fallback for
-  inserting text when the addon is not installed. Missing it only costs those two paths.
+
+Clipboard copies go through DMS's own `dms cl copy`, so no extra package is needed.
 
 ## Install
 
@@ -217,8 +217,8 @@ Insertion does **not** go through the key-injection path. `EmojiPanel` only
 reports the character; the daemon hands it to the fcitx5 addon, which calls
 `InputContext::commitString()` in-process. A ZWJ emoji (`👨‍👩‍👧`) is several code
 points and cannot be expressed as keycodes, so this is the only path that
-works. Without the addon the character is copied to the clipboard instead; if
-`wl-copy` is missing as well, a toast says so rather than pretending it worked.
+works. Without the addon the character is copied to the clipboard instead, via
+DMS's own `dms cl copy`.
 
 `layouts/emoji.js` is **generated**: `python3 tools/gen-emoji.py` reads
 Unicode 16's `emoji-test.txt` (cached under `tools/.cache/`) and writes 1900
@@ -345,7 +345,7 @@ IPC/diagnostic output backing the claim:
 | Candidates + preedit drawn in-keyboard | live rime 万象 input, candidate list opened/closed/scrolled |
 | Input-method switching (globe key, long-press picker) | tapped on the tablet; the label on the space bar follows every tap |
 | Docked / floating switch, position dragging, resize panel, opacity panel | used on the tablet; geometry confirmed from IPC values, not screenshots |
-| Emoji / symbol insertion | tapped on hardware; falls back to `wl-copy` without the addon |
+| Emoji / symbol insertion | tapped on hardware; falls back to `dms cl copy` without the addon |
 | Translations (zh_CN) | strings switched at runtime and compared on screen |
 
 Regressions found this way are listed as commits against the source, not as

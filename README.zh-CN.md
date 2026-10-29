@@ -106,8 +106,8 @@ fcitx5 addon（[独立仓库](https://github.com/LilFishyChan/fcitx5-inline-keyb
 **可选**
 
 - `vinput` —— 语音输入。没有它，「语音输入」动作和语音模式是灰的，键盘其余部分不受影响。
-- `wl-clipboard`（`wl-copy`）—— 把候选复制到剪贴板，以及 addon 未安装时插入文本的兜底
-  通道。缺了只损失这两条路径。
+
+剪贴板复制走 DMS 自带的 `dms cl copy`，不需要额外装什么。
 
 ## 安装
 
@@ -194,8 +194,8 @@ QML 按路径缓存编译产物 —— 改完 `.qml` 一定先清 `~/.cache/quic
 
 插入**不**走按键注入通道。`EmojiPanel` 只报告字符，由 daemon 交给 fcitx5 addon，addon 在
 进程内调 `InputContext::commitString()`。ZWJ 表情（`👨‍👩‍👧`）由多个码位组成，没法表示成
-keycode，所以这是唯一可行的路径。没装 addon 时字符改为复制到剪贴板；如果连 `wl-copy` 也
-没有，就弹个 toast 说实话，而不是假装插入成功。
+keycode，所以这是唯一可行的路径。没装 addon 时字符改为复制到剪贴板（走 DMS 自带的
+`dms cl copy`）。
 
 `layouts/emoji.js` 是**生成物**：`python3 tools/gen-emoji.py` 读取 Unicode 16 的
 `emoji-test.txt`（缓存在 `tools/.cache/`），写出 1900 个表情（肤色变体是有意排除的）以及
@@ -301,7 +301,7 @@ keycode，所以这是唯一可行的路径。没装 addon 时字符改为复制
 | 键盘内候选 + 拼音串 | rime 万象实打，候选列表开/关/滚动 |
 | 输入法切换（地球键、长按选择器） | 在平板上点过；空格键上的标识跟着每次点击变 |
 | 停靠/浮动切换、位置拖动、缩画面板、透明度面板 | 平板上用过；几何以 IPC 返回值为准，不靠截图 |
-| 表情 / 符号插入 | 硬件上点过；没有 addon 时回落到 `wl-copy` |
+| 表情 / 符号插入 | 硬件上点过；没有 addon 时回落到 `dms cl copy` |
 | 翻译（zh_CN） | 运行时切换字符串并对着屏幕比对 |
 
 这样查出来的回归，记录为源码里的提交，而不是这份 README 里的口头保证。

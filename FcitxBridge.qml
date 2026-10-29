@@ -274,14 +274,14 @@ Item {
         return true
     }
 
-    // 兜底：复制到剪贴板，由用户自己粘贴。
-    // wl-clipboard 没装就别假装复制成功了 —— 平板上真出现过这种情况（toast 说已复制，实际什么都没发生）
-    property bool clipboardAvailable: false
+    // 兜底：复制到剪贴板，由用户自己粘贴。走 DMS 自带的 `dms cl copy`
+    //（参数形式，不经 shell，省掉转义问题；DMS 在跑就一定可用）。
+    property bool clipboardAvailable: true
 
     function copyText(text) {
-        if (!text || !clipboardAvailable)
+        if (!text)
             return false
-        clipboardProc.command = ["wl-copy", text]
+        clipboardProc.command = ["dms", "cl", "copy", text]
         clipboardProc.running = true
         return true
     }
@@ -370,21 +370,10 @@ Item {
         onTriggered: socket.connected = false
     }
 
-    // 剪贴板兜底：wl-copy 直接吃文本参数，不经过 shell，省掉转义问题
+    // 剪贴板兜底：dms cl copy 直接吃文本参数，不经过 shell
     Process {
         id: clipboardProc
         command: ["true"]
-    }
-
-    // 开局探一次有没有 wl-copy（Wayland 下唯一的复制手段）
-    Process {
-        id: clipboardProbe
-        command: ["sh", "-c", "command -v wl-copy >/dev/null && echo yes || echo no"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: bridge.clipboardAvailable =
-                                  String(text || "").trim() === "yes"
-        }
     }
 
     // socket 没连上时（fcitx5 没起 / addon 没加载）退回文件读取兜底

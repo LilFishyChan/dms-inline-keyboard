@@ -30,6 +30,7 @@ PluginComponent {
     KeyRouter {
         id: keyRouter
         bridge: fcitxBridge
+        active: root.keyboardVisible
         actions: root.actions
         modifierMode: root.modifierMode
     }
@@ -39,6 +40,11 @@ PluginComponent {
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     property bool avoidWindows: PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
     readonly property bool fnActive: root.fnState > 0
+
+    // 调试 IPC（debug* 系列）默认关闭：其中 debugAddCommandAction 能把任意 sh -c
+    // 存成持久动作、debugRunAction 会执行它，不能对任何本地进程开放。
+    // 需要时用 `INLINE_KEYBOARD_DEV=1 systemctl --user restart dms` 打开。
+    readonly property bool devMode: Quickshell.env("INLINE_KEYBOARD_DEV") === "1"
     // 键位页 id：page1 主键区 / page2 F 区 / emoji 表情 & 符号页
     // （卡片的 page 属性是绑定到这里的，任何地方都别直接给卡片赋值，否则绑定断掉）
     property string page: "page1"
@@ -188,7 +194,7 @@ PluginComponent {
             // 只说「失败了」，用户完全不知道该装什么（平板上就是这样）
             const term = copied
                 ? "Copied — long press the text field to paste"
-                : "Cannot insert text: install the fcitx5 addon (inline-keyboard-status) or wl-clipboard"
+                : "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)"
             ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor)
                                   ? I18n.trFor(root.pluginId, term) : term)
         }
@@ -1228,6 +1234,7 @@ PluginComponent {
         }
 
         function debugCardHeight(): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "INLINE_KEYBOARD_H:-1"
@@ -1311,6 +1318,7 @@ PluginComponent {
 
         // 调试：绕过卡片直接走 socket 直通，用来单独验证这条通道
         function debugDirectKey(sym: string): string {
+            if (!root.devMode) return "dev mode off"
             const ok = root.sendFcitx("key:" + sym)
             return "INLINE_KEYBOARD_DIRECT:" + sym + ":sent=" + ok
                 + ":engine=" + (!root.fcitxImKeyboard)
@@ -1332,6 +1340,7 @@ PluginComponent {
         // 临时：走用户的真实路径（点动作 → handleQuick → beginResize）
         // 调试：等价于点语音行右侧的麦克风（走 voiceMicPressed 那条路）
         function debugVoiceMic(): string {
+            if (!root.devMode) return "dev mode off"
             root.voiceMicPressed()
             return "voice=" + (root.voiceActive ? "rec" : "idle")
                 + "/" + (root.voiceMinimal ? "mini" : "full")
@@ -1339,17 +1348,20 @@ PluginComponent {
 
         // 调试：直接切语音模式（等价于点语音行左侧按钮）
         function debugVoiceMinimal(on: bool): string {
+            if (!root.devMode) return "dev mode off"
             if (root.voiceMinimal !== on)
                 root.toggleVoiceMinimal()
             return "minimal=" + root.voiceMinimal + " floating=" + root.floating
         }
 
         function debugMinimize(): string {
+            if (!root.devMode) return "dev mode off"
             root.toggleMinimize()
             return "min=" + (root.minimized ? 1 : 0) + " open=" + root.open
         }
 
         function debugQuickAction(id: string): string {
+            if (!root.devMode) return "dev mode off"
             root.handleQuick(id)
             const card = root.activeCard
             return "mode=" + (card ? card.mode : "-")
@@ -1380,6 +1392,7 @@ PluginComponent {
         // 调试用：模拟「把列表第 index 个动作拖到卡片坐标 (x,y)」，
         // 用来在没有人手的情况下检查拖动预览（幽灵块 / 让位 / 挤出）
         function debugDrag(index: int, x: real, y: real): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "INLINE_KEYBOARD_NO_CARD"
@@ -1465,6 +1478,7 @@ PluginComponent {
         // 直接拒收（Error parsing function "debugCand": Type of argument 1
         // (csv: QVariant) cannot be used across IPC）。
         function debugCand(csv: string): string {
+            if (!root.devMode) return "dev mode off"
             const text = String(csv || "")
             root.debugCandItems = text === ""
                 ? [] : text.split(",").map(s => s.trim()).filter(s => s !== "")
@@ -1473,6 +1487,7 @@ PluginComponent {
 
         // dms ipc call inlineKeyboard debugCandList   切换候选列表页
         function debugCandList(): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "no-card"
@@ -1492,6 +1507,7 @@ PluginComponent {
 
         // 临时：验证候选列表页右侧按钮（滚动 / 退格 / 回车）
         function debugSideButton(act: string): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "no-card"
@@ -1516,6 +1532,7 @@ PluginComponent {
         }
 
         function debugPanel(): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "no-card"
@@ -1532,6 +1549,7 @@ PluginComponent {
         }
 
         function debugRows(): string {
+            if (!root.devMode) return "dev mode off"
             let out = ["im=" + root.fcitxImName,
                        "ascii=" + root.imAsciiMode,
                        "list=" + root.imList.length,
@@ -1549,6 +1567,7 @@ PluginComponent {
         }
 
         function debugCycleIm(): string {
+            if (!root.devMode) return "dev mode off"
             root.cycleIm()
             return "im=" + root.fcitxImName
                 + " rows=" + root.imRows.length
@@ -1559,17 +1578,20 @@ PluginComponent {
         // 调试用：直接走 handleQuick 执行一次动作（验证自定义动作的命令链路）
         // 调试：直接把一次按键交给 handleKey（模拟点键盘）
         function debugKey(kind: string, to: string): string {
+            if (!root.devMode) return "dev mode off"
             root.handleKey({ k: kind, to: to })
             return "INLINE_KEYBOARD_KEY:" + kind + ":to=" + to + ":page=" + root.page
         }
 
         // 调试：直接注入一个键码（不经过卡片，方便无触摸屏验证输入后端）
         function debugType(code: string): string {
+            if (!root.devMode) return "dev mode off"
             root.injectKey(Number(code))
             return "INLINE_KEYBOARD_TYPE:" + code + ":ydotoold=" + (root.ydotooldUp ? "up" : "down")
         }
 
         function debugRunAction(id: string): string {
+            if (!root.devMode) return "dev mode off"
             const action = root.actionById(id)
             if (!action)
                 return "INLINE_KEYBOARD_NO_ACTION:" + id
@@ -1579,6 +1601,7 @@ PluginComponent {
 
         // 调试用：写一个带命令的自定义动作（用于验证 cmd 链路）
         function debugAddCommandAction(label: string, icon: string, cmd: string): string {
+            if (!root.devMode) return "dev mode off"
             const list = Actions.toArray(root.actions).slice()
             list.push({
                 id: "u" + Date.now(),
@@ -1596,6 +1619,7 @@ PluginComponent {
         // 调试用：生成 count 个占位动作（测滚动、容量、拖放用）。
         // 同时清空固定栏和槽，避免它们指向已经不存在的 id。
         function debugSetActions(count: int): string {
+            if (!root.devMode) return "dev mode off"
             const icons = ["label", "star", "circle", "square", "flag",
                            "bookmark", "bolt", "eco", "face", "cake"]
             const list = []
@@ -1617,6 +1641,7 @@ PluginComponent {
 
         // 调试用：模拟「从固定栏第 index 个动作拖到卡片坐标 (x,y)」
         function debugDragFromBar(index: int, x: real, y: real): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "INLINE_KEYBOARD_NO_CARD"
@@ -1640,6 +1665,7 @@ PluginComponent {
 
         // 调试用：结束上面模拟的拖动（走真实落盘路径）
         function debugDrop(): string {
+            if (!root.devMode) return "dev mode off"
             const card = root.activeCard
             if (!card)
                 return "INLINE_KEYBOARD_NO_CARD"

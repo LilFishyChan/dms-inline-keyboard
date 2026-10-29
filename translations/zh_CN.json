@@ -75,7 +75,7 @@
     "Numbers": "序号",
     "Misc": "杂项",
     "Copied — long press the text field to paste": "已复制，长按输入框粘贴",
-    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status) or wl-clipboard": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）或 wl-clipboard，装好其中一个即可",
+    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）",
     "Special key labels": "特殊键显示方式",
     "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": "Backspace、Enter、Shift、Ctrl、Alt、Tab 这些键怎么画。选完整名字时字号会自动缩小以放得下。",
     "Short": "简写",

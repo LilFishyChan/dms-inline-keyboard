@@ -25,6 +25,8 @@ Item {
 
     // fcitx5 桥（由 daemon 注入）。直通要靠它发按键、读当前输入法类型。
     property var bridge: null
+    // 键盘是否开着。关着的时候没必要每 3 秒起一次 sh 去探 ydotoold。
+    property bool active: false
     // 当前动作表（自定义动作要拿 cmd）
     property var actions: []
 
@@ -259,7 +261,7 @@ Item {
 
     Timer {
         interval: 3000
-        running: true
+        running: router.active
         repeat: true
         triggeredOnStart: true
         onTriggered: router.probeYdotoold()

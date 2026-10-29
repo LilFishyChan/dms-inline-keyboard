@@ -6,6 +6,7 @@ import Quickshell.Io
 import QtQuick.Controls
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 import "actions.js" as Actions
 
@@ -390,44 +391,22 @@ PluginSettings {
         Row {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.rightMargin: 16
-            anchors.bottomMargin: 14
-            spacing: 10
+            anchors.rightMargin: Theme.spacingM
+            anchors.bottomMargin: Theme.spacingM
+            spacing: Theme.spacingS
 
-            Rectangle {
-                width: 96
-                height: 36
-                radius: 18
-                color: Theme.primary
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.tr("Start")
-                    color: Theme.onPrimary
-                    font.pixelSize: 14
-                }
-
-                TapHandler {
-                    onTapped: daemonStart.running = true
-                }
+            DCommon.DButton {
+                text: root.tr("Start")
+                backgroundColor: Theme.primary
+                textColor: Theme.onPrimary
+                onClicked: daemonStart.running = true
             }
 
-            Rectangle {
-                width: 132
-                height: 36
-                radius: 18
-                color: Theme.withAlpha(Theme.surfaceText, 0.12)
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.tr("Enable at login")
-                    color: Theme.surfaceText
-                    font.pixelSize: 14
-                }
-
-                TapHandler {
-                    onTapped: daemonEnable.running = true
-                }
+            DCommon.DButton {
+                text: root.tr("Enable at login")
+                backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                textColor: Theme.surfaceText
+                onClicked: daemonEnable.running = true
             }
         }
     }
@@ -486,25 +465,12 @@ PluginSettings {
             }
         }
 
-        Rectangle {
-            width: 190
-            height: 36
+        DCommon.DButton {
             visible: !root.bridgeUp
-            radius: 18
-            color: Theme.withAlpha(Theme.surfaceText, 0.12)
-
-            Text {
-                anchors.centerIn: parent
-                text: root.tr("Copy install commands")
-                color: Theme.surfaceText
-                font.pixelSize: 14
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: copyInstall.running = true
-            }
+            text: root.tr("Copy install commands")
+            backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+            textColor: Theme.surfaceText
+            onClicked: copyInstall.running = true
         }
     }
 
@@ -1009,40 +975,14 @@ PluginSettings {
         }
     }
 
-    // 添加按钮
-    Rectangle {
+    DCommon.DButton {
         width: parent.width
         visible: !root.adding
-        height: visible ? 44 : 0
-        radius: Theme.cornerRadius
-        color: Theme.withAlpha(Theme.primary, 0.08)
-        border.width: 1
-        border.color: Theme.withAlpha(Theme.primary, 0.35)
-
-        Row {
-            anchors.centerIn: parent
-            spacing: Math.round(Theme.spacingXS)
-
-            DankIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "add"
-                size: 18
-                color: Theme.primary
-            }
-
-            StyledText {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.tr("Add a custom action")
-                font.pixelSize: Theme.fontSizeMedium
-                color: Theme.primary
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.startAdd()
-        }
+        text: root.tr("Add a custom action")
+        iconName: "add"
+        backgroundColor: Theme.withAlpha(Theme.primary, 0.08)
+        textColor: Theme.primary
+        onClicked: root.startAdd()
     }
 
     // 图标选择器浮窗：搜索 + 可滚动网格
