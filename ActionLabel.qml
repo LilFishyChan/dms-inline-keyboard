@@ -16,6 +16,8 @@ Row {
     property int pixelSize: 14
     // 分隔线的不透明度：磁贴用 0.16/0.35，幽灵块用 0.45
     property real dividerOpacity: 0.45
+    // 标题可用宽度上限；<=0 表示不限制（浮在列表外的幽灵块没有容器宽度）
+    property real maxLabelWidth: -1
 
     spacing: Math.round(iconSize * 0.43)
 
@@ -38,8 +40,19 @@ Row {
     Text {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.label !== ""
+        // 行高跟着图标走，文字在行内垂直居中。
+        // 只靠 anchors.verticalCenter 时，HorizontalFit 缩小字号后会按
+        // 原字号算行高，基线偏下 —— 看着就是"没垂直居中"。
+        height: root.iconSize
+        verticalAlignment: Text.AlignVCenter
         text: root.label
         color: root.color
+        // 给了上限就按宽度自适应字号，保证一行放得下、不溢出
+        width: root.maxLabelWidth > 0 ? root.maxLabelWidth : implicitWidth
+        elide: Text.ElideNone
+        wrapMode: Text.NoWrap
+        fontSizeMode: root.maxLabelWidth > 0 ? Text.HorizontalFit : Text.FixedSize
+        minimumPixelSize: 8
         font.pixelSize: root.pixelSize
     }
 }

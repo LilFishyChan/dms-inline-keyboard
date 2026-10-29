@@ -14,6 +14,7 @@ import qs.Widgets
 import "layouts/phone.js" as Layout
 import "actions.js" as Actions
 import "modifiers.js" as Modifiers
+import "layouts/resize.js" as Resize
 
 // 键盘主体：顶部快捷条 + 候选/快捷栏 + 键区（或功能列表） + 底部把手条
 Rectangle {
@@ -506,6 +507,28 @@ Rectangle {
     // 主键区行数，候选列表页的滚动区高度按它算
     readonly property int keyRowCount: Layout.pageRows("page1").length
 
+    // 特殊键的表现形式（见 layouts/special-keys.js）
+    property string specialKeyStyle: "full"
+    property string winKeyStyle: "mod"
+
+    // 调整大小面板：预览尺寸 / 名义尺寸 / 屏幕尺寸 / 停靠是否铺满
+    property real resizeW: 1050
+    property real resizeH: 444
+    property real baseKbWidth: 1050
+    property real baseKbHeight: 444
+    property real screenW: 1920
+    property real screenH: 1080
+    property bool dockFill: true
+    signal resizeCommitRequested()
+    signal resizeCloseRequested()
+    signal resizeCancelRequested()
+    signal resizeResetRequested()
+    signal resizeFillToggleRequested()
+    // 换模式的请求：不能在子组件里直接写 card.mode —— 那是 daemon 的
+    // `mode: root.mode` 绑定，直接赋值会把绑定打断，之后 daemon 再怎么改
+    // mode 卡片都不会跟着变（「点了调整大小没反应」就是这么来的）
+    signal modeChangeRequested(string mode)
+
     // 候选列表页的数据源：真实全量候选优先；调试注入的 {i,t} 兜底
     // 调试候选的 {i,t} 形态缓存：debugCandItems 每变一次才重建，
     // 不用每次读 candListModel 都 map 一遍（1000 词就是 1000 个对象）。
@@ -617,6 +640,9 @@ Rectangle {
     onWidthChanged: recomputeCandBar()
     onUnitChanged: recomputeCandBar()
     onGapChanged: recomputeCandBar()
+    // 高度变了 keyH 就变，候选测量的字号跟着变（candMeasure.font 依赖 keyH），
+    // 容量必须重算 —— 否则拖高键盘后候选栏仍按旧字号排版，出现早省略
+    onKeyHChanged: recomputeCandBar()
     Component.onCompleted: recomputeCandBar()
 
     // 候选栏显示前一段
@@ -1021,7 +1047,10 @@ Rectangle {
             KeyGrid {
                 controller: root
                 anchors.fill: parent
-                visible: root.mode === "keys" && root.page !== "emoji"
+                // resize 模式下键区要留着：遮罩半透明盖在上面，
+                // 底下必须是真实的键盘主页面
+                visible: (root.mode === "keys" || root.mode === "resize")
+                         && root.page !== "emoji"
                          && !root.candListOpen
             }
 
@@ -1051,6 +1080,9 @@ Rectangle {
         }
 
         // ---------------- 底部把手条 ----------------
+        // 就排在键区下面，位置完全由这个 Column 决定，不再单独算中点。
+        // 之前那套「居中于最后一行按键与卡片底部之间」的算法要在卡片里
+        // 重复算一遍键区高度，两处几何一旦不同步就会错位。
         BottomBar {
             controller: root
         }
@@ -1115,5 +1147,248 @@ Rectangle {
     ImPicker {
         id: imPicker
         controller: root
+    }
+
+    // ---------------- 调整大小面板 ----------------
+    //
+    // 半透明遮罩压暗整个键盘（底下仍是键盘主页面），上面按当前尺寸画一个框，
+    // 框的四边 + 四角是拖拽把手，中心是铺满/重置/取消/确定。框只是预览，
+    // 键盘本身不动，确认才落盘。
+    Item {
+        id: resizeArea
+        anchors.fill: parent
+        visible: root.mode === "resize"
+        // 盖在把手条（z 200）和所有页之上
+        z: 300
+
+        // 把手的**命中区**厚度 = 键盘底部拖动行的高度（handleH = keyH × 0.75），
+        // 视觉上仍是一条细线，但可触控范围有整行那么厚，好点得多。
+        readonly property real grip: root.handleH
+
+        // 停靠且铺满时宽度没得调 → 只剩顶边；否则按模式给对应把手
+        // 三个方向：上、左、右。
+        //
+        // 没有下方把手：底部那一行是「拖动改键盘位置」的把手，两个手势叠在
+        // 同一个位置会互相抢；键盘下沿又贴着屏幕底或紧邻应用内容，往下拉
+        // 本来也没什么意义。去掉后底部只负责移动位置。
+        //
+        // 也没有四角：L 形在角上要么和描边糊成一团、要么缩到看不清。
+        readonly property var handles: {
+            if (!root.isFloating && root.dockFill)
+                return ["n"]                      // 已水平铺满，只能调高度
+            return ["n", "e", "w"]
+        }
+
+        // 遮罩：整体键盘背景色的 50%
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.withAlpha(Theme.surface, 0.5)
+            radius: Theme.cornerRadius
+
+            // 吞掉点击：下面看得见但点不到
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+            }
+        }
+
+        // 框：尺寸就是松手后的键盘大小
+        Rectangle {
+            id: resizeFrame
+            // 目标尺寸（不含描边内缩）
+            readonly property real outerW: (!root.isFloating && root.dockFill)
+                ? resizeArea.width
+                : Math.round(root.resizeW)
+            readonly property real outerH: Math.round(root.resizeH)
+            // 描边宽度：按键高取比例，比边框线粗一档才看得出是「可拖区域」
+            readonly property real bw: Math.max(4, Math.round(root.keyH * 0.07))
+
+            // 矩形按半个描边内缩：内层描边骑在自己的边界上，
+            // 内缩后外沿正好压在 outerW/outerH 这条线上，全部朝内长。
+            x: Math.round((resizeArea.width - outerW) / 2) + bw / 2
+            y: Math.round(resizeArea.height - outerH) + bw / 2
+            width: Math.max(0, outerW - bw)
+            height: Math.max(0, outerH - bw)
+            color: "transparent"
+            radius: Theme.cornerRadius
+
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                border.width: resizeFrame.bw
+                border.color: Theme.primary
+                radius: Math.max(0, Theme.cornerRadius - resizeFrame.bw / 2)
+            }
+        }
+
+        // 把手
+        Repeater {
+            id: handleRepeater
+            model: resizeArea.handles
+
+            delegate: Item {
+                id: handleItem
+                required property var modelData
+
+                readonly property string h: modelData
+                readonly property real g: resizeArea.grip
+                readonly property real fx: resizeFrame.x - resizeFrame.bw / 2
+                readonly property real fy: resizeFrame.y - resizeFrame.bw / 2
+                readonly property real fw: resizeFrame.outerW
+                readonly property real fh: resizeFrame.outerH
+                readonly property bool horizontal: h === "n" || h === "s"
+                readonly property bool vertical: h === "w" || h === "e"
+                // 边把手只取中间一段，整条会和描边糊在一起
+                readonly property real barLen: Math.min(200, Math.max(60,
+                    (horizontal ? fw : fh) * 0.3))
+
+                // 命中区**完整落在框内**，不越过描边 —— 跨出去的部分在视觉上
+                // 就是一条悬在框外的红线。居中用把手实际长度 barLen，不能用厚度 g。
+                x: h === "w" ? fx
+                 : h === "e" ? fx + fw - g
+                 : fx + fw / 2 - barLen / 2
+                y: h === "n" ? fy
+                 : h === "s" ? fy + fh - g
+                 : fy + fh / 2 - barLen / 2
+                width: horizontal ? barLen : g
+                height: vertical ? barLen : g
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: handleItem.horizontal ? parent.width : 6
+                    height: handleItem.vertical ? parent.height : 6
+                    radius: 3
+                    color: Theme.primary
+                }
+
+                DragHandler {
+                    target: null
+                    cursorShape: handleItem.horizontal ? Qt.SizeVerCursor
+                        : Qt.SizeHorCursor
+
+                    property real startW: 0
+                    property real startH: 0
+
+                    onActiveChanged: {
+                        if (active) {
+                            startW = root.resizeW
+                            startH = root.resizeH
+                        } else {
+                            // 松手即生效：把当前预览尺寸写进设置，
+                            // 键盘当场变成新大小，不用再点确定
+                            root.resizeCommitRequested()
+                        }
+                    }
+
+                    onTranslationChanged: {
+                        const r = Resize.planResize({
+                            handle: handleItem.h,
+                            start: { w: startW, h: startH },
+                            dx: translation.x,
+                            dy: translation.y,
+                            minW: root.baseKbWidth * 0.8,
+                            minH: root.baseKbHeight * 0.8,
+                            maxW: root.screenW,
+                            // 最高只到屏幕 2/3，再高就把应用内容压没了
+                            maxH: Math.round(root.screenH * 2 / 3),
+                            symmetric: !root.isFloating
+                                && (handleItem.h === "e" || handleItem.h === "w"),
+                            // 角落始终按当前宽高比缩放
+                            aspect: startW / Math.max(1, startH),
+                        })
+                        root.resizeW = r.w
+                        root.resizeH = r.h
+                    }
+                }
+            }
+        }
+
+        // 调整大小面板的中心按钮组：圆形底 + 图标。
+        // 必须在 Repeater 之外（Repeater 只渲染 delegate，
+        // 放在里面的其它子项会被静默丢掉 —— 踩过一次）
+        Row {
+            anchors.centerIn: parent
+            spacing: root.gap * 2
+            z: 10
+
+            readonly property real btn: Math.round(root.keyH * 0.92)
+
+            // 铺满 / 不铺满（停靠态专用，浮窗没有这个概念）
+            Rectangle {
+                visible: !root.isFloating
+                width: parent.btn
+                height: parent.btn
+                radius: width / 2
+                color: root.dockFill ? Theme.primary : Theme.surfaceContainerHigh
+                DankIcon {
+                    anchors.centerIn: parent
+                    name: root.dockFill ? "collapse_content" : "expand_content"
+                    size: Math.round(root.keyH * 0.42)
+                    color: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, 0.85)
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.resizeFillToggleRequested()
+                }
+            }
+
+            // 重置回名义尺寸
+            Rectangle {
+                width: parent.btn
+                height: parent.btn
+                radius: width / 2
+                color: Theme.surfaceContainerHigh
+                DankIcon {
+                    anchors.centerIn: parent
+                    name: "restart_alt"
+                    size: Math.round(root.keyH * 0.42)
+                    color: Theme.withAlpha(root.fg, 0.85)
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.resizeResetRequested()
+                }
+            }
+
+            // 取消：还原进入时的尺寸
+            Rectangle {
+                width: parent.btn
+                height: parent.btn
+                radius: width / 2
+                color: Theme.surfaceContainerHigh
+                DankIcon {
+                    anchors.centerIn: parent
+                    name: "close"
+                    size: Math.round(root.keyH * 0.42)
+                    color: Theme.withAlpha(root.fg, 0.85)
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.resizeCancelRequested()
+                }
+            }
+
+            // 确定：关面板（尺寸松手时已经落盘）
+            Rectangle {
+                width: parent.btn
+                height: parent.btn
+                radius: width / 2
+                color: Theme.primary
+                DankIcon {
+                    anchors.centerIn: parent
+                    name: "check"
+                    size: Math.round(root.keyH * 0.42)
+                    color: Theme.onPrimary
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.resizeCloseRequested()
+                }
+            }
+        }
     }
 }

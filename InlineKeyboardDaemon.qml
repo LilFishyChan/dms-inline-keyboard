@@ -5,6 +5,8 @@
 
 import QtQuick
 import "data.js" as Data
+import "layouts/special-keys.js" as SpecialKeys
+import "layouts/resize.js" as Resize
 import "actions.js" as Actions
 import "modifiers.js" as Modifiers
 import Quickshell
@@ -79,6 +81,9 @@ PluginComponent {
     // addon 推回来的 label 已经是目标值了 → 立刻收起乐观态，
     // 这样正常情况下切换是「瞬间到位」，不会白压 1 秒
     onFcitxImLabelChanged: {
+        // 只关「乐观显示」，**不清 optimisticImIdx**：
+        // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从
+        // 真实值重算，连续点击就会一直在同一项上打转。
         if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
             root.optimisticImActive = false
     }
@@ -97,6 +102,7 @@ PluginComponent {
     Timer {
         id: optimisticImTimer
         interval: 1000
+        // 超时同理：只回落到真实值，不清索引
         onTriggered: root.optimisticImActive = false
     }
 
@@ -109,7 +115,9 @@ PluginComponent {
     readonly property alias fcitxSocketUp: fcitxBridge.socketUp
     readonly property alias fcitxLastError: fcitxBridge.lastError
     readonly property alias imList: fcitxBridge.imList
-    readonly property alias imRows: fcitxBridge.imRows
+    // 不能写 alias：imRows 是 property var 存数组，alias 只跟住引用，
+    // bridge 重建数组后这里不会重新求值，nextImRow 就一直读到没有 current 的旧数组。
+    readonly property var imRows: fcitxBridge.imRows
     readonly property alias imAsciiMode: fcitxBridge.isAsciiMode
 
     // 预编辑是否由应用自己画（fcitx5 的 clientPreedit 非空）。
@@ -253,6 +261,14 @@ PluginComponent {
     }
 
     // 快捷动作分发：内置动作先判，剩下的当自定义动作按 cmd 跑
+    // 进透明度面板：记下当前值（「取消」用它还原），然后切模式。
+    // 固定栏走 handleQuick，列表页走 modeChangeRequested，两条路都要这份快照。
+    function enterTransparency() {
+        root.prevBgOpacity = root.bgOpacity
+        root.prevKeyOpacity = root.keyOpacity
+        root.mode = "transparency"
+    }
+
     function handleQuick(action) {
         // 自定义动作：跑它自己的命令（用户自己写的，等同桌面启动器）
         const custom = root.actionById(action)
@@ -281,7 +297,13 @@ PluginComponent {
             root.notifyUnimplemented("Voice input")
             return
         case "size":
-            root.notifyUnimplemented("Size")
+            root.beginResize()
+            return
+        case "opacity":
+            // 固定栏（QuickBar）走的是 quickAction -> handleQuick，
+            // 而 ActionList 里那段独立分支只覆盖列表页。少了这一条，
+            // 固定栏点击会掉进 default，什么都不发生。
+            root.enterTransparency()
             return
         case "avoid":
             // 停靠模式下是否让其它窗口避让键盘（改 layer-shell 的独占区）
@@ -330,17 +352,123 @@ PluginComponent {
     }
 
     // 外观：缩放 + 透明度，都从设置读（PluginSettings 存的是百分数）
-    property real scale: PluginService.loadPluginData(root.pluginId, "scale", 100) / 100.0
     property real bgOpacity: PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100.0
     property real keyOpacity: PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100.0
+    // 进入透明度面板时的快照，取消要还原。
+    // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
+    // 表现成「点透明度没反应」，很容易误判成面板本身坏了。
+    property real prevBgOpacity: 1.0
+    property real prevKeyOpacity: 1.0
+
+    // 特殊键（Backspace / Enter / Shift…）的表现：图标 / 缩写 / 完整。
+    // 存的是字符串，非法值在读取时归一化，避免设置文件被手改坏后键帽全变空。
+    property string specialKeyStyle: SpecialKeys.normalizeStyle(
+        PluginService.loadPluginData(root.pluginId, "specialKeyStyle", "full"))
+
+    // Win 键单独的表现：mod（默认，显示「Mod」）/ system / windows
+    property string winKeyStyle: SpecialKeys.normalizeWinLook(
+        PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod"))
     property bool defaultFloating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // Esc 与 \`~ 键对调（想要 Esc 在左上角的人用）
     property bool escSwap: PluginService.loadPluginData(root.pluginId, "escSwap", false)
-    // 键盘名义尺寸（scale = 1 时的大小）。窗口与卡片都按它推按键尺寸
+    // 键盘名义尺寸（重置和下限都以它为基准）。窗口与卡片都按它推按键尺寸
     readonly property real baseKbWidth: 1050
     readonly property real baseKbHeight: 444
-    readonly property real kbWidth: baseKbWidth * root.scale
-    readonly property real kbHeight: baseKbHeight * root.scale
+
+    // 键盘实际尺寸：由「调整大小」拖出来并保存，默认就是名义尺寸。
+    // 原来的 scale 设置项已移除 —— 整体缩放和拖拽调大小是同一件事，
+    // 留两个概念会让人分不清「拖到 80% 再乘 90%」到底多大。
+    property real savedW: PluginService.loadPluginData(
+        root.pluginId, "keyboardWidth", baseKbWidth)
+    property real savedH: PluginService.loadPluginData(
+        root.pluginId, "keyboardHeight", baseKbHeight)
+
+    // 停靠时是否横向铺满屏幕（调整大小面板里可以切）
+    property bool dockFill: PluginService.loadPluginData(
+        root.pluginId, "dockFillWidth", true)
+
+    function toggleDockFill() {
+        root.dockFill = !root.dockFill
+        PluginService.savePluginData(root.pluginId, "dockFillWidth", root.dockFill)
+    }
+
+    readonly property real kbWidth: root.savedW
+    readonly property real kbHeight: root.savedH
+
+    // ---- 调整大小：拖拽中的预览值，确认后写进 savedW/savedH ----
+    property real resizeW: baseKbWidth
+    property real resizeH: baseKbHeight
+    // 进入调整态时的尺寸，取消要用它还原
+    property real resizeOrigW: baseKbWidth
+    property real resizeOrigH: baseKbHeight
+
+    function persistSize(w, h) {
+        root.savedW = w
+        root.savedH = h
+        PluginService.savePluginData(root.pluginId, "keyboardWidth", w)
+        PluginService.savePluginData(root.pluginId, "keyboardHeight", h)
+    }
+
+    function beginResize() {
+        root.resizeOrigW = root.savedW
+        root.resizeOrigH = root.savedH
+        if (root.activeCard) {
+            root.activeCard.resizeW = root.savedW
+            root.activeCard.resizeH = root.savedH
+        }
+        // 先回到键盘主页：从功能列表或表情页点「调整大小」时，
+        // 遮罩底下的必须是主键区，否则用户看到的是表情面板。
+        //
+        // 必须写 "page1"，不是 "keys"：page 的合法值是 page1/page2/emoji，
+        // 卡片的 spaceEntry 判据是 `page !== "page1"` 就返回 null。
+        // 写成 "keys" 会让空格上的输入法标识整块消失，而且退出调整态后
+        // page 不会自愈，图标一直不回来。
+        root.page = "page1"
+        if (root.activeCard)
+            root.activeCard.candListOpen = false
+        root.mode = "resize"
+    }
+
+    // 重置 = 回到名义尺寸，并且立刻落盘（和拖拽松手同一套语义）
+    function resetResize() {
+        const r = Resize.resetSize(root.baseKbWidth, root.baseKbHeight,
+                                   root.baseKbWidth * 0.8, root.baseKbHeight * 0.8)
+        if (root.resizeCard) {
+            root.resizeCard.resizeW = r.w
+            root.resizeCard.resizeH = r.h
+        }
+        root.persistSize(r.w, r.h)
+        // 重置后的尺寸成为新的"取消基准"，否则点取消会弹回重置前的值
+        root.resizeOrigW = r.w
+        root.resizeOrigH = r.h
+    }
+
+    // resizeW/H 的**唯一真相在卡片上**（DragHandler 改的是卡片那份）。
+    // daemon 里曾经也存了一份，结果拖拽改卡片、commit 读 daemon，
+    // 两个值从不同步 —— 松手后尺寸"没变"就是这么来的。
+    readonly property var resizeCard: root.activeCard
+
+    function commitResize() {
+        if (!root.resizeCard)
+            return
+        // 拖拽松手：立刻落盘，键盘当场变成新尺寸；不关面板，可以接着拖另一边
+        root.persistSize(root.resizeCard.resizeW, root.resizeCard.resizeH)
+    }
+
+    // 「确定」只负责关面板（尺寸早在松手时已经落了）
+    function closeResize() {
+        root.mode = "keys"
+    }
+
+    // 「取消」还原进入调整态时的尺寸
+    function cancelResize() {
+        root.persistSize(root.resizeOrigW, root.resizeOrigH)
+        if (root.resizeCard) {
+            root.resizeCard.resizeW = root.resizeOrigW
+            root.resizeCard.resizeH = root.resizeOrigH
+        }
+        root.mode = "keys"
+    }
 
     Connections {
         target: PluginService
@@ -367,9 +495,6 @@ PluginComponent {
     function selectCandidateByIndex(index) { fcitxBridge.selectCandidate(index) }
 
     function reloadSettings() {
-        const nextScale = PluginService.loadPluginData(root.pluginId, "scale", 100) / 100.0
-        if (nextScale !== root.scale)
-            root.scale = nextScale
         const nextBgOpacity = PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100.0
         if (nextBgOpacity !== root.bgOpacity)
             root.bgOpacity = nextBgOpacity
@@ -603,6 +728,17 @@ PluginComponent {
         }
         root.optimisticImLabel = row.label || ""
         root.optimisticImIcon = row.icon || ""
+        // 同时记住目标在 imRows 里的行号：连续点击时用它算「下一个」，
+        // 否则真实的 imName/imLabel 还没追上，每次点都算出同一项
+        let idx = -1
+        for (let i = 0; i < root.imRows.length; i++) {
+            const r = root.imRows[i]
+            if (r.name === row.name && r.ascii === row.ascii && r.keyboard === row.keyboard) {
+                idx = i
+                break
+            }
+        }
+        fcitxBridge.optimisticImIdx = idx
         root.optimisticImActive = true
         optimisticImTimer.restart()
     }
@@ -642,6 +778,24 @@ PluginComponent {
             avoidWindows: root.avoidWindows
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            specialKeyStyle: root.specialKeyStyle
+            winKeyStyle: root.winKeyStyle
+            resizeW: root.resizeW
+            resizeH: root.resizeH
+            baseKbWidth: root.baseKbWidth
+            baseKbHeight: root.baseKbHeight
+            onResizeCommitRequested: root.commitResize()
+            onResizeCloseRequested: root.closeResize()
+            onResizeCancelRequested: root.cancelResize()
+            onResizeResetRequested: root.resetResize()
+            onResizeFillToggleRequested: root.toggleDockFill()
+            onModeChangeRequested: mode => {
+                if (mode === "transparency")
+                    root.enterTransparency()   // 面板需要进入前的快照
+                else
+                    root.mode = mode
+            }
+            dockFill: root.dockFill
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
             fcitxImKeyboard: root.fcitxImKeyboard
@@ -704,6 +858,24 @@ PluginComponent {
             avoidWindows: root.avoidWindows
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            specialKeyStyle: root.specialKeyStyle
+            winKeyStyle: root.winKeyStyle
+            resizeW: root.resizeW
+            resizeH: root.resizeH
+            baseKbWidth: root.baseKbWidth
+            baseKbHeight: root.baseKbHeight
+            onResizeCommitRequested: root.commitResize()
+            onResizeCloseRequested: root.closeResize()
+            onResizeCancelRequested: root.cancelResize()
+            onResizeResetRequested: root.resetResize()
+            onResizeFillToggleRequested: root.toggleDockFill()
+            onModeChangeRequested: mode => {
+                if (mode === "transparency")
+                    root.enterTransparency()   // 面板需要进入前的快照
+                else
+                    root.mode = mode
+            }
+            dockFill: root.dockFill
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
             fcitxImKeyboard: root.fcitxImKeyboard
@@ -873,6 +1045,15 @@ PluginComponent {
         }
 
         // 调试用：keys / functions 之间切换
+        // 临时：走用户的真实路径（点动作 → handleQuick → beginResize）
+        function debugQuickAction(id: string): string {
+            root.handleQuick(id)
+            const card = root.activeCard
+            return "mode=" + (card ? card.mode : "-")
+                + " page=" + (card ? card.page : "-")
+                + " listOpen=" + (card ? card.candListOpen : "-")
+        }
+
         function setMode(m: string): string {
             root.mode = m
             return "INLINE_KEYBOARD_MODE:" + m
@@ -937,6 +1118,13 @@ PluginComponent {
         // QML 侧真正显示给用户的输入法标签/图标（含乐观值）
         parts.push("qLabel=" + root.fcitxImLabel)
         parts.push("opt=" + (root.optimisticImActive ? "1" : "0"))
+        parts.push("saved=" + Math.round(root.savedW) + "x" + Math.round(root.savedH))
+        parts.push("dockFill=" + (root.dockFill ? 1 : 0))
+        parts.push("cardW=" + Math.round(root.activeCard ? root.activeCard.width : -1))
+        parts.push("mode=" + (root.activeCard ? root.activeCard.mode : "-"))
+        parts.push("handles=" + (root.activeCard && root.activeCard.candListPanel
+            ? "-" : "-"))
+        parts.push("isFloat=" + (root.activeCard && root.activeCard.isFloating ? 1 : 0))
             parts.push("candListOpen="
                        + (root.activeCard ? root.activeCard.candListOpen : "-")
                        + " loaderActive="
@@ -980,6 +1168,31 @@ PluginComponent {
                                   ? card.candBarItems[0].t : "-")
                 + " listFirst=" + (card.candListItems.length > 0
                                    ? card.candListItems[0].t : "-")
+        }
+
+        // 临时：验证候选列表页右侧按钮（滚动 / 退格 / 回车）
+        function debugSideButton(act: string): string {
+            const card = root.activeCard
+            if (!card)
+                return "no-card"
+            const panel = card.candListPanel
+            if (!panel)
+                return "no-panel"
+            if (act === "up" || act === "down") {
+                const before = panel.contentYOf()
+                panel.scrollBy(act === "up" ? -1 : 1)
+                return "act=" + act + " y=" + Math.round(before)
+                    + " -> " + Math.round(panel.contentYOf())
+            }
+            if (act === "backspace") {
+                card.keyPressed({ k: "key", l: "Backspace", c: 14 })
+                return "act=backspace sent"
+            }
+            if (act === "enter") {
+                card.keyPressed({ k: "key", l: "Enter", c: 28 })
+                return "act=enter sent"
+            }
+            return "unknown:" + act
         }
 
         function debugPanel(): string {

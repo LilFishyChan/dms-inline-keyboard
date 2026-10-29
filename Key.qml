@@ -5,6 +5,7 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 import Qt5Compat.GraphicalEffects
+import "layouts/special-keys.js" as SpecialKeys
 
 // 单个按键。宽度/高度都由 unit、keyH、gap 推出来，布局只负责给单位宽和跨行数。
 Item {
@@ -25,6 +26,11 @@ Item {
     property real keyOpacity: 1.0
     // 字母是否大写：shift 激活 / caps 锁定时为 true（默认小写）
     property bool upperMode: false
+    // 特殊键（Backspace / Enter / Shift…）画成图标、缩写还是完整名字。
+    // 由设置页选，取值见 layouts/special-keys.js 的 STYLES。
+    property string specialKeyStyle: "full"
+    // Win 键单独的表现（mod / system / windows），不受上面那个影响
+    property string winKeyStyle: "mod"
 
     readonly property string kind: keyData.k || "char"
     readonly property real wUnits: keyData.w || 1
@@ -56,9 +62,15 @@ Item {
     // 上面那行文字 / 下面那行文字
     readonly property string topLabel: useFn ? "" : (hasShiftPair
         ? (upperMode ? pairBig : pairSmall) : "")
-    readonly property string bottomLabel: hasShiftVariant
-        ? effectiveLabel
-        : ((hasShiftPair && !useFn) ? (upperMode ? pairSmall : pairBig) : mainLabel)
+    readonly property string bottomLabel: {
+        // 特殊键的形态由设置决定；图标形态时 text 为空，交给下面的
+        // iconName + DankIcon 绘制
+        if (root.specialLook !== null)
+            return root.specialLook.text
+        return hasShiftVariant
+            ? effectiveLabel
+            : ((hasShiftPair && !useFn) ? (upperMode ? pairSmall : pairBig) : mainLabel)
+    }
     // 两行各自的字号比例：大字永远当前输入项
     readonly property real topRatio: (hasShiftPair && !useFn && upperMode)
         ? mainLabelRatio : upperLabelRatio
@@ -67,7 +79,9 @@ Item {
     // 「非当前状态会输入」的那一行：比正文色再淡一档，层次更清楚
     readonly property color minorLabelColor: Theme.withAlpha(Theme.onSurfaceVariant, 0.6)
     // 键面图标（表情、第二页、菜单…）。可以是 Material 名字，也可以是图片路径
-    readonly property string iconName: keyData.icon || ""
+    readonly property string iconName: (root.specialLook !== null && root.specialLook.icon !== "")
+        ? root.specialLook.icon
+        : (keyData.icon || "")
     readonly property bool iconIsImage: {
         const n = root.iconName
         if (n === "")
@@ -88,6 +102,12 @@ Item {
 
     // Shift 下的替代键：Enter 在 Shift 激活时变 Del（显示和执行都换）
     readonly property bool hasShiftVariant: !!keyData.shift && upperMode
+    // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），
+    // 那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
+    readonly property var specialLook: (!hasShiftVariant
+                                        && SpecialKeys.isSpecialKey(keyData.l))
+        ? SpecialKeys.resolve(keyData.l, root.specialKeyStyle, root.winKeyStyle)
+        : null
     readonly property string effectiveLabel: hasShiftVariant ? keyData.shift.l : mainLabel
     // 真正要注入的键码：Fn 层的键（F1-F12）和 Shift 变体（Enter→Del）都在这儿定
     readonly property int effectiveCode: {
@@ -187,9 +207,15 @@ Item {
                 text: root.topLabel
                 width: Math.max(10, bg.width - 8)
                 horizontalAlignment: Text.AlignHCenter
+                // HorizontalFit 缩字号后，行框仍按原字号高算，文字会贴在行框顶部。
+                // 显式在行框内垂直居中，视觉才和真正的键帽中心对齐。
+                verticalAlignment: Text.AlignVCenter
                 // shift 激活时这行是「当前输入的大字」，用正文色；否则是次要标签，淡一档
                 color: root.topRatio === root.mainLabelRatio
                        ? root.labelColor : root.minorLabelColor
+                // 长标签按可用宽度自动缩字号，一行不溢出
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: 7
                 font.pixelSize: Math.round(root.keyH * root.topRatio)
                 font.weight: root.topRatio === root.mainLabelRatio ? Font.Medium : Font.Normal
             }
@@ -197,7 +223,10 @@ Item {
             // 图标键（表情 / 第二页 / 菜单）。icon 是图片路径时用 Image 渲染
             DankIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
+                // 有文字标签时优先用文字：再叠一个图标会让 Column 变成两行，
+                // 文字被推到键帽顶部，看起来像"没有垂直居中"
                 visible: root.iconName !== "" && !root.iconIsImage
+                         && root.topLabel === "" && root.bottomLabel === ""
                 name: root.iconName
                 size: Math.round(root.keyH * (root.bigIcon ? root.bigIconRatio : root.iconRatio))
                 color: root.labelColor
@@ -206,6 +235,7 @@ Item {
             Image {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: root.iconIsImage
+                         && root.topLabel === "" && root.bottomLabel === ""
                 source: root.iconSource
                 readonly property int px: Math.round(root.keyH * (root.bigIcon
                                                                  ? root.bigIconRatio : root.iconRatio))
@@ -226,6 +256,7 @@ Item {
                 text: root.bottomLabel
                 color: root.bottomRatio === root.mainLabelRatio
                        ? root.labelColor : root.minorLabelColor
+                verticalAlignment: Text.AlignVCenter
                 // 长标签（Backspace / Caps Lock）自动缩到放得下
                 fontSizeMode: Text.HorizontalFit
                 minimumPixelSize: 7

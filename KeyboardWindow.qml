@@ -18,6 +18,22 @@ PanelWindow {
     property real bgOpacity: 1.0
     property int repeatInterval: 60
     property real keyOpacity: 1.0
+    // 特殊键形态设置（见 layouts/special-keys.js）
+    property string specialKeyStyle: "full"
+    property string winKeyStyle: "mod"
+    // 调整大小：预览尺寸 / 名义尺寸 / 屏幕尺寸
+    property real resizeW: 1050
+    property real resizeH: 444
+    property real baseKbWidth: 1050
+    property real baseKbHeight: 444
+    signal resizeCommitRequested()
+    signal resizeCloseRequested()
+    signal resizeCancelRequested()
+    signal resizeResetRequested()
+    signal resizeFillToggleRequested()
+    signal modeChangeRequested(string mode)
+    // 停靠时是否横向铺满屏幕
+    property bool dockFill: true
     property var actionList: []
     // fcitx5 候选（由 daemon 从 inline-keyboard-status.json 读入）
     property var fcitxCandidates: []
@@ -85,6 +101,8 @@ PanelWindow {
         showCandBar: root.showCandBar
         screenW: root.screen ? root.screen.width : 1280
         screenH: root.screen ? root.screen.height : 800
+        // 停靠模式贴屏幕两侧；关掉「铺满」时回到名义宽度并居中
+        fillWidth: root.dockFill
     }
 
     function show() {
@@ -113,7 +131,13 @@ PanelWindow {
     // 算进 exclusiveZone 会把下面的窗口无谓地往上推 42px。
     exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(root.kbHeight) : 0
 
-    implicitWidth: metrics.cardW
+    // 窗口只包住键盘本体 + 预编辑标签的预留高度。
+    //
+    // 试过铺满整屏（implicitHeight: screenH）来让上方区域也能点穿，但那样
+    // exclusiveZone 就失效了：窗口覆盖全屏后 niri 把它当全屏窗口，
+    // 不再为下面窗口预留空间，应用内容会被键盘盖住。
+    // 避让和全屏不可兼得，取避让。
+    implicitWidth: metrics.screenW
     // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
     // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），
     // 标签不会被窗口裁掉。
@@ -131,15 +155,20 @@ PanelWindow {
     // 键盘自己不发按键（由 ydotool 注入），绝不能抢焦点
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    // 不要用 Region { item: card }：card 之外的部分会被裁掉，
-    // 而 preedit 标签正是浮在 card 上方那 42px 里。
+    // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。
+    //
+    // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，
+    // 键盘以外那整条屏幕宽都是不透明输入区——下面的窗口点不动。
+    // 所以这里用绝对坐标算出卡片的实际范围。
+    //
+    // 上边界取 card.y - preeditReserve：预编辑标签浮在卡片上方，
+    // 虽然现在可能没显示，但恒定留出来比按状态动态算稳（不会让 mask 抖动）。
     mask: Region {
-        item: maskArea
-    }
-
-    Item {
-        id: maskArea
-        anchors.fill: parent
+        x: Math.round(card.x)
+        y: Math.max(0, Math.round(card.y - root.preeditReserve))
+        width: Math.round(card.width)
+        height: Math.max(0, Math.round(root.height - Math.max(0,
+                Math.round(card.y - root.preeditReserve))))
     }
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
@@ -177,6 +206,21 @@ PanelWindow {
         avoidWindows: root.avoidWindows
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
+        specialKeyStyle: root.specialKeyStyle
+        winKeyStyle: root.winKeyStyle
+        resizeW: root.resizeW
+        resizeH: root.resizeH
+        baseKbWidth: root.baseKbWidth
+        baseKbHeight: root.baseKbHeight
+        screenW: root.screen ? root.screen.width : 1920
+        screenH: root.screen ? root.screen.height : 1080
+        onResizeCommitRequested: root.resizeCommitRequested()
+        onResizeCloseRequested: root.resizeCloseRequested()
+        onResizeCancelRequested: root.resizeCancelRequested()
+        onResizeResetRequested: root.resizeResetRequested()
+        onResizeFillToggleRequested: root.resizeFillToggleRequested()
+        onModeChangeRequested: mode => root.modeChangeRequested(mode)
+        dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
         fcitxImKeyboard: root.fcitxImKeyboard

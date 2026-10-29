@@ -358,16 +358,6 @@ PluginSettings {
     }
 
     SliderSetting {
-        settingKey: "scale"
-        label: root.tr("Keyboard scale")
-        description: root.tr("Overall scale of the whole keyboard.")
-        minimum: 50
-        maximum: 100
-        defaultValue: 100
-        unit: "%"
-    }
-
-    SliderSetting {
         settingKey: "bgOpacity"
         label: root.tr("Background opacity")
         description: root.tr("Opacity of the keyboard panel itself.")
@@ -433,6 +423,33 @@ PluginSettings {
             { label: root.tr("Tap to activate; any key clears it"), value: "toggle" },
             { label: root.tr("Tap to lock (tap again to unlock)"), value: "tapLock" },
             { label: root.tr("Tap to toggle, double-tap to lock"), value: "doubleTapLock" }
+        ]
+    }
+
+    // 特殊键的表现形式。三个选项对应 layouts/special-keys.js 的 STYLES；
+    // 「完整」形态下过长的文字由 Key.qml 的 Text.HorizontalFit 自动缩字号。
+    SelectionSetting {
+        settingKey: "specialKeyStyle"
+        label: root.tr("Special key labels")
+        description: root.tr("How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.")
+        defaultValue: "full"
+        options: [
+            { label: root.tr("Icon"), value: "icon" },
+            { label: root.tr("Short"), value: "short" },
+            { label: root.tr("Full name"), value: "full" }
+        ]
+    }
+
+    // Win 键实际发的是 Super_L，叫 Win 只对 Windows 用户成立，默认显示 Mod
+    SelectionSetting {
+        settingKey: "winKeyStyle"
+        label: root.tr("Win key label")
+        description: root.tr("This key sends Super. Show it as Mod, or as an icon.")
+        defaultValue: "mod"
+        options: [
+            { label: root.tr("Mod"), value: "mod" },
+            { label: root.tr("System icon"), value: "system" },
+            { label: root.tr("Windows icon"), value: "windows" }
         ]
     }
 

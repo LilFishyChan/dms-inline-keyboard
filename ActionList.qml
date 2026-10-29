@@ -233,6 +233,10 @@ Item {
                         iconSize: Math.round(controller.keyH * 0.42)
                         pixelSize: Math.max(12, Math.round(controller.keyH * 0.29))
                         dividerOpacity: actState === "active" ? 0.35 : 0.16
+                        // 标题可用宽 = 磁贴宽 − 左右内边距 − 图标 − 间距 − 分隔线
+                        readonly property real sidePad: Math.round(controller.keyH * 0.34)
+                        maxLabelWidth: Math.max(24, parent.width - sidePad * 2
+                            - Math.round(controller.keyH * 0.42) * 2 - 1)
                     }
 
                     MouseArea {
@@ -245,9 +249,10 @@ Item {
                         onCanceled: fnRipple.release()
                         onClicked: {
                             if (modelData.id === "opacity") {
-                                controller.prevBgOpacity = controller.bgOpacity
-                                controller.prevKeyOpacity = controller.keyOpacity
-                                controller.mode = "transparency"
+                                // 快照由 daemon 在切模式时自己记：这里拿到的
+                                // controller 是卡片，卡片上没有 prevBgOpacity，
+                                // 直接写会抛 ReferenceError，后面切模式执行不到
+                                controller.modeChangeRequested("transparency")
                                 return
                             }
                             controller.quickAction(modelData.id)

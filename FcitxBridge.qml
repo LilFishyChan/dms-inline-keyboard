@@ -107,7 +107,31 @@ Item {
         return out
     }
 
-    readonly property var imRows: Data.buildImRows(imListForRows, imName, imLabel)
+    // 连续点击地球键时，真实的 imName/imLabel 要等 addon 推送才更新，
+    // 期间 buildImRows 会把同一个输入法标成 current，nextImRow 就原地打转。
+    //
+    // 记的不是输入法名而是**行号**：rime 有「万」和「abc」两个子模式，
+    // 只记名字分不清它们，连点第二下就会算错。
+    property int optimisticImIdx: -1
+
+    readonly property var imRows: {
+        const rows = Data.buildImRows(imListForRows, imName, imLabel)
+        // 本文件的 id 是 bridge，写 root.* 会解析到外层组件（文件头注释
+        // 就记着这个坑），拿到 undefined → 乐观索引永远不生效
+        const idx = bridge.optimisticImIdx
+        if (idx < 0 || idx >= rows.length)
+            return rows
+        const out = []
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i]
+            out.push({
+                name: r.name, ascii: r.ascii, keyboard: r.keyboard,
+                label: r.label, icon: r.icon, text: r.text,
+                current: i === idx
+            })
+        }
+        return out
+    }
 
     // 当前是否英文字模式（按子模式标签是否为纯 ASCII 字母判断）
     readonly property bool isAsciiMode: Data.isAsciiMode(imLabel)
@@ -319,8 +343,31 @@ Item {
     // 开关信号）。这里如果也发 mode:osk，会和 addon 内部的
     // setInputMethodMode -> hide/showVirtualKeyboard 回调链撞在一起。
     onKeyboardOpenChanged: {
-        if (!keyboardOpen && socket.connected)
-            socket.connected = false
+        if (keyboardOpen && socket.connected) {
+            // 每次打开都重新申领一次 UI。
+            // addon 的 markShown(true) 有状态去重：socket 一直连着时 shown_
+            // 已经是 true，再开键盘不会调 setInputMethodMode/updateAvailability，
+            // UI 角色就留在 classicui 手里（候选窗又冒出来，键盘自己的候选栏空着）。
+            bridge.sendFcitx("reclaim")
+            return
+        }
+        if (!keyboardOpen && socket.connected) {
+            // 关键盘：先显式让 addon 交还 UI，再断 socket。
+            // 只断 socket 时 addon 走 peer-eof -> markShown(false)，
+            // 而 markShown 里 shown_ 可能已经是 false（上一轮交还后没重置），
+            // 状态去重会把这次交还吞掉 —— 这就是"有时没移交"的来源。
+            bridge.sendFcitx("release")
+            releaseCloseTimer.restart()
+        }
+    }
+
+    // 给 release 一条命令的往返时间，再断开
+    Timer {
+        id: releaseCloseTimer
+        interval: 40
+        // socket 是同级对象的 id，不是 bridge 的属性：写 bridge.socket
+        // 取到的是 undefined，赋值时抛 TypeError
+        onTriggered: socket.connected = false
     }
 
     // 剪贴板兜底：wl-copy 直接吃文本参数，不经过 shell，省掉转义问题

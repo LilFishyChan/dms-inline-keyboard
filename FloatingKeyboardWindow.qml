@@ -37,6 +37,22 @@ PanelWindow {
     property real bgOpacity: 1.0
     property int repeatInterval: 60
     property real keyOpacity: 1.0
+    // 特殊键形态设置（见 layouts/special-keys.js）
+    property string specialKeyStyle: "full"
+    property string winKeyStyle: "mod"
+    // 调整大小：预览尺寸 / 名义尺寸 / 屏幕尺寸
+    property real resizeW: 1050
+    property real resizeH: 444
+    property real baseKbWidth: 1050
+    property real baseKbHeight: 444
+    signal resizeCommitRequested()
+    signal resizeCloseRequested()
+    signal resizeCancelRequested()
+    signal resizeResetRequested()
+    signal resizeFillToggleRequested()
+    signal modeChangeRequested(string mode)
+    // 停靠时是否横向铺满屏幕
+    property bool dockFill: true
     property var actionList: []
     // fcitx5 候选（由 daemon 从 inline-keyboard-status.json 读入）
     property var fcitxCandidates: []
@@ -197,6 +213,21 @@ PanelWindow {
         avoidWindows: root.avoidWindows
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
+        specialKeyStyle: root.specialKeyStyle
+        winKeyStyle: root.winKeyStyle
+        resizeW: root.resizeW
+        resizeH: root.resizeH
+        baseKbWidth: root.baseKbWidth
+        baseKbHeight: root.baseKbHeight
+        screenW: root.screen ? root.screen.width : 1920
+        screenH: root.screen ? root.screen.height : 1080
+        onResizeCommitRequested: root.resizeCommitRequested()
+        onResizeCloseRequested: root.resizeCloseRequested()
+        onResizeCancelRequested: root.resizeCancelRequested()
+        onResizeResetRequested: root.resizeResetRequested()
+        onResizeFillToggleRequested: root.resizeFillToggleRequested()
+        onModeChangeRequested: mode => root.modeChangeRequested(mode)
+        dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
         fcitxImKeyboard: root.fcitxImKeyboard

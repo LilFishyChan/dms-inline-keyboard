@@ -120,6 +120,15 @@ Item {
                 NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
             }
 
+            // 和右侧固定按钮一样的涟漪。写在 ActionIcon 之前，
+            // 让涟漪铺在图标下面而不是盖住它。
+            Ripple {
+                id: barRipple
+                anchors.fill: parent
+                // 动作块是胶囊形，涟漪按高度的一半裁圆角
+                cornerRadius: parent.height / 2
+            }
+
             ActionIcon {
                 anchors.centerIn: parent
                 action: modelData
@@ -135,6 +144,9 @@ Item {
                 anchors.fill: parent
                 enabled: !controller.editing && !parent.leaving
                 acceptedButtons: Qt.LeftButton
+                onPressed: mouse => barRipple.press(mouse.x, mouse.y)
+                onReleased: barRipple.release()
+                onCanceled: barRipple.release()
                 onClicked: controller.quickAction(modelData.id)
             }
 
@@ -319,7 +331,7 @@ Item {
                             controller.bgOpacity = controller.prevBgOpacity
                             controller.keyOpacity = controller.prevKeyOpacity
                         }
-                        controller.mode = "keys"
+                        controller.modeChangeRequested("keys")
                         return
                     }
                     // 编辑态只有 index 0（确认）可点，槽让位给拖动手势
@@ -328,7 +340,8 @@ Item {
                         return
                     }
                     if (!isSlot)
-                        controller.mode = (controller.mode === "functions" ? "keys" : "functions")
+                        controller.modeChangeRequested(
+                            controller.mode === "functions" ? "keys" : "functions")
                     else if (controller.slotActionId !== "")
                         controller.quickAction(controller.slotActionId)
                 }

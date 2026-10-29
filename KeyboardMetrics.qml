@@ -20,12 +20,16 @@ QtObject {
     property real gap: 6
     property real pad: 8
     property real candH: 44
-    property bool showCandBar: false
-    property real screenW: 1280
     property real screenH: 800
 
-    // 卡片不超出屏幕两侧
-    readonly property real cardW: Math.min(kbWidth, screenW - 24)
+    property bool showCandBar: false
+    property real screenW: 1280
+    // 停靠模式铺满屏幕两侧；浮动模式保持名义宽度并留出边距，
+    // 否则浮窗会被拉成整屏宽。
+    property bool fillWidth: false
+    readonly property real cardW: root.fillWidth
+        ? root.screenW
+        : Math.min(root.kbWidth, root.screenW - 24)
     // 一行 = rowUnits 个单元 + (rowUnits-1) 个间距 + 两侧内边距
     readonly property real unit:
         (cardW - pad * 2 - (Layout.rowUnits - 1) * gap) / Layout.rowUnits

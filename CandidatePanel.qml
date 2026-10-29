@@ -116,6 +116,7 @@ Item {
     onControllerChanged: rebuildLayout()
     onWidthChanged: rebuildLayout()
     onUnitChanged: rebuildLayout()
+    onGapChanged: rebuildLayout()
     onActiveChanged: rebuildLayout()
     onKeyHChanged: rebuildLayout()
     Component.onCompleted: rebuildLayout()
@@ -298,25 +299,100 @@ Item {
     }
 
     // ---------------------------------------------------------------
-    // 右侧一列：上两个 + 中间空 + 下两个
+    // 右侧一列：上面两个翻页、下面两个退格/回车，中间留空
+    //
     // 用绝对坐标而不是 Column：Column 里插空 Item 占位时，间距和高度
     // 容易算错，实测中间那行会多冒一个色块。
     // ---------------------------------------------------------------
+    readonly property real scrollStep: 0.9
+
+    // 一屏滚动 90%：留一成重叠，用户能看出「接着上一屏」而不是跳到新地方。
+    // 给调试入口读当前滚动位置
+    function contentYOf() {
+        return flick.contentY
+    }
+
+    function scrollBy(direction) {
+        const maxY = Math.max(0, flick.contentHeight - flick.height)
+        flick.contentY = Math.max(0, Math.min(maxY,
+            flick.contentY + direction * flick.height * scrollStep))
+    }
+
+    // 四个按钮贴列表页的首尾：上两个占前两行、下两个占最后两行。
+    //
+    // 不能用主键盘行高（keyH）来排行号——候选行高是 rowH（keyH 的 0.72），
+    // 两者混用会让按钮和左侧候选行整体错位，越往下偏得越多。
+    readonly property var sideButtons: [
+        { pos: "top0", icon: "keyboard_arrow_up", act: "up" },
+        { pos: "top1", icon: "keyboard_arrow_down", act: "down" },
+        { pos: "bottom0", icon: "backspace", act: "backspace" },
+        { pos: "bottom1", icon: "keyboard_return", act: "enter" }
+    ]
+
+    // 四个按钮的高度固定为主键盘的标准键高，不跟着候选行高浮动
+    // （rowH 是按字号推的，随键盘缩放和字体变化，按钮跟着变会忽大忽小）。
+    readonly property real sideKeyH: keyH
+    readonly property real sideRowStep: sideKeyH + gap
+
+    // 首尾各两个，中间整段留空
+    function sideButtonY(pos) {
+        switch (pos) {
+        case "top0": return 0
+        case "top1": return sideRowStep
+        case "bottom0": return Math.max(sideRowStep * 2,
+                                        candList.height - sideRowStep * 2)
+        default: return Math.max(sideRowStep * 3,
+                                 candList.height - sideRowStep)
+        }
+    }
+
     Repeater {
-        model: [0, 1, candList.rowCount - 2, candList.rowCount - 1]
+        model: candList.sideButtons
 
         delegate: Rectangle {
-            required property int modelData
+            id: sideBtn
+            required property var modelData
+
+            readonly property bool isKey: modelData.act === "backspace"
+                                          || modelData.act === "enter"
 
             x: parent.width - width
-            y: modelData * (candList.keyH + candList.gap)
+            y: candList.sideButtonY(modelData.pos)
             width: candList.colW
-            height: candList.keyH
-            radius: Theme.cornerRadius / 2
-            // 空键帽：和普通键同色系，但不带图标也不响应点击
-            color: Theme.withAlpha(candList.fgColor, 0.10)
-            border.width: 1
-            border.color: Theme.withAlpha(candList.fgColor, 0.16)
+            // 固定高度（见 sideKeyH 的说明），不跟随候选行高
+            height: candList.sideKeyH
+            // 圆角、底色、图标色都跟主键盘的特殊键一致（Tab / Enter 那种）：
+            // 这一列是键区的一部分，不该看起来像另一套控件。
+            radius: Math.min(Theme.cornerRadius, candList.sideKeyH * 0.16)
+            color: Theme.surfaceContainerHighest
+            opacity: press.pressed ? 0.72 : 1
+            Behavior on opacity { NumberAnimation { duration: 90 } }
+
+            DankIcon {
+                anchors.centerIn: parent
+                name: sideBtn.modelData.icon
+                size: Math.round(candList.sideKeyH * 0.38)
+                color: Theme.surfaceText
+            }
+
+            MouseArea {
+                id: press
+                anchors.fill: parent
+                onClicked: {
+                    switch (sideBtn.modelData.act) {
+                    case "up":   candList.scrollBy(-1); break
+                    case "down": candList.scrollBy(1); break
+                    // 退格/回车走和主键盘完全相同的入口（keyPressed →
+                    // 窗口 → daemon.handleKey），不另开一条按键通道
+                    case "backspace":
+                        candList.controller.keyPressed({ k: "key", l: "Backspace", c: 14 })
+                        break
+                    case "enter":
+                        candList.controller.keyPressed({ k: "key", l: "Enter", c: 28 })
+                        break
+                    }
+                }
+            }
         }
     }
 }

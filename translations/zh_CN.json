@@ -3,8 +3,6 @@
     "Touch keyboard for DMS with fcitx5-backed candidates (kimpanel)": "DMS 上的触摸键盘，候选词走 fcitx5 kimpanel",
     "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": "键盘用 `dms ipc call inlineKeyboard toggle` 开合，也可以把 DankBar 上的小部件加进来。",
     "Appearance": "外观",
-    "Keyboard scale": "键盘缩放",
-    "Overall scale of the whole keyboard.": "整体缩放比例，影响最终显示大小",
     "Background opacity": "背景透明度",
     "Opacity of the keyboard panel itself.": "键盘面板本身的透明度",
     "Key opacity": "按键透明度",
@@ -73,6 +71,19 @@
     "Numbers": "序号",
     "Misc": "杂项",
     "Copied — long press the text field to paste": "已复制，长按输入框粘贴",
-    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status) or wl-clipboard": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）或 wl-clipboard，装好其中一个即可"
+    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status) or wl-clipboard": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）或 wl-clipboard，装好其中一个即可",
+    "Special key labels": "特殊键显示方式",
+    "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": "Backspace、Enter、Shift、Ctrl、Alt、Tab 这些键怎么画。选完整名字时字号会自动缩小以放得下。",
+    "Short": "缩写",
+    "Full name": "完整名字",
+    "Win key label": "Win 键显示",
+    "This key sends Super. Show it as Mod, or as an icon.": "这个键实际发的是 Super，可以显示成 Mod，或者用图标。",
+    "Mod": "Mod",
+    "System icon": "系统图标",
+    "Windows icon": "Windows 图标",
+    "Reset": "重置",
+    "Cancel": "取消",
+    "Done": "确定",
+    "Fill width": "铺满"
   }
 }

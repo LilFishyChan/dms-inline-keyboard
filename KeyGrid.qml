@@ -36,6 +36,8 @@ Item {
             upperMode: (grid.c.modifierStates.shift || 0) > 0
                        || (grid.c.modifierStates.caps || 0) > 0
             modifierState: grid.c.modifierStateFor(modelData.key)
+            specialKeyStyle: grid.c.specialKeyStyle
+            winKeyStyle: grid.c.winKeyStyle
             keyOpacity: grid.c.keyOpacity
             active: modelData.key.active === true
             x: modelData.col * (grid.c.unit + grid.c.gap)

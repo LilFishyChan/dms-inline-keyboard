@@ -94,7 +94,8 @@ Item {
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 3
-                        radius: 7
+                        // 胶囊形：半径取一半高度，首项高亮和悬浮反馈都是两端全圆
+                        radius: height / 2
                         color: mouse.containsMouse
                                ? Theme.withAlpha(Theme.primary, 0.18)
                                : (isFirst ? Theme.withAlpha(Theme.primary, 0.13) : "transparent")
@@ -102,9 +103,14 @@ Item {
 
                     Text {
                         id: label
-                        anchors.centerIn: parent
-                        // 只在超出上限时才限制宽度，正常词按内容排
-                        width: Math.min(implicitWidth, Math.max(0, capW - pad))
+                        // 不能用 anchors.centerIn：锚点会反过来设置 width，
+                        // 和下面的绑定打架，elide 就按错的值判断。
+                        x: Math.round((parent.width - width) / 2)
+                        y: Math.round((parent.height - height) / 2)
+                        // 只在超出上限时才限制宽度，正常词按内容排。
+                        // ceil 给 1px 余量：capW - pad 是浮点，和 implicitWidth
+                        // 差零点几像素时 Math.min 会取小值，两字词正好踩到这个边界。
+                        width: Math.min(implicitWidth, Math.max(0, Math.ceil(capW - pad)))
                         elide: isFirst ? Text.ElideLeft : Text.ElideRight
                         // QML 的 JS 引擎不支持 ?? 和 ?.，用三元代替（踩过两次）
                         text: {
