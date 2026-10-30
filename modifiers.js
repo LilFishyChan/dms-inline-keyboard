@@ -1,18 +1,5 @@
-// 修饰键的纯逻辑：键码 → 修饰键名、按下/松开/点按之后的状态、普通键后的复位。
-// 不依赖 QML，可用 node --test 直接测试（见 tests/modifiers.test.js）。
-//
-// 状态：
-//   0 = 未激活
-//   1 = 激活，但按下普通键就取消（"软激活"）
-//   2 = 锁定，只有再点本键才取消（普通键不影响）
-//
-// 切换方式（插件设置 modifierMode）：
-//   noLock        按住才生效：按下 → 1，松手 → 0；点一下不留下状态
-//   toggle        点一下即激活：0 ⇄ 1（激活期间按普通键就取消）
-//   tapLock       点一下即锁定：0 ⇄ 2（普通键不影响，再点本键取消）
-//   doubleTapLock 单击 = toggle（0 → 1），双击 = 锁定（1 → 2），锁定后 2 → 0
-//
-// Caps Lock 不受这四种方式影响，永远是传统开关（0 ⇄ 2，普通键不清）。
+// 修饰键纯逻辑：键码 → 名字、按下/松开/点按后的状态、普通键后的复位。node --test 可测。
+// 状态 0 未激活 / 1 软激活（普通键取消）/ 2 锁定（只有再点本键才取消）
 
 var MODES = {
     noLock: "noLock",
@@ -51,6 +38,10 @@ function modifierNameFor(keyData) {
     // Fn 和 shift/ctrl/alt 走同一套状态机（0 关 / 1 一次性 / 2 锁定）
     if (keyData.k === "fn")
         return "fn"
+    // 第二页开关走状态机：0 = 第一页 / >0 = 第二页。
+    // 表情页那种也是 k === "page"，但它是普通跳转，不是「切到第二页」
+    if (keyData.k === "page")
+        return (keyData.to === "page1" || keyData.to === "page2") ? "page" : ""
     if (keyData.k !== "key")
         return ""
     return MODIFIER_BY_KEYCODE[keyData.c] || ""
@@ -64,6 +55,8 @@ function modifierNameFor(keyData) {
 function keyDataFor(name) {
     if (name === "shift")
         return { k: "shift" }
+    if (name === "page")
+        return { k: "page" }
     if (KEYCODE_BY_MODIFIER[name] !== undefined)
         return { k: "key", c: KEYCODE_BY_MODIFIER[name] }
     return null
@@ -91,7 +84,8 @@ function nextModifierState(opts) {
         return current === 2 ? 0 : 2
 
     // Fn 是「切层」不是「按住生效」，noLock 对它没意义 → 退化成传统开关
-    if (name === "fn" && mode === MODES.noLock)
+    // page 同理：切页只有「停在哪一页」有意义，按住切页等于锁定
+    if ((name === "fn" || name === "page") && mode === MODES.noLock)
         return current === 2 ? 0 : 2
 
     if (mode === MODES.noLock)
@@ -119,9 +113,13 @@ function nextModifierState(opts) {
  * 按下修饰键时的状态（只有 noLock 会变）。
  * @param {string} mode 切换方式
  * @param {number} current 当前状态
+ * @param {string} [name] 修饰键名；page 不走「按住生效」
  * @returns {number} 新状态
  */
-function pressModifierState(mode, current) {
+function pressModifierState(mode, current, name) {
+    // page 键按住不切页：切页靠点击锁定，按住切页没有可用的手感
+    if (name === "page")
+        return current
     if (mode === MODES.noLock)
         return 1
     return current
@@ -131,9 +129,12 @@ function pressModifierState(mode, current) {
  * 松开修饰键时的状态（只有 noLock 会回落）。
  * @param {string} mode 切换方式
  * @param {number} current 当前状态
+ * @param {string} [name] 修饰键名；page 不参与回落
  * @returns {number} 新状态
  */
-function releaseModifierState(mode, current) {
+function releaseModifierState(mode, current, name) {
+    if (name === "page")
+        return current
     if (mode === MODES.noLock)
         return 0
     return current

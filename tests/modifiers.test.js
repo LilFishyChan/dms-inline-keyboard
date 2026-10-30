@@ -6,10 +6,13 @@ const {
     DEFAULT_MODE,
     DEFAULT_DOUBLE_TAP_MS,
     modifierNameFor,
+    keyDataFor,
     nextModifierState,
     pressModifierState,
     releaseModifierState,
-    clearTransient
+    clearTransient,
+    MODIFIER_KEYCODES,
+    modifierSequence
 } = require("../modifiers.js");
 
 // 点一下：只关心「点完是什么状态」
@@ -160,4 +163,95 @@ test("nextModifierState: Fn 在双击锁定模式下 0 → 1 → 2 → 0", () =>
 test("clearTransient: Fn 的一次性状态会被普通键清掉，锁定的保留", () => {
     assert.deepEqual(clearTransient({ fn: 1 }).fn, 0);
     assert.deepEqual(clearTransient({ fn: 2 }).fn, 2);
+});
+
+// ---- 页面键：和 Shift / Ctrl 同一套状态机 ----
+
+test("modifierNameFor: 只有切两页的 page 键算修饰键", () => {
+    assert.equal(modifierNameFor({ k: "page", to: "page2" }), "page");
+    assert.equal(modifierNameFor({ k: "page", to: "page1" }), "page");
+    // 表情页也是 k === "page"，但它是普通跳转，不能当第二页开关
+    assert.equal(modifierNameFor({ k: "page", to: "emoji", icon: "mood" }), "");
+});
+
+test("page: noLock 档不按住生效，点一下就是锁定", () => {
+    assert.equal(pressModifierState(MODES.noLock, 0, "page"), 0);
+    assert.equal(releaseModifierState(MODES.noLock, 0, "page"), 0);
+    assert.equal(tap("page", 0, MODES.noLock), 2);
+    assert.equal(tap("page", 2, MODES.noLock), 0);
+});
+
+test("page: toggle 档点一下激活、再点取消", () => {
+    assert.equal(tap("page", 0, MODES.toggle), 1);
+    assert.equal(tap("page", 1, MODES.toggle), 0);
+});
+
+test("page: doubleTapLock 单击激活、双击锁定、再点回第一页", () => {
+    assert.equal(tap("page", 0, MODES.doubleTapLock), 1);
+    assert.equal(tap("page", 1, MODES.doubleTapLock, { isSameKey: true, sinceLastTapMs: 100 }), 2);
+    assert.equal(tap("page", 1, MODES.doubleTapLock, { isSameKey: false }), 0);
+    assert.equal(tap("page", 2, MODES.doubleTapLock), 0);
+});
+
+test("page: 不影响其它修饰键的按住生效", () => {
+    assert.equal(pressModifierState(MODES.noLock, 0, "ctrl"), 1);
+    assert.equal(releaseModifierState(MODES.noLock, 1, "ctrl"), 0);
+});
+
+test("page: 一次性状态会被普通键清掉，锁定的保留", () => {
+    assert.equal(clearTransient({ page: 1 }).page, 0);
+    assert.equal(clearTransient({ page: 2 }).page, 2);
+});
+
+// ---- ydotool 组合键序列：modifierSequence ----
+
+test("modifierSequence: 没有按下的修饰键时是空序列", () => {
+    assert.deepEqual(modifierSequence({}), { down: [], up: [] });
+    assert.deepEqual(modifierSequence(null), { down: [], up: [] });
+    assert.deepEqual(modifierSequence({ ctrl: 0, shift: 0 }), { down: [], up: [] });
+});
+
+test("modifierSequence: 单个修饰键按下再松开", () => {
+    assert.deepEqual(modifierSequence({ ctrl: 1 }), { down: ["29:1"], up: ["29:0"] });
+});
+
+test("modifierSequence: 顺序固定 ctrl → alt → shift → super，松开反序", () => {
+    // 故意按倒序传，结果必须按固定顺序排，否则组合键会和别的进程抢
+    const seq = modifierSequence({ super: 1, shift: 1, alt: 1, ctrl: 1 });
+    assert.deepEqual(seq.down, ["29:1", "56:1", "42:1", "125:1"]);
+    assert.deepEqual(seq.up, ["125:0", "42:0", "56:0", "29:0"]);
+});
+
+test("modifierSequence: 锁定态(2)也当作按下", () => {
+    assert.deepEqual(modifierSequence({ shift: 2 }), { down: ["42:1"], up: ["42:0"] });
+});
+
+test("modifierSequence: 只认四个组合键，caps/fn/page 不产生序列", () => {
+    assert.deepEqual(modifierSequence({ caps: 2, fn: 1, page: 1 }), { down: [], up: [] });
+});
+
+test("modifierSequence: 键码表和实现一致", () => {
+    assert.equal(MODIFIER_KEYCODES.ctrl, 29);
+    assert.equal(MODIFIER_KEYCODES.alt, 56);
+    assert.equal(MODIFIER_KEYCODES.shift, 42);
+    assert.equal(MODIFIER_KEYCODES.super, 125);
+});
+
+// ---- keyDataFor：名字 → 键位数据（调试 IPC 用）----
+
+test("keyDataFor: shift / page 走各自的 kind", () => {
+    assert.deepEqual(keyDataFor("shift"), { k: "shift" });
+    assert.deepEqual(keyDataFor("page"), { k: "page" });
+});
+
+test("keyDataFor: caps / ctrl / alt / super 换成键码", () => {
+    assert.deepEqual(keyDataFor("ctrl"), { k: "key", c: 29 });
+    assert.deepEqual(keyDataFor("caps"), { k: "key", c: 58 });
+    assert.deepEqual(keyDataFor("alt"), { k: "key", c: 56 });
+    assert.deepEqual(keyDataFor("super"), { k: "key", c: 125 });
+});
+
+test("keyDataFor: 未知名字返回 null", () => {
+    assert.equal(keyDataFor("nope"), null);
+    assert.equal(keyDataFor(""), null);
 });

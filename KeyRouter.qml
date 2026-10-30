@@ -1,19 +1,11 @@
-// 按键路由：修饰键状态机 + 按键注入。
-//
-// 从 InlineKeyboardDaemon 拆出来的。这里只回答一个问题：
-// 「这个键该发给 fcitx5，还是该交给合成器？」
-//
-//   有输入法引擎 + 无 Ctrl/Alt/Super 组合  → socket 直通 fcitx5（约 2ms）
-//   纯键盘布局（keyboard-us）/ 带组合键     → ydotool（约 25ms，但走真实设备）
-//
-// 为什么纯键盘布局不能直通：fcitx5 的 InputContextVirtualKeyboardEvent 处理器
-// 在 !engine || !entry 时直接 return，keyboard-us 没有输入法引擎，事件被丢弃。
-// 为什么组合键不能直通：Alt+Tab / Mod+数字 必须让合成器看到，socket 到不了合成器。
+// 按键路由：修饰键状态机 + 注入。只回答「发给 fcitx5 还是交给合成器」。
+//   组合键必须走 ydotool：socket 到不了合成器；且要优先于输入法，否则 Ctrl+C 要按两次
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import "data.js" as Data
 import "modifiers.js" as Modifiers
+import "keyroute.js" as KeyRoute
 
 Item {
     id: router
@@ -38,6 +30,8 @@ Item {
     property int altState: 0
     property int superState: 0
     property int fnState: 0
+    // 页面键状态：0 = 第一页 / 1 = 一次性 / 2 = 锁定（第二页）
+    property int pageState: 0
 
     // 切换方式：noLock / toggle / tapLock / doubleTapLock（设置页可选）
     property string modifierMode: "doubleTapLock"
@@ -48,18 +42,35 @@ Item {
     // 给卡片的快照：每次状态变化都生成新对象，键盘才收得到通知
     readonly property var modifierStates: ({
         shift: shiftState, caps: capsState, ctrl: ctrlState,
-        alt: altState, super: superState, fn: fnState
+        alt: altState, super: superState, fn: fnState, page: pageState
     })
 
     // 组合键（Ctrl/Alt/Super）要优先于输入法：
     // 预编辑挂着时 fcitx5 会先把组合键交给输入法引擎判断，
-    // 结果 Ctrl+C 要按两次才生效。Shift 不算组合键（Shift+A 是正常输入）。
     readonly property bool hasComboModifier: ctrlState !== 0 || altState !== 0 || superState !== 0
 
     // ---- ydotool ----
     // 唯一后端。它通过 uinput 造真实键盘设备，事件走 libinput → 合成器第一环，
-    // 打字和合成器快捷键都是原生行为。
     property bool ydotooldUp: false
+
+    // 测试用：只记录「会发什么」，不真的注入（不调 ydotool、不发 socket）。
+    // 由 debugSetDryRun / debugInjected 驱动，见 scripts/acceptance.py。
+    property bool dryRun: false
+    property var dryRunLog: []
+
+    function noteDryRun(code, sym, kind, route, mods) {
+        const log = dryRunLog.slice()
+        log.push({
+            code: code,
+            sym: sym || "",
+            kind: kind || "",
+            route: route,
+            mods: mods
+        })
+        while (log.length > 50)
+            log.shift()
+        dryRunLog = log
+    }
 
     // ---- 修饰键 ----
 
@@ -71,6 +82,7 @@ Item {
         case "alt": return altState
         case "super": return superState
         case "fn": return fnState
+        case "page": return pageState
         }
         return 0
     }
@@ -83,6 +95,7 @@ Item {
         case "alt": altState = value; return
         case "super": superState = value; return
         case "fn": fnState = value; return
+        case "page": pageState = value; return
         }
     }
 
@@ -110,6 +123,7 @@ Item {
         altState = 0
         superState = 0
         fnState = 0
+        pageState = 0
         lastModifierTapped = ""
         lastModifierTapAt = 0
     }
@@ -119,14 +133,14 @@ Item {
         const name = Modifiers.modifierNameFor(keyData)
         if (name === "")
             return
-        setState(name, Modifiers.pressModifierState(modifierMode, stateOf(name)))
+        setState(name, Modifiers.pressModifierState(modifierMode, stateOf(name), name))
     }
 
     function modifierRelease(keyData) {
         const name = Modifiers.modifierNameFor(keyData)
         if (name === "")
             return
-        setState(name, Modifiers.releaseModifierState(modifierMode, stateOf(name)))
+        setState(name, Modifiers.releaseModifierState(modifierMode, stateOf(name), name))
     }
 
     // 普通键按下后：软激活(1)清零，锁定(2)与 caps lock 保留
@@ -138,13 +152,14 @@ Item {
         altState = next.alt
         superState = next.super
         fnState = next.fn || 0
+        pageState = next.page || 0
     }
 
     // 调试用：状态打成一串，方便 IPC 自测
     function stateSummary() {
         return "shift=" + shiftState + " caps=" + capsState
              + " ctrl=" + ctrlState + " alt=" + altState + " super=" + superState
-             + " fn=" + fnState
+             + " fn=" + fnState + " page=" + pageState
     }
 
     // ---- 按键分发 ----
@@ -165,35 +180,41 @@ Item {
         if (k === "space")
             injectKey(57, "space")     // 布局里没有码，keysym 名单独给
         else
-            injectKey(keyData.c, keyData.l)
+            injectKey(keyData.c, keyData.l, keyData.k)
         // 一次性修饰键用完复位（锁定态保留）
         clearTransientModifiers()
     }
 
     // 注入一个键：修饰键状态包成按下/松开序列，一次 ydotool 调用发完。
     // sym 是布局里的键名（"a" / "Backspace" / "Enter"…），用于走 socket 直通。
-    function injectKey(code, sym) {
+    function injectKey(code, sym, kind) {
         if (!code)
             return
+        const b = bridge
+        let route = KeyRoute.ROUTE.ydotool
+        let mods = 0
         if (sym) {
-            const b = bridge
-            // 三种情况走 ydotool 而不是 socket 直通：
-            //   · 英文模式：Virtual 事件会被当成「组合中」塞进 preedit，不上屏
-            //   · 退格且当前没有 preedit：fcitx5 会把它当成「没有可删的」直接
-            //     吞掉，删不到已上屏的文本
-            //   · 组合键 / 纯键盘布局（原本就有）
-            const backspaceWithNothingToDelete = sym === "Backspace" && b
-                && (b.preedit || "") === ""
-            // 数字键：rime 会把它们当候选序号选词，用户按 1 却打出候选词。
-            // 键盘上的数字就该是数字，一律走 ydotool。
-            const isDigit = /^[0-9]$/.test(sym)
-            if (b && !b.imKeyboard && !hasComboModifier && !b.isAsciiMode
-                && !backspaceWithNothingToDelete && !isDigit) {
-                const mods = shiftState ? 1 : 0
-                if (b.sendFcitx("key:" + sym + (mods ? ":" + mods : ""))) {
-                    clearTransientModifiers()
-                    return
-                }
+            // 交给输入法还是直接发真键：判据在 keyroute.js（纯函数，有单测）。
+            // 控制键交给输入法会被 fcitx 吞掉（Wayland 上不转发给应用），必须发真键。
+            route = KeyRoute.decideRoute(sym, kind, {
+                available: b !== null && b !== undefined,
+                preedit: b ? b.preedit : "",
+                imKeyboard: b ? b.imKeyboard : false,
+                isAsciiMode: b ? b.isAsciiMode : false,
+                combo: hasComboModifier
+            })
+            if (route === KeyRoute.ROUTE.fcitx)
+                mods = shiftState ? 1 : 0
+        }
+        // 测试用：只记下要发什么，不真的往系统发
+        if (dryRun) {
+            noteDryRun(code, sym, kind, route, mods)
+            return
+        }
+        if (sym && route === KeyRoute.ROUTE.fcitx) {
+            if (b && b.sendFcitx("key:" + sym + (mods ? ":" + mods : ""))) {
+                clearTransientModifiers()
+                return
             }
         }
         if (!ydotooldUp) {
@@ -231,14 +252,13 @@ Item {
         return null
     }
 
-    // ------------------------------------------------------------------
 
     Process {
         id: ydotoolProc
         command: ["true"]
         // 注入失败才重探（ydotoold 掉了 / socket 没了）。成功时什么都不做，
         // 键盘开着也不会有定时进程。
-        onExited: if (exitCode !== 0) router.probeYdotoold()
+        onExited: exitCode => { if (exitCode !== 0) router.probeYdotoold() }
     }
 
     function runCommand(cmd) {

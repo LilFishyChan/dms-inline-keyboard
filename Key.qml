@@ -6,6 +6,7 @@ import qs.Common
 import qs.Widgets
 import Qt5Compat.GraphicalEffects
 import "layouts/special-keys.js" as SpecialKeys
+import qs.DCommon.Widgets
 
 // 单个按键。宽度/高度都由 unit、keyH、gap 推出来，布局只负责给单位宽和跨行数。
 Item {
@@ -42,7 +43,7 @@ Item {
     readonly property bool isLetter: kind === "char" && !!keyData.l
                                      && /^[A-Za-z]$/.test(keyData.l)
     // 有上下档两个标签的键（1/!、;/: …）
-    readonly property bool hasShiftPair: kind === "char" && !!keyData.s
+    readonly property bool hasShiftPair: kind === "char" && !!pairData.s
 
     readonly property string mainLabel: {
         if (useFn)
@@ -53,30 +54,29 @@ Item {
     }
 
     // 双标签键：**当前会输入的那个**用大字号（和字母键一样），另一个小字。
-    // 默认：上=上档(小)、下=下档(大)；shift 激活时位置和字号整体互换 → 上=下档(小)、下=上档(大)
-    // ⚠ 双标签只在「不在 Fn 层」时成立：Fn 层的键（F1/F2…）没有上下档，
-    // 直接用 mainLabel，否则数字键会一直显示 1/! 而不切到 F1
-    readonly property string pairBig: (hasShiftPair && !useFn)
-        ? (upperMode ? keyData.s : keyData.l) : mainLabel
-    readonly property string pairSmall: (hasShiftPair && !useFn)
-        ? (upperMode ? keyData.l : keyData.s) : ""
+    // 判断按「当前生效的那一份」来：Fn 层看 fn，否则看外层。
+    readonly property var pairData: (useFn && keyData.fn) ? keyData.fn : keyData
+    readonly property string pairBig: hasShiftPair
+        ? (upperMode ? pairData.s : pairData.l) : mainLabel
+    readonly property string pairSmall: hasShiftPair
+        ? (upperMode ? pairData.l : pairData.s) : ""
 
     // 上面那行文字 / 下面那行文字
-    readonly property string topLabel: useFn ? "" : (hasShiftPair
-        ? (upperMode ? pairBig : pairSmall) : "")
+    readonly property string topLabel: hasShiftPair
+        ? (upperMode ? pairBig : pairSmall) : ""
     readonly property string bottomLabel: {
         // 特殊键的形态由设置决定；图标形态时 text 为空，交给下面的
-        // iconName + DankIcon 绘制
+        // iconName + DIcon 绘制
         if (root.specialLook !== null)
             return root.specialLook.text
         return hasShiftVariant
             ? effectiveLabel
-            : ((hasShiftPair && !useFn) ? (upperMode ? pairSmall : pairBig) : mainLabel)
+            : (hasShiftPair ? (upperMode ? pairSmall : pairBig) : mainLabel)
     }
     // 两行各自的字号比例：大字永远当前输入项
-    readonly property real topRatio: (hasShiftPair && !useFn && upperMode)
+    readonly property real topRatio: (hasShiftPair && upperMode)
         ? mainLabelRatio : upperLabelRatio
-    readonly property real bottomRatio: (hasShiftPair && !useFn && upperMode)
+    readonly property real bottomRatio: (hasShiftPair && upperMode)
         ? upperLabelRatio : mainLabelRatio
     // 「非当前状态会输入」的那一行：比正文色再淡一档，层次更清楚
     readonly property color minorLabelColor: Theme.withAlpha(Theme.onSurfaceVariant, 0.6)
@@ -106,9 +106,12 @@ Item {
     readonly property bool hasShiftVariant: !!keyData.shift && upperMode
     // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），
     // 那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
+    readonly property string labelKey: (keyData.swap && useFn
+                                        && keyData.fn && keyData.fn.l)
+        ? keyData.fn.l : keyData.l
     readonly property var specialLook: (!hasShiftVariant
-                                        && SpecialKeys.isSpecialKey(keyData.l))
-        ? SpecialKeys.resolve(keyData.l, root.specialKeyStyle, root.winKeyStyle,
+                                        && SpecialKeys.isSpecialKey(labelKey))
+        ? SpecialKeys.resolve(labelKey, root.specialKeyStyle, root.winKeyStyle,
                                  root.winKeyCustomIcon)
         : null
     readonly property string effectiveLabel: hasShiftVariant ? keyData.shift.l : mainLabel
@@ -133,11 +136,6 @@ Item {
     readonly property bool isModifier: kind === "key" || kind === "shift" || kind === "fn"
                                      || kind === "stub" || kind === "page"
     // ---- 键面配色 ----
-    // 用 M3 的语义色，不自己叠 alpha 造层级：
-    //   普通键      surfaceContainer        修饰键 surfaceContainerHighest
-    //   激活(1)     底色不变 + primary 描边 + primary 文字（"待生效"）
-    //   锁定(2)     primary 实心 + onPrimary 文字（"持续生效"）
-    // 用「有没有填充」区分两档，不靠透明度：alpha 叠加在浅/深主题下混合结果不同，
     // 形状差异才是稳的。Theme.primaryContainer 也不能用——DMS 会给它叠 elevation 淡化。
     readonly property bool lockedLook: (isModifier && modifierState > 1) || active
     readonly property bool activeLook: isModifier && modifierState === 1
@@ -168,17 +166,13 @@ Item {
     readonly property real mainLabelWithUpperRatio: 0.3
     readonly property real labelGapRatio: -0.02
 
+    // 本机 DRipple 只有 trigger(x, y)，没有 release()；涟漪自己淡出
     function pressRipple(px, py) {
-        ripple.press(px, py)
-    }
-
-    function releaseRipple() {
-        ripple.release()
+        ripple.trigger(px, py)
     }
 
     // 宽度补偿：w 个单位 = w*unit + (w-1) 个间距。
     // 这样"一行若干键"的总宽恒等于 15 个单位对应的宽度，与这一行有几个键无关 ——
-    // 底行只有 8 个键，也能和上面 15 个键的行右边缘对齐。
     width: unit * wUnits + Math.max(0, wUnits - 1) * gap
     height: keyH * span + Math.max(0, span - 1) * gap
     enabled: !isSpacer
@@ -195,10 +189,11 @@ Item {
         border.width: root.activeLook ? root.activeBorderWidth : 0
         border.color: Theme.primary
 
-        Ripple {
+        DRipple {
             id: ripple
             anchors.fill: parent
             cornerRadius: bg.radius
+            rippleColor: Theme.primary
         }
 
         Column {
@@ -224,7 +219,7 @@ Item {
             }
 
             // 图标键（表情 / 第二页 / 菜单）。icon 是图片路径时用 Image 渲染
-            DankIcon {
+            DIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
                 // 有文字标签时优先用文字：再叠一个图标会让 Column 变成两行，
                 // 文字被推到键帽顶部，看起来像"没有垂直居中"
