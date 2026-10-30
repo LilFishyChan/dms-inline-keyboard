@@ -320,23 +320,36 @@ Item {
     }
 
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
+    //
+    // 退避重连：1s → 2s → 4s → 8s 封顶。没装 addon 的用户整天开着键盘，
+    // 固定 1s 就是每分钟 60 次无用的连接尝试；连上后立刻复位回 1s，
+    // 保证 fcitx5 重启这种短暂断开还是秒回。
+    property int reconnectDelay: 1000
+
     Timer {
-        interval: 1000
-        // 只有键盘打开、且该连时才连。
-        // 无条件 running: true 会让插件在键盘收起后仍每秒重连，
+        interval: bridge.reconnectDelay
+        // 连上了就不跑；只有键盘打开、且该连时才连。
+        // 无条件 running: true 会让插件在键盘收起后仍然重连，
         // 一直占着 addon 的唯一客户端槽位 —— 任何别的客户端
         // （scripts/test-addon.py、排障工具）刚连上就被顶掉。
         // 最小化时不连：只剩圆按钮，没地方画候选，连着只会把 classicui 顶掉。
-        running: keyboardOpen && connectEnabled
+        running: bridge.keyboardOpen && bridge.connectEnabled && !socket.connected
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            if (!socket.connected) {
-                socket.connected = true
-                // 新一轮连接从零算：不清的话上一轮的旧时间戳会让超时判定
-                // 在刚连上时就成立
-                bridge.lastSeenAt = 0
-            }
+            socket.connected = true
+            // 新一轮连接从零算：不清的话上一轮的旧时间戳会让超时判定
+            // 在刚连上时就成立
+            bridge.lastSeenAt = 0
+            bridge.reconnectDelay = Math.min(bridge.reconnectDelay * 2, 8000)
+        }
+    }
+
+    Connections {
+        target: socket
+        function onConnectedChanged() {
+            if (socket.connected)
+                bridge.reconnectDelay = 1000
         }
     }
 
