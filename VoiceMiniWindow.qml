@@ -1,11 +1,5 @@
-// 语音模式窗口：一条浮动的胶囊，只显示语音行。
-//
-// 和 FloatingKeyboardWindow 是**两种不同的布局**，不是同一个窗口的收窄版：
-//   · 宽度只包住内容，不是全屏
-//   · 高度一行，圆角取一半 → 胶囊形
-//   · 里面只放 VoiceBar，没有键区、没有底栏、没有候选
-//
-// 主键盘窗口在语音模式下整体隐藏，由 daemon 负责切换。
+// 语音模式窗口：一条浮动胶囊，只放 VoiceBar 一行。
+// 和 FloatingKeyboardWindow 是两种布局（宽度包内容、高度一行、圆角取一半）。
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -32,7 +26,6 @@ PanelWindow {
     readonly property real capH: rowH + Math.round(metrics.pad * 2)
     // 宽度跟随主键盘的**名义宽度**（keyboardWidth），不跟全宽模式：
     // 铺满时 cardW 会等于屏幕宽，那对一条语音条来说太长了。
-    // 屏幕比键盘窄时再夹一下，免得超出屏幕。
     readonly property real capW: Math.min(metrics.kbWidth,
                                          metrics.screenW - metrics.pad * 4)
 
@@ -56,9 +49,7 @@ PanelWindow {
         bottom: Math.round(Math.max(0, Math.min(metrics.screenH - capH, posY)))
     }
 
-    // 每次进入语音模式重新居中、贴底。
-    // 注意 onVisibleChanged 只能有一个：这里顺带把几何打出来，分两个写会报
-    // Property value set multiple times、整个组件不可用。
+    // 每次进入语音模式重新居中、贴底（onVisibleChanged 只能有一个）
     onVisibleChanged: {
         if (visible) {
             posX = Math.round((metrics.screenW - capW) / 2)
@@ -70,15 +61,13 @@ PanelWindow {
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:voice"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.exclusionMode: WlrLayershell.Ignore
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
     // 窗口尺寸就是胶囊尺寸
     implicitWidth: capW
     implicitHeight: capH
 
-    // PanelWindow 的 mask 同时是**指针输入区域**：不设的话整个窗口收不到点击
-    // （实测：胶囊看得见、按钮点不动）。窗口本来就只有胶囊大小，整块都给出去。
-    // 不可见时收成 0 —— 隐藏后 layer surface 的 mask 仍会留在屏幕上吃点击。
+    // mask 同时是指针输入区域；不可见时收成 0，否则隐藏后仍会吃点击
     mask: Region {
         x: 0
         y: 0

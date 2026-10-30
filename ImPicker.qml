@@ -1,11 +1,8 @@
 // 输入法选择器（长按底部地球打开）。
 // 键盘内部的下拉框：从右下角弹出、内容可滚动。
-// 直接平铺「输入法 + 子模式」列表，每行是：
-//     [label] [图标]  输入法 - 子模式名称
-// 拼音类输入法（如 rime）把中英文两个状态各列一行，点哪行就切到哪个状态。
-// 点面板外任意位置关闭。
 import QtQuick
 import qs.Common
+import qs.DCommon.Widgets
 
 Item {
     id: root
@@ -17,8 +14,7 @@ Item {
     // 没有输入法列表时不该露出空面板（一片白色方块）
     visible: root.controller.imPickerOpen && root.controller.imRows.length > 0
 
-    // 平铺行由 daemon 统一提供（controller.imRows）：地球键的循环切换和
-    // 这个列表必须用同一份数据，否则「切了但高亮不对」这类问题会反复出现。
+// 地球键循环和这个列表必须同一份数据（controller.imRows）
 
 
     // 点面板外关闭
@@ -52,7 +48,7 @@ Item {
             anchors.fill: parent
         }
 
-        ListView {
+        DListView {
             id: listView
 
             anchors.fill: parent
@@ -126,7 +122,7 @@ Item {
                 }
 
                 // 涟漪：输入法行没有底色，扩散范围留一点内边距
-                Ripple {
+                DRipple {
                     id: rowRipple
                     anchors.fill: parent
                     anchors.margins: Math.round(root.controller.gap * 0.4)
@@ -138,9 +134,7 @@ Item {
                     id: rowMouse
                     anchors.fill: parent
                     hoverEnabled: true
-                    onPressed: mouse => rowRipple.press(mouse.x, mouse.y)
-                    onReleased: rowRipple.release()
-                    onCanceled: rowRipple.release()
+                    onPressed: mouse => rowRipple.trigger(mouse.x, mouse.y)
                     onClicked: {
                         // 纯键盘布局直接切；拼音类输入法走 selectImMode，
                         // 它会在切换生效后再校正中英文状态

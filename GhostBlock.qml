@@ -1,6 +1,5 @@
 // 落点幽灵块：半透明 + 主题色描边，表示「松手之后这个动作会在这里」。
 // 固定栏的插入位、列表的落点、被挤出到列表首位的动作，共用这一套样式。
-// 尺寸由使用方给（宽度/高度各自不同），这里只管画。
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -40,7 +39,6 @@ Rectangle {
         pixelSize: Math.max(12, Math.round(root.height * 0.29))
         // 不给上限时 ActionLabel 用 implicitWidth，elide 又是 ElideNone，
         // 名字一长就直接冲出幽灵块右边界。给宽后它自动切 HorizontalFit。
-        // 可用宽 = 块宽 − 左内边距 − 图标 − 图标右侧留白
         maxLabelWidth: Math.max(24, root.width
                                 - Math.round(root.height * 0.34) * 2
                                 - root.iconSize * 2 - 1)

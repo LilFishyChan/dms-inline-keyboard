@@ -1,6 +1,5 @@
 // 动作的一行展示：图标 │ 分隔线 │ 标题。
 // 列表磁贴、拖动落点幽灵、被挤出的幽灵都用它 —— 这三处本来各写了一份，
-// 其中一份已经漏了分隔线，抽出来才不会继续漂移。
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -42,7 +41,6 @@ Row {
         visible: root.label !== ""
         // 行高跟着图标走，文字在行内垂直居中。
         // 只靠 anchors.verticalCenter 时，HorizontalFit 缩小字号后会按
-        // 原字号算行高，基线偏下 —— 看着就是"没垂直居中"。
         height: root.iconSize
         verticalAlignment: Text.AlignVCenter
         text: root.label

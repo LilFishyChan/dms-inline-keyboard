@@ -3,6 +3,7 @@ import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
 import qs.Services
+import qs.DCommon.Widgets
 
 // Optional DankBar pill. Toggles the same global var the daemon owns, so the
 // pill and `dms ipc call inlineKeyboard toggle` never disagree.
@@ -24,7 +25,7 @@ PluginComponent {
     }
 
     horizontalBarPill: Component {
-        DankIcon {
+        DIcon {
             name: "keyboard"
             size: root.iconSize
             color: root.keyboardOpen ? Theme.primary : Theme.surfaceText

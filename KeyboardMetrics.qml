@@ -35,20 +35,8 @@ QtObject {
         (cardW - pad * 2 - (Layout.rowUnits - 1) * gap) / Layout.rowUnits
     readonly property real quickH: Math.round(keyH * quickBarRatio)
 
-    // 竖直方向（和 KeyboardCard 里 Column 的结构逐项对齐）：
-    //   cardHeight = pad + topH + gap + rows*keyH + (rows-1)*gap + handleH
-    // 底部把手行上下都不留白（贴键区、贴卡片底），所以只有**一段 gap**、
-    // 而且底部不再有 pad —— 只剩顶部那一个 pad。
-    //
-    // kbHeight 是用户拖出来的旧尺寸，仍含原来的底部 pad 和把手前的 gap；
-    // 这两项（pad + gap）现在是多余的高度，卡片比它矮这么多。
-    // keyH 按 cardHeight 解，所以按键大小不受这次改动影响。
-    //
-    // topH = max(quickH, candH)：候选栏可能比快捷栏高，顶栏按两者较大的那个占位。
-    // 于是要分两种情形解，否则卡片实际高度会比 kbHeight 多出一截，
-    // 调整大小时的预览框就对不上卡片（踩过：444 名义、实际 450）。
-    //
-    // 直接解出 keyH，避免「keyH 依赖 handleH、handleH 依赖 keyH」的循环绑定。
+    // cardHeight = pad + topH + gap + rows*keyH + (rows-1)*gap + handleH
+    // topH = max(quickH, candH)，分两种情形解；直接解 keyH 避免与 handleH 循环依赖
     readonly property real cardHeight: kbHeight - pad - gap
     readonly property real verticalSlack:
         cardHeight - pad - gap - (keyRowCount - 1) * gap

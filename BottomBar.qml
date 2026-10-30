@@ -3,6 +3,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets
 
 Item {
     id: handleBar
@@ -33,27 +34,29 @@ Item {
         radius: width / 2
         color: "transparent"
 
-        DankIcon {
+        DIcon {
             anchors.centerIn: parent
             name: "expand_more"
             size: handleBar.endIcon
             color: controller.fg
         }
 
-        Ripple {
+        DRipple {
             id: hideRipple
             anchors.fill: parent
             cornerRadius: width / 2
         }
 
         MouseArea {
+            id: hideMouse
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-            onPressed: mouse => hideRipple.press(mouse.x, mouse.y)
-            onReleased: hideRipple.release()
-            onCanceled: hideRipple.release()
-            onClicked: controller.quickAction("close")
+            function tapAt() {
+                controller.quickAction("close")
+            }
+            onPressed: mouse => hideRipple.trigger(mouse.x, mouse.y)
+            onClicked: tapAt()
         }
     }
 
@@ -95,35 +98,49 @@ Item {
         radius: width / 2
         color: "transparent"
 
-        DankIcon {
+        DIcon {
             anchors.centerIn: parent
             name: "language"
             size: handleBar.endIcon
             color: controller.fg
         }
 
-        Ripple {
+        DRipple {
             id: langRipple
             anchors.fill: parent
             cornerRadius: width / 2
         }
 
         MouseArea {
+            id: langMouse
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-            onPressed: mouse => langRipple.press(mouse.x, mouse.y)
-            onReleased: langRipple.release()
-            onCanceled: langRipple.release()
-            // 单击：在本列表里循环切到下一项（含 rime 中英文态）
-            onClicked: {
+            // 单击逻辑抽成函数：模拟点击和手指点走同一份
+            function tapAt() {
                 controller.imListRequested()
                 controller.imCycleRequested()
             }
+            onPressed: mouse => langRipple.trigger(mouse.x, mouse.y)
+            // 单击：在本列表里循环切到下一项（含 rime 中英文态）
+            onClicked: tapAt()
             onPressAndHold: {
                 controller.imListRequested()
                 controller.imPickerOpen = true
             }
         }
+    }
+
+    // 模拟使用流程：底部两个按钮（close = 关闭键盘 / lang = 地球键）
+    function pointerTap(which) {
+        if (which === "close") {
+            hideMouse.tapAt()
+            return true
+        }
+        if (which === "lang") {
+            langMouse.tapAt()
+            return true
+        }
+        return false
     }
 }

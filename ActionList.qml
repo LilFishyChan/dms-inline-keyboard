@@ -1,9 +1,9 @@
 // Inline Keyboard 的功能动作列表：4 行滚动网格 + 底部编辑按钮；
 // 编辑态下可拖动排序、拖到顶部快捷栏/右上角槽。
-// 拖动逻辑全部委托给 controller（= KeyboardCard 根），本文件负责布局与手势。
 import QtQuick
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets
 import "Motion.js" as Motion
 import "actions.js" as Actions
 
@@ -60,7 +60,6 @@ Item {
     readonly property real cellW: (fnScroll.width - (columns - 1) * controller.gap) / columns
 
     // 拖到了「无效位置」：既不在列表里，也不在快捷栏 / 右上角槽上。
-    // 这时松手不会调整任何顺序，所以列表要保持原样、幽灵回到它自己那一格 ——
     // 否则整列前移，看着像要把这一项删掉。
     readonly property bool dropNoop: controller !== null && controller.dragActive
         && controller.dragIndex >= 0
@@ -69,7 +68,6 @@ Item {
 
     // 幽灵块该画在第几格 —— 松手后这一项实际会落到的格子（见 listGhostIndex）。
     // 无效落点（拖到键盘外）时松手不调整顺序，幽灵回它自己那一格。
-    // 拖到槽时原槽动作要插入的格子（= 被抓项腾出的那一格）
     readonly property int slotInsertIndex: (controller && controller.dragOverSlot
                                             && controller.dragIndex >= 0
                                             && controller.rightSlot)
@@ -126,7 +124,7 @@ Item {
         color: Theme.surfaceContainerLow
     }
 
-    Flickable {
+    DFlickable {
         id: fnScroll
         // 左右各让出半个按键：列表宽度 = 键盘内容宽 - 1 个单位
         anchors.left: parent.left
@@ -196,13 +194,16 @@ Item {
             }
 
             Repeater {
-                // ⚠ 必须是真实数组：model 一换就会销毁重建 delegate，拖动手势会断
+                id: cellRepeater
+// 必须是真实数组：model 一换就销毁重建 delegate，拖动手势会断
                 model: controller.availableActions || []
 
                 delegate: Rectangle {
                     id: listCell
                     required property var modelData
                     required property int index
+                    // 把点击入口暴露给 functionsArea（模拟点击用）
+                    property alias cellMouse: cellMouse
 
                     readonly property bool isDragging: controller.editing
                                                       && controller.dragIndex === index
@@ -249,7 +250,7 @@ Item {
                            ? Theme.primary
                            : Theme.surfaceContainer
 
-                    Ripple {
+                    DRipple {
                         id: fnRipple
                         anchors.fill: parent
                         cornerRadius: parent.height / 2
@@ -275,14 +276,17 @@ Item {
                     }
 
                     MouseArea {
+                        id: cellMouse
                         anchors.fill: parent
                         enabled: !controller.editing && actState !== "disabled"
                         acceptedButtons: Qt.LeftButton
                         cursorShape: Qt.PointingHandCursor
-                        onPressed: mouse => fnRipple.press(mouse.x, mouse.y)
-                        onReleased: fnRipple.release()
-                        onCanceled: fnRipple.release()
-                        onClicked: controller.quickAction(modelData.id)
+                        // 点击逻辑抽成函数：模拟点击和手指点走同一份
+                        function tapAt() {
+                            controller.quickAction(modelData.id)
+                        }
+                        onPressed: mouse => fnRipple.trigger(mouse.x, mouse.y)
+                        onClicked: tapAt()
                     }
 
                     // 编辑态：长按拖动排序
@@ -401,13 +405,13 @@ Item {
             // 和磁贴同一套填充（比磁贴深一档，读起来像「次级按钮」而不是另一个动作）
             color: Theme.surfaceContainerHigh
 
-            Ripple {
+            DRipple {
                 id: editRipple
                 anchors.fill: parent
                 cornerRadius: parent.height / 2
             }
 
-            DankIcon {
+            DIcon {
                 anchors.centerIn: parent
                 name: "edit"
                 size: Math.round(controller.keyH * 0.42)
@@ -418,11 +422,21 @@ Item {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
-                onPressed: mouse => editRipple.press(mouse.x, mouse.y)
-                onReleased: editRipple.release()
-                onCanceled: editRipple.release()
+                onPressed: mouse => editRipple.trigger(mouse.x, mouse.y)
                 onClicked: controller.editing = true
             }
         }
+    }
+
+    // 模拟使用流程：点功能列表里的动作磁贴（按动作 id 找，见 scripts/acceptance.py）
+    function pointerTapAction(actionId) {
+        for (let i = 0; i < cellRepeater.count; i++) {
+            const item = cellRepeater.itemAt(i)
+            if (item && item.modelData && item.modelData.id === actionId && item.cellMouse) {
+                item.cellMouse.tapAt()
+                return true
+            }
+        }
+        return false
     }
 }

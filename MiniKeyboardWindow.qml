@@ -1,16 +1,11 @@
-// 最小化模式：整个键盘收起来，屏幕上只留一个浮动的小圆按钮。
-//
-// 和语音模式（VoiceMiniWindow）是两回事：
-//   · 语音模式 → 一条胶囊，承载语音行
-//   · 最小化   → 一个圆按钮，什么都不承载，点一下把键盘叫回来
-//
-// 主键盘窗口在最小化期间被销毁（不是隐藏 —— 隐藏时 layer surface 的
-// 输入区域还留在屏幕上，会吃掉点击）。点击、拖动都由本窗口自己处理。
+// 最小化模式：键盘收起，屏幕上只留一个浮动圆按钮，点一下叫回键盘。
+// 和语音模式（一条胶囊）是两种布局。主键盘窗口在最小化期间被销毁
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets
 
 PanelWindow {
     id: miniWindow
@@ -34,7 +29,6 @@ PanelWindow {
 
     // 可拖动：锚点 + margins（layer-shell 不能直接改 x/y）。
     // 位置存在 daemon 里，下次最小化还回到用户拖到的地方
-    // （miniPosRight/miniPosBottom 为 -1 表示还没拖过，用默认边距）
     property real posRight: controller && controller.miniPosRight >= 0
                             ? controller.miniPosRight : edge
     property real posBottom: controller && controller.miniPosBottom >= 0
@@ -65,14 +59,12 @@ PanelWindow {
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:minimized"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.exclusionMode: WlrLayershell.Ignore
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
     implicitWidth: btnSize
     implicitHeight: btnSize
 
-    // PanelWindow 的 mask 同时是指针输入区域，不设就收不到点击。
-    // 不可见时必须收成 0：layer surface 隐藏后 mask 仍留在屏幕上继续吃点击
-    //（和 KeyboardWindow 里那条实测结论同一个坑），否则关闭状态下会挡住右下角。
+    // mask 同时是指针输入区域；不可见时收成 0，否则隐藏后仍会吃点击
     mask: Region {
         x: 0
         y: 0
@@ -88,14 +80,14 @@ PanelWindow {
         border.width: 2
         border.color: Theme.withAlpha(Theme.primary, 0.5)
 
-        DankIcon {
+        DIcon {
             anchors.centerIn: parent
             name: "keyboard"
             size: Math.round(miniWindow.btnSize * 0.5)
             color: Theme.primary
         }
 
-        Ripple {
+        DRipple {
             id: bubbleRipple
             anchors.fill: parent
             cornerRadius: width / 2
@@ -132,9 +124,7 @@ PanelWindow {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-            onPressed: mouse => bubbleRipple.press(mouse.x, mouse.y)
-            onReleased: bubbleRipple.release()
-            onCanceled: bubbleRipple.release()
+            onPressed: mouse => bubbleRipple.trigger(mouse.x, mouse.y)
             onClicked: {
                 if (miniWindow.controller)
                     miniWindow.controller.restoreFromMinimize()

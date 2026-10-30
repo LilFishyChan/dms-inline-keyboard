@@ -1,8 +1,5 @@
 // 插件启用前的依赖检查。
-//
 // 只检查**必需**依赖：ydotool。没有它键盘一个字符都打不出来。
-// fcitx5 和 inline-keyboard-status addon 是**可选**的——缺了只是没有候选和输入法切换，
-// 键盘本体（键位、快捷栏、设置）仍然可用，不该因此禁用整个插件。
 import QtQuick
 import qs.Common
 

@@ -1,18 +1,10 @@
 .pragma library
 
-// 特殊键的表现形式：图标 / 缩写 / 完整。
-//
-// 同一套键盘上 Backspace、Enter 这些键既有「一眼认形状」的需求（图标），
-// 也有「一眼读名字」的需求（完整文字），还有人嫌完整文字太长挤。做成设置项，
-// 三种形态由用户选。完整形态的超宽文字由 Key.qml 的
-// Text.HorizontalFit 自动缩字号，不需要在这里算宽度。
-//
-// Win 键例外：它不代表某个固定动作（不同桌面环境下可能是 Mod / Super /
-// Windows 键），所以它的表现单独由 winLook 决定，不受全局 style 影响。
+// 特殊键三种形态：图标 / 缩写 / 完整。超宽文字由 Key.qml 自动缩字号。
+// icon 留空表示没有合适图标（选图标时回落简写）；图标名必须是 Material 里真实存在的连字
 
 // 每个特殊键的三种形态。
 // icon 留空表示该键没有合适的图标，选「图标」时回落到简写。
-// short 一律用文字，不用 ⌫ ↵ ⇧ 这类符号。
 const SPECIAL_KEYS = {
     "Backspace": { icon: "backspace",          short: "Back",  full: "Backspace" },
     "Enter":     { icon: "keyboard_return",    short: "Enter", full: "Enter" },
@@ -25,9 +17,6 @@ const SPECIAL_KEYS = {
     "Esc":       { icon: "",                   short: "Esc",   full: "Esc" },
     // 图标名必须是 Material Symbols 字体里真实存在的连字，
     // 写错不会报错、只是画不出字形 —— 键帽看起来是空的。
-    // Del 不配图标（Material 里没有合适的删除键符号，垃圾桶语义也不对）：
-    // icon 留空 → 「图标」形态下回落成 "Del" 文字，和 Ctrl / Alt / Esc 一样。
-    // 原来写的 "backspace_outline" 字体里根本不存在（只有 backspace），所以是空键帽。
     "Del":       { icon: "",                   short: "Del",   full: "Del" },
     "Ins":       { icon: "",                   short: "Ins",   full: "Ins" },
     "Home":      { icon: "",                   short: "Home",  full: "Home" },

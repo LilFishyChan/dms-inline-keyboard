@@ -1,15 +1,7 @@
 .pragma library
 
-// Inline Keyboard 布局数据。
-// 行宽统一 15 单位（真键盘主键区宽度）。
-//
-// 键字段：
-//   k   kind：char 字符键 / key 键码键 / shift / space / page / spacer / fn / stub
-//   l   下档字符（或功能键名）        s  上档符号（双行键面的上面那行）
-//   c   Linux input-event keycode     w  宽度（单位，默认 1）
-//   to  page 键的目标页               fn {l, c}  Fn 层激活时的替代标签与键码
-//
-// 页面：page1 主键区 / page2 F 区 + 导航 + 小键盘
+// 键盘布局数据。行宽统一 15 单位。
+// 键字段：k kind / l 下档 / s 上档 / c keycode / w 宽度 / to 目标页 / fn {l,c}
 
 var rowUnits = 15
 
@@ -87,10 +79,6 @@ var rows = {
     page2: [
         // 列布局（15 列，整块居中）：
         //   左距 1.25 | 左区 4 | 0.75 | 中区 3 | 0.75 | 右区 4 | 右距 1.25
-        // 左右边距都取 1.25 —— 和括号里的页面切换键同宽，视觉上对称；
-        // 那两格之间额外留 0.75 当三块之间的分隔。
-        // 三块在 1.25–13.75 这个主要键盘区里靠边平均分布：左区贴左沿、
-        // 右区贴右沿、中区正好居中，每行三块的起点都一致。
         [
             {k: "spacer", l: "", w: 1.25},
             {k: "key", l: "Esc", c: 1}, {k: "key", l: "Print", c: 99},
@@ -155,8 +143,9 @@ var rows = {
             // 0 贴右区左沿（横跨两格，落在 1、2 下面），. 落在 3 下面；
             // 最右那一列留给上面跨行下来的 Enter
             {k: "key", l: "0", c: 82, w: 2}, {k: "key", l: ".", c: 83},
-            // 右边距那格就是页面切换键本身（1.25 = 左右边距宽度）
-            {k: "page", l: "", to: "page1", icon: "layers", w: 1.25, active: true}
+            // 右边距那格就是页面切换键本身（1.25 = 左右边距宽度）；
+            // 激活态由 page 状态驱动，不写死
+            {k: "page", l: "", to: "page1", icon: "layers", w: 1.25}
         ]
     ]
 }
@@ -167,8 +156,8 @@ function pageRows(page) {
 
 // 把行数组摊平成 [{key, row, col, w, rs}]，处理跨行/跨列占位。
 // QML 侧按 col*(unit+gap) / row*(keyH+gap) 绝对定位，跨行键高度按 rs 拉伸。
-function layoutFlat(page) {
-    var src = pageRows(page)
+function layoutFlat(page, overrideRows) {
+    var src = overrideRows || pageRows(page)
     var out = []
     var taken = {}
     for (var r = 0; r < src.length; r++) {

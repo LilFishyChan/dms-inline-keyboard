@@ -1,11 +1,10 @@
 // Inline Keyboard 顶部快捷栏：左侧导航按钮、中间固定栏动作、右侧圆形动作槽。
 // 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，
-// 预览只改 delegate 的**位置**、外加一个独立的幽灵块 —— model 一变就会销毁重建
-// delegate，拖动手势随之断掉（见 KeyboardCard.quickBarResolved 的注释）。
 import QtQuick
 import qs.Common
 import qs.Widgets
 import "Motion.js" as Motion
+import qs.DCommon.Widgets
 
 Item {
     id: quickBar
@@ -22,7 +21,7 @@ Item {
     readonly property real midX: btnW + controller.gap
     readonly property real midW: Math.max(0, width - 2 * (btnW + controller.gap))
 
-    // ⚠ 必须是稳定的真实数组：它同时是 Repeater 的 model
+// 必须是稳定的真实数组：它同时是 Repeater 的 model
     readonly property var items: controller.quickBarActions || []
     // 松手后的样子，只用来算位置（多一个或少一个时让位）
     readonly property var resolved: controller.quickBarResolved || []
@@ -129,14 +128,18 @@ Item {
 
         // x 手动同步：绑定在 plan 为 null 时会 fallback 到第 0 格，首帧会滑过来。
         // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
+        // 不能回落到 x：syncX 会写 x，读 x 就成了绑定循环
         property bool allowAnim: false
         property bool settling: false
         // 交换时 barDropPlan 也会给出 insertedAt（= 被抓项腾出的那一格）
         readonly property real targetX: plan !== null
             ? quickBar.slotX(plan.insertedAt) + (quickBar.slotW - quickBar.cellW) / 2
-            : x
+            : -1
 
         function syncX(animate) {
+            // 还没有 plan：保持原位，等目标格算出来再同步
+            if (insertGhost.targetX < 0)
+                return
             if (!animate)
                 insertGhost.allowAnim = false
             insertGhost.x = insertGhost.targetX
@@ -173,12 +176,15 @@ Item {
     }
 
     Repeater {
+        id: barRepeater
         model: quickBar.items
 
         delegate: Rectangle {
             id: barCell
             required property int index
             required property var modelData
+            // 把点击入口暴露给 quickBar（模拟点击用）
+            property alias barMouse: barMouse
 
             // 松手后它排第几；-1 表示会被挤出固定栏
             readonly property int slotIndex: controller.quickBarIndexFor(modelData.id)
@@ -190,7 +196,6 @@ Item {
             readonly property bool isDisabled: actState === "disabled"
             // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，
             // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，
-            // 看起来就是「从第一项冒出来又滑过去」。
             property real lastValidX: 0
             readonly property real cellX: slotIndex >= 0
                 ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2
@@ -203,7 +208,6 @@ Item {
             radius: quickBar.cellH / 2
             // 非编辑态普通动作不要底色（只图标）；编辑态给 surfaceContainer 方便拖；
             // 激活态和右侧动作槽统一：surfaceContainerHigh 底 + primary 图标。
-            // 不用主题色实心 —— 那一排里两个"选中"用两种画法会显得像两套设计。
             color: controller.editing
                    ? Theme.surfaceContainer
                    : (isActive ? Theme.surfaceContainerHigh : "transparent")
@@ -225,7 +229,7 @@ Item {
 
             // 和右侧固定按钮一样的涟漪。写在 ActionIcon 之前，
             // 让涟漪铺在图标下面而不是盖住它。
-            Ripple {
+            DRipple {
                 id: barRipple
                 anchors.fill: parent
                 // 动作块是胶囊形，涟漪按高度的一半裁圆角
@@ -244,18 +248,19 @@ Item {
             }
 
             MouseArea {
+                id: barMouse
                 anchors.fill: parent
                 enabled: !controller.editing && !parent.leaving
                 acceptedButtons: Qt.LeftButton
-                onPressed: mouse => barRipple.press(mouse.x, mouse.y)
-                onReleased: barRipple.release()
-                onCanceled: barRipple.release()
-                onClicked: controller.quickAction(modelData.id)
+                // 点击逻辑抽成函数：模拟点击和手指点走同一份
+                function tapAt() {
+                    controller.quickAction(modelData.id)
+                }
+                onPressed: mouse => barRipple.trigger(mouse.x, mouse.y)
+                onClicked: tapAt()
             }
 
-            // 编辑态：可以拖到别的位置 / 拖进槽 / 拖回列表。
-            // ⚠ 不能加 !leaving：从固定栏往外拖时，这个块会被移出预览 → leaving 变 true，
-            // 若 enabled 也跟着变 false，拖动手势会被就地取消（表现为"跟手块不动"）
+// 编辑态可拖到别处/槽/列表；enabled 不能跟 leaving 变，否则手势会被取消
             DragInitiator {
                 enabled: controller.editing
                 controller: quickBar.controller
@@ -268,12 +273,15 @@ Item {
     }
 
     Repeater {
+        id: slotRepeater
         model: controller.quickBarItems
 
         delegate: Rectangle {
             id: slotCell
             required property int index
             required property var modelData
+            // 把点击入口暴露给 quickBar（模拟点击用）
+            property alias slotMouse: slotMouse
 
             readonly property bool isSlot: modelData.kind === "slot"
             // 空槽在非编辑态不显示（省掉一个空圆）；
@@ -347,7 +355,7 @@ Item {
                 NumberAnimation { duration: Motion.micro; easing.type: Easing.OutCubic }
             }
 
-            Ripple {
+            DRipple {
                 id: qbRipple
                 anchors.fill: parent
                 // 快捷条的按钮是圆形，涟漪也要按圆形裁
@@ -355,7 +363,7 @@ Item {
             }
 
             // 导航按钮（index 0）用字体图标；槽（index 1）用统一的 ActionIcon
-            DankIcon {
+            DIcon {
                 anchors.centerIn: parent
                 visible: index === 0
                 name: btnIcon
@@ -378,10 +386,8 @@ Item {
                                                       slotState === "disabled" ? 0.4 : 0.8))
             }
 
-            // 空槽 / 透明度面板的占位图标（编辑态被拖走时也走这里，预览"变空"）。
-            // ⚠ 不能走 btnIcon：它读的是 slotActionId，从槽往外拖的那一刻那还是旧动作，
-            // 会残留原来的图标（「浮动」的自绘 SVG 看着就像个手机）
-            DankIcon {
+// 占位图标不能走 btnIcon：从槽往外拖时它还是旧动作，会残留原图标
+            DIcon {
                 anchors.centerIn: parent
                 visible: isSlot && (controller.mode === "transparency" || slotShow === null)
                 name: controller.mode === "transparency" ? "close" : "add"
@@ -402,15 +408,14 @@ Item {
             }
 
             MouseArea {
+                id: slotMouse
                 anchors.fill: parent
                 // index 0 是对钩/导航，编辑态也要能点；槽在编辑态让位给拖动
                 enabled: !isSlot || !controller.editing
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
-                onPressed: mouse => qbRipple.press(mouse.x, mouse.y)
-                onReleased: qbRipple.release()
-                onCanceled: qbRipple.release()
-                onClicked: {
+                // 点击逻辑抽成函数：模拟点击和手指点走同一份
+                function tapAt() {
                     if (controller.mode === "transparency") {
                         // index 0 = 确定：保留当前透明度，回键盘页
                         // 槽 = 取消：恢复到进来之前的透明度
@@ -432,7 +437,41 @@ Item {
                     else if (controller.slotActionId !== "")
                         controller.quickAction(controller.slotActionId)
                 }
+                onPressed: mouse => qbRipple.trigger(mouse.x, mouse.y)
+                onClicked: tapAt()
             }
         }
+    }
+
+    // 模拟使用流程：点顶部左侧导航（keys ↔ functions）/ 固定栏里的动作
+    function pointerTapNav() {
+        const item = slotRepeater.count > 0 ? slotRepeater.itemAt(0) : null
+        if (!item || !item.slotMouse)
+            return false
+        item.slotMouse.tapAt()
+        return true
+    }
+
+    function pointerTapAction(actionId) {
+        for (let i = 0; i < barRepeater.count; i++) {
+            const item = barRepeater.itemAt(i)
+            if (item && item.modelData && item.modelData.id === actionId && item.barMouse) {
+                item.barMouse.tapAt()
+                return true
+            }
+        }
+        return false
+    }
+
+    // 右上角动作槽（浮动 / 避让这类常驻动作就在这）
+    function pointerTapSlot() {
+        for (let i = 0; i < slotRepeater.count; i++) {
+            const item = slotRepeater.itemAt(i)
+            if (item && item.modelData && item.modelData.kind === "slot" && item.slotMouse) {
+                item.slotMouse.tapAt()
+                return true
+            }
+        }
+        return false
     }
 }

@@ -2,12 +2,10 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 import Qt5Compat.GraphicalEffects
+import qs.DCommon.Widgets
 
 // 统一的动作图标：同一个动作在任何位置（列表 / 快捷栏 / 右上角槽 / 拖动块）都长一样。
 // icon 有两种写法：
-//   - Material Symbols 名字（"undo"、"settings"…）→ DankIcon 字体图标
-//   - 图片（".svg" / ".png" / "icons/x.svg" 相对插件目录 / "/abs/path" / "file://…"）→ Image + 着色
-// 内置动作「悬浮」也走第二条：图标就是插件自带的 icons/keyboard-float.svg。
 Item {
     id: root
 
@@ -43,7 +41,7 @@ Item {
     height: size
 
     // 字体图标（Material Symbols）
-    DankIcon {
+    DIcon {
         anchors.centerIn: parent
         visible: !root.isImageIcon
         name: root.iconName

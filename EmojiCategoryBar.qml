@@ -1,11 +1,10 @@
 // 表情 / 符号页的顶部分类条：全部 + 各分组。
 // 高度和快捷栏相同（quickH），由 KeyboardCard 放在 topArea 里，替换掉快捷栏。
-// 只负责「有哪些分类、当前选哪个」，选中值写回卡片（emojiCategory），
-// 内容由 EmojiPanel 读同一份状态 —— 两边不同源会立刻错位。
 import QtQuick
 import qs.Common
 import "layouts/emoji.js" as Emoji
 import "Motion.js" as Motion
+import qs.DCommon.Widgets
 
 Item {
     id: bar
@@ -26,7 +25,7 @@ Item {
 
     clip: true
 
-    Flickable {
+    DFlickable {
         id: scroller
         anchors.fill: parent
         contentWidth: row.width
@@ -43,10 +42,13 @@ Item {
             spacing: bar.controller.gap
 
             Repeater {
+                id: chipRepeater
                 model: bar.chips
 
                 delegate: Rectangle {
                     required property var modelData
+                    // 把点击入口暴露给 bar（模拟点击用）
+                    property alias chipTap: chipTap
 
                     readonly property bool active:
                         bar.controller.emojiCategory === modelData.id
@@ -71,7 +73,7 @@ Item {
                     }
 
                     // 涟漪：同样挂在 TapHandler 上（它在横滑列表里才能既滚动又点击）
-                    Ripple {
+                    DRipple {
                         id: chipRipple
                         anchors.fill: parent
                         cornerRadius: height / 2
@@ -80,21 +82,35 @@ Item {
 
                     TapHandler {
                         id: chipTap
-                        onTapped: bar.controller.emojiCategory = modelData.id
+                        // 点击逻辑抽成函数：模拟点击和手指点走同一份
+                        function tapAt() {
+                            bar.controller.emojiCategory = modelData.id
+                        }
+                        onTapped: tapAt()
                         onPressedChanged: {
                             // 圆心取触点（centroid 在本机 Qt 版本里恒为 null，用 point）
                             const p = chipTap.point ? chipTap.point.position : null
                             if (pressed) {
                                 const pt = (p && !isNaN(p.x) && !isNaN(p.y))
                                            ? p : Qt.point(chip.width / 2, chip.height / 2)
-                                chipRipple.press(pt.x, pt.y)
-                            } else {
-                                chipRipple.release()
+                                chipRipple.trigger(pt.x, pt.y)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // 模拟使用流程：点分类条上的某个分组（见 scripts/acceptance.py）
+    function pointerTapCategory(id) {
+        for (let i = 0; i < chipRepeater.count; i++) {
+            const item = chipRepeater.itemAt(i)
+            if (item && item.modelData && item.modelData.id === id && item.chipTap) {
+                item.chipTap.tapAt()
+                return true
+            }
+        }
+        return false
     }
 }

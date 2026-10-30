@@ -1,14 +1,9 @@
 // 语音输入时占据顶部那一行（快捷栏 / 候选栏共用同一块高度）。
-//
 // 布局按「以功能栏为基础」来：两端是圆形按钮，中间是内容区。
-//   左：四角向内 —— 点击进入小模式（浮动 + 只留这一行），图标随之翻成四角向外
-//   中：当前识别到的文字，过长时省略**前面**（和候选栏首项同一套习惯）
-//   右：麦克风 —— 正在录音
-//
-// 优先级由外层保证：语音 > 候选 > 功能。本组件只在录音中显示。
 import QtQuick
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets
 
 Item {
     id: voiceBar
@@ -28,8 +23,6 @@ Item {
 
     // 度量来源有两种：
     //   · 主键盘里 controller 是卡片，card 上直接有 keyH / pad / quickH
-    //   · 语音胶囊里 controller 是 daemon（没有这些），由宿主传 metrics
-    // 所以这里优先用 metrics，没有就退回 controller，两者都没有才用兜底值。
     readonly property var src: metrics ? metrics : controller
     readonly property real mkeyH: src && src.keyH ? src.keyH : 44
     // 这一行的高度是 quickH（顶部动作栏那一行），不是底部把手的 handleH：
@@ -43,8 +36,6 @@ Item {
     readonly property real icon: Math.round(mrowH * 0.5)
     // 胶囊是大圆角，两侧按钮留出和上下对称的边距
     //（(行高 - 按钮)/2），否则圆形按钮会压到圆角的切线上。
-    // 注意主键盘里这一行的高度正好等于按钮高，算出来是 0 —— 那里按钮本来就
-    // 贴着键盘左右内沿（和 QuickBar 两端按钮同一套位置），不是漏了边距。
     readonly property real sidePad: Math.max(0, Math.round((height - btn) / 2))
 
     // 整行背景：和键盘卡片同色。
@@ -67,18 +58,17 @@ Item {
         radius: width / 2
         color: Theme.surfaceContainer
 
-        DankIcon {
+        DIcon {
             anchors.centerIn: parent
             // 和调整大小面板的「铺满 / 收起」用同一对图标：
             //   普通模式 → collapse_content（收成语音条）
-            //   语音模式 → expand_content（恢复全键盘）
             name: voiceBar.controller.voiceMinimal ? "expand_content" : "collapse_content"
             size: voiceBar.icon
             // 文字色，和这一行的其它文字一致
             color: Theme.surfaceText
         }
 
-        Ripple {
+        DRipple {
             id: collapseRipple
             anchors.fill: parent
             cornerRadius: width / 2
@@ -88,16 +78,13 @@ Item {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-            onPressed: mouse => collapseRipple.press(mouse.x, mouse.y)
-            onReleased: collapseRipple.release()
-            onCanceled: collapseRipple.release()
+            onPressed: mouse => collapseRipple.trigger(mouse.x, mouse.y)
             onClicked: voiceBar.controller.voiceMinimalRequested()
         }
     }
 
     // ---- 中：识别文字 ----
     // 用 Item 夹在两端按钮之间，文字在里面左对齐；超长时从**前面**省略，
-    // 和候选栏首项一致 —— 正在说的话，末尾才是刚刚识别到的部分。
     Item {
         id: textArea
         anchors.left: collapseBtn.right
@@ -175,19 +162,18 @@ Item {
         // 激活态用主色实心，和固定框同一套：底色 primary、图标 onPrimary
         color: voiceBar.controller.voiceActive ? Theme.primary : Theme.surfaceContainer
 
-        DankIcon {
+        DIcon {
             anchors.centerIn: parent
             name: "mic"
             size: voiceBar.icon
             // 激活态图标转 onPrimary；未激活用正文色
             //（不能写 controller.fg —— 胶囊窗口里 controller 是 daemon，
-            //  没有 fg 属性，取到 undefined 会让图标整个透明）
             color: voiceBar.controller.voiceActive
                    ? Theme.onPrimary
                    : Theme.withAlpha(Theme.surfaceText, 0.8)
         }
 
-        Ripple {
+        DRipple {
             id: micRipple
             anchors.fill: parent
             cornerRadius: width / 2
@@ -197,9 +183,7 @@ Item {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-            onPressed: mouse => micRipple.press(mouse.x, mouse.y)
-            onReleased: micRipple.release()
-            onCanceled: micRipple.release()
+            onPressed: mouse => micRipple.trigger(mouse.x, mouse.y)
             onClicked: voiceBar.controller.voiceMicRequested()
         }
     }

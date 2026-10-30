@@ -1,15 +1,5 @@
-// fcitx5 通信桥：所有和输入法相关的状态、命令、实时通道都在这里。
-//
-// 从 InlineKeyboardDaemon 拆出来的（那个文件超过 1300 行，混了通信/路由/窗口/设置
-// 四件事）。现在职责很单一：跟 fcitx5 的 addon 说话，把结果整理成属性。
-//
-// 数据流：
-//   addon --socket--> state:{json} / imlist:{json} --> data.js 解析 --> 这里的属性
-//   这里 --socket--> key:<keysym>[:<mods>]  --> addon 转 VirtualKeyboardEvent
-//   这里 --文件-->  inline-keyboard-expand / -select --> addon 读走即删
-//
-// 为什么不用文件轮询：轮询最快 40ms（addon 侧）/ 300ms（插件侧），
-// socket 推送端到端约 2ms。详见 docs/ARCHITECTURE.md。
+// fcitx5 通信桥：和 addon 说话，把结果整理成属性。
+//   addon --socket--> state/imlist --> data.js 解析 --> 属性
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -52,18 +42,13 @@ Item {
     property bool inputFocused: false
     // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
     // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），
-    // 这时继续显示的是过期状态。
     property double lastSeenAt: 0
 
     // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，
     // 带下标是为了让显示层做去重/剔除时不破坏选词准确性。
     property var allCandidates: []
 
-    // 候选内容真的变了才加一。
-    //
-    // 不能直接监听 candidates：addon 每 40ms 推一次状态、每次都是新数组，
-    // 数组替换会触发 onChanged，定时器被无限重启、永远到不了头（踩过）。
-    // int 是值类型，只在「数量 / 首项 / 预编辑」真的变了时才 ++。
+    // int 值属性：addon 每 40ms 推新数组，监听数组会无限重启定时器
     property int candRevision: 0
 
     // ---- 输入法清单 ----
@@ -72,7 +57,6 @@ Item {
 
     // 每个输入法上一次见到的子模式标签（rime 中文是「万」这种）。
     // 输入法清单里只有它自己的标识（rime 是「ㄓ」），切过去的瞬间
-    // addon 还没来得及推子模式，直接用清单值就会先闪一下「ㄓ」再变「万」。
     property var imLabelCache: ({})
 
     // ---- 诊断 ----
@@ -96,11 +80,8 @@ Item {
 
     // 平铺的「输入法 + 子模式」列表：地球键循环和下拉菜单共用同一份数据。
     // 构造逻辑在 data.js（有单测覆盖 current 唯一性）。
-    // 把缓存过的子模式标签补进清单，再交给 buildImRows。
-    // 只补键盘型之外的输入法：keyboard-us 的 label 就是「en」，不该被覆盖。
     readonly property var imListForRows: {
-        // 不要写 root.*：本文件的 id 是 bridge，root 会解析到外层组件上去，
-        // 拿到 undefined（实测报 "Cannot read property 'keyboard-us' of undefined"）
+        // 本文件 id 是 bridge，写 root.* 会解析到外层组件
         const cache = bridge.imLabelCache
         const src = bridge.imList
         if (!src || src.length === 0)
@@ -115,17 +96,12 @@ Item {
         return out
     }
 
-    // 连续点击地球键时，真实的 imName/imLabel 要等 addon 推送才更新，
-    // 期间 buildImRows 会把同一个输入法标成 current，nextImRow 就原地打转。
-    //
-    // 记的不是输入法名而是**行号**：rime 有「万」和「abc」两个子模式，
-    // 只记名字分不清它们，连点第二下就会算错。
+    // 记行号而不是输入法名：rime 的「万」「abc」同属一个输入法
     property int optimisticImIdx: -1
 
     readonly property var imRows: {
         const rows = Data.buildImRows(imListForRows, imName, imLabel)
-        // 本文件的 id 是 bridge，写 root.* 会解析到外层组件（文件头注释
-        // 就记着这个坑），拿到 undefined → 乐观索引永远不生效
+        // 同上：写 root.* 拿不到本文件的属性
         const idx = bridge.optimisticImIdx
         if (idx < 0 || idx >= rows.length)
             return rows
@@ -144,11 +120,8 @@ Item {
     // 当前是否英文字模式（按子模式标签是否为纯 ASCII 字母判断）
     readonly property bool isAsciiMode: Data.isAsciiMode(imLabel)
 
-    // ------------------------------------------------------------------
 
-    // 逐项比较两个字符串数组。用来判断 addon 这次推的 items 和上次是不是
-    // 真的不一样 —— parseStatus 每次都 JSON.parse 出新数组，哪怕内容相同，
-    // 直接赋值也会让下游的 candListModel / 重排全部重跑一遍。
+    // parseStatus 每次都 JSON.parse 出新数组，只能逐项比内容
     function sameStrings(a, b) {
         if (a === b)
             return true
@@ -208,7 +181,6 @@ Item {
         preeditEmbedded = st.embedded
         // UI 被 classicui 顶掉这件事交给 addon 自己处理：它的心跳每 2s 比一次
         // currentUI()，不是自己就 claim —— 比这里 5s 限流地发 reclaim 更早，
-        // 而且只依赖一套判据。
     }
 
     function applyImList(raw) {
@@ -261,9 +233,6 @@ Item {
 
     // ---- 文本提交（表情 / 符号页）----
     // 为什么不用按键通道：一个表情是多个码位，key: 是 keysym 语义，
-    // ydotool 也只认键码 —— 只有 InputContext::commitString 送得进去。
-    // 老版本 addon 不认识 text: 会回 error:unknown-command:text…，
-    // 收到就把 textSupported 关掉，之后直接走剪贴板，不再白发一次。
     property bool textSupported: true
 
     function commitText(text) {
@@ -293,14 +262,12 @@ Item {
 
     // 选第 N 个候选。index 是 addon 的 candidateFromAll 全局下标。
     // 走 socket 的 select: 命令——addon 重写后不再读 inline-keyboard-select 文件，
-    // 之前写文件的做法会让选词静默失效（点了没反应，也不报错）。
     function selectCandidate(index) {
         if (index < 0)
             return false
         return sendFcitx("select:" + index)
     }
 
-    // ------------------------------------------------------------------
 
     Socket {
         id: socket
@@ -308,9 +275,6 @@ Item {
 
         // Quickshell 的 Socket 只暴露 connected，没有 onDisconnected /
         // onSocketError 可接（查 qmltypes 确认：这两个是 C++ 侧槽名，QML 里
-        // 写上去会直接 "Cannot assign to non-existent property"，整个
-        // FcitxBridge 加载失败、插件变 disabled）。所以掉线只能靠
-        // connected 属性变化 + 重连 Timer 兜，别指望事件通知。
 
         // DataStream 不设 parser 就永远不会触发 read —— 连上了也收不到字节。
         parser: SplitParser {
@@ -320,19 +284,13 @@ Item {
     }
 
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
-    //
     // 退避重连：1s → 2s → 4s → 8s 封顶。没装 addon 的用户整天开着键盘，
-    // 固定 1s 就是每分钟 60 次无用的连接尝试；连上后立刻复位回 1s，
-    // 保证 fcitx5 重启这种短暂断开还是秒回。
     property int reconnectDelay: 1000
 
     Timer {
         interval: bridge.reconnectDelay
         // 连上了就不跑；只有键盘打开、且该连时才连。
         // 无条件 running: true 会让插件在键盘收起后仍然重连，
-        // 一直占着 addon 的唯一客户端槽位 —— 任何别的客户端
-        // （scripts/test-addon.py、排障工具）刚连上就被顶掉。
-        // 最小化时不连：只剩圆按钮，没地方画候选，连着只会把 classicui 顶掉。
         running: bridge.keyboardOpen && bridge.connectEnabled && !socket.connected
         repeat: true
         triggeredOnStart: true
@@ -377,11 +335,7 @@ Item {
     }
 
     // 键盘收起就把连接还回去，别赖着。
-    //
     // 打开这一侧不用做任何事：addon 在 acceptClient 里就把 shown_ 置 true
-    // 并切到 OnScreenKeyboard 了（socket 连上 = 键盘开了，这是它唯一的
-    // 开关信号）。这里如果也发 mode:osk，会和 addon 内部的
-    // setInputMethodMode -> hide/showVirtualKeyboard 回调链撞在一起。
     onKeyboardOpenChanged: {
         // 打开时读一次文件兜底：addon 还没连上时先有初始状态
         if (keyboardOpen && !socket.connected)

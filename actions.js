@@ -1,17 +1,5 @@
-// 动作列表的纯逻辑：清洗、排序、可见性拆分。
-// 不依赖 QML，可用 node --test 直接测试（见 tests/actions.test.js）。
-//
-// 数据结构：动作 = { id, label, icon, hidden?, builtin?, kind, cmd }
-//   hidden  —— 列表里不显示（固定栏/槽里已放的不受影响），内置动作只能隐藏不能删
-//   builtin —— 来自默认动作表，设置页不允许删除
-//   kind    —— 执行方式，决定点击时怎么跑（InlineKeyboardDaemon.handleQuick 只看这个）：
-//                "builtin" → 内置逻辑，按 id 查处理函数表
-//                "cmd"     → 跑 cmd 里的 shell 命令
-//   cmd     —— kind="cmd" 时要执行的 shell 命令
-//
-// ⚠ 所有对外函数的第一步都要过 toArray()。QML 会把 .js 模块返回的数组、
-// 以及 property var 里存的数组包成「类数组对象」，此时 Array.isArray() 是 false ——
-// QML 的数组/类数组不一定是真 Array，直接判 Array.isArray 会把列表判成空。
+// 动作列表的纯逻辑：清洗、排序、可见性拆分。不依赖 QML，node --test 可测。
+// 动作 = { id, label, icon, hidden?, builtin?, kind, cmd }；kind: "builtin" | "cmd"
 
 /**
  * 转成真正的数组。Array.isArray 为真就原样返回，否则按 length 逐项搬运。
@@ -113,9 +101,6 @@ function moveActionById(list, fromId, toId) {
  * @returns {Array} 可见动作，保持 all 的相对顺序
  */
 // 把 action 插到「可见列表」的第 at 位，返回全量列表的新顺序。
-//
-// at 是**可见列表**里的下标（拖放落点就是这么算的），而 all 是全量动作表，
-// 里面还包含固定栏 / 槽里的动作（它们在列表里不显示）。直接拿 at 去 all 上
 // splice 会插偏，必须先找到「可见列表第 at 个动作」在 all 里的位置。
 function insertAtVisibleIndex(all, action, visible, at) {
     const list = toArray(all).slice().filter(a => a && action && a.id !== action.id)
@@ -133,7 +118,6 @@ function insertAtVisibleIndex(all, action, visible, at) {
     return list
 }
 
-// ---------------- 列表（网格）的拖动预览 ----------------
 // 纯计算，不放在 delegate 里：让位规则分支多，内联在 QML 里既难读也没法测。
 
 // 第 index 个格子拖动时该偏移几格（负=往前挪，正=往后挪）
@@ -232,7 +216,6 @@ function dropIndexAt(ghostX, ghostY, contentWidth, count, cellHeight, gap, colum
     const cellWidth = (contentWidth - (columns - 1) * gap) / columns
     // 列表按**格子左边界**取整：指针落在哪一格，就插到那一格前面。
     // 固定栏用的是「指针过块中心线」，两套判据各自独立 —— 不要互相借，
-    // 网格和单行的手感本来就不一样。
     const col = Math.max(0, Math.min(columns - 1, Math.floor(ghostX / (cellWidth + gap))))
     const row = Math.max(0, Math.floor(ghostY / (cellHeight + gap)))
     const index = row * columns + col
@@ -280,11 +263,6 @@ function moveActionToEndById(list, id) {
  */
 // 用**指针位置**判定，不看跟手块自己的尺寸：
 //   指针在某个动作块的**中心线左侧** → 插到这个块的左边
-//   指针在它的中心线右侧           → 插到它的右边
-//
-// ghostIndex 那一格（幽灵块自己占的位）整格都是死区：它只是「松手后会插在这」
-// 的显示，不是可比较的锚点。不跳过的话，指针在幽灵块里来回移动会让插入位置
-// 自己跳来跳去。
 function quickBarInsertIndex(pointerX, count, slotW, slotGap, ghostIndex) {
     if (count <= 0)
         return 0

@@ -1,18 +1,10 @@
 // Inline Keyboard 顶部候选条
-//
 // 布局规则（和主键盘共用同一套度量）：
-//   · 每个候选词包一层容器，容器左右内边距各 = ⅓ 标准键宽（unit/3）
-//   · 容器之间留一个标准键间距（gap）
-//   · 分隔竖线画在间距正中间
-//   · 候选从前往后排，加下一个会溢出可用宽度时就停（不换行、不滚动）
-//
-// 数据取前 3 屏（addon 的顶部候选池），实际显示多少由可用宽度决定。
-//
-// 原文（拼音串）单独做成浮动小标签，浮在候选区上方、不占高度。
 import QtQuick
 import qs.Common
 import qs.Widgets
 import "Motion.js" as Motion
+import qs.DCommon.Widgets
 
 Item {
     id: candArea
@@ -39,11 +31,8 @@ Item {
     visible: height > 0
     z: 20
 
-    // ---------- 候选池：由卡片统一算好的「前一段」 ----------
     // 顶栏和候选列表页是同一个列表的两段：卡片按列表前几项量出容量
-    // （candBarCount），顶栏取 slice(0, n)，列表页取 slice(n)。
     // 这里不再自己算，避免两边各量一次得出不同结果。
-    // 右侧留给展开按钮的那一列：一个标准键宽 + 间距
     readonly property real trailW: unit + gap
 
     readonly property var pool: controller ? controller.candBarSlice : []
@@ -51,9 +40,9 @@ Item {
     readonly property int fitCount: poolLen
 
     // 量文字宽度用（必须和下面 Text 的字体一致）
-    readonly property int candFontSize: Math.round((controller.keyH || 64) * 0.42)
+    // 和按键主标签同一比例（Key.qml mainLabelRatio），候选看起来才和键帽上的字一致
+    readonly property int candFontSize: Math.round((controller.keyH || 64) * 0.32)
 
-    // ---------- 候选面板 ----------
     Rectangle {
         id: panel
 
@@ -81,7 +70,6 @@ Item {
                     readonly property bool isFirst: index === 0
                     // 首项最多占候选栏的三分之二，再长就省略**前面**
                     // （输入法首项通常是用户正在打的那个词，末尾更要紧）。
-                    // 其余项省略末尾，和普通文本流的习惯一致。
                     readonly property real firstMaxW: candArea.width * 2 / 3
                     readonly property real pad: candArea.unit * 2 / 3
                     readonly property real contentW: label.implicitWidth + pad
@@ -110,10 +98,10 @@ Item {
                         y: Math.round((parent.height - height) / 2)
                         // 只在超出上限时才限制宽度，正常词按内容排。
                         // ceil 给 1px 余量：capW - pad 是浮点，和 implicitWidth
-                        // 差零点几像素时 Math.min 会取小值，两字词正好踩到这个边界。
-                        width: Math.min(implicitWidth, Math.max(0, Math.ceil(capW - pad)))
+                        width: Math.min(Math.ceil(implicitWidth) + 1,
+                                        Math.max(0, Math.ceil(capW - pad) + 1))
                         elide: isFirst ? Text.ElideLeft : Text.ElideRight
-                        // QML 的 JS 引擎不支持 ?? 和 ?.，用三元代替（踩过两次）
+// 老版本 QML 的 JS 引擎不支持 ?? 和 ?.，用三元代替
                         text: {
                             const item = candArea.pool[index]
                             if (item === undefined || item === null)
@@ -151,11 +139,8 @@ Item {
             }
         }
 
-        // ---------- 展开按钮（右侧固定框，和顶部功能栏右边那个同款）----------
         // 常驻显示：不管候选放不放得下都给入口，点它翻到候选列表页。
         // 外层占满一列（一个标准键宽 + 间距），保证右侧留白和
-        // 候选列表页那一列严格对齐；里面那个圆按钮按 quickH 画，
-        // 和顶部功能栏右边的固定框同尺寸。
         Item {
             id: expandTrail
 
@@ -175,12 +160,13 @@ Item {
                 // 和 QuickBar 右侧固定框同一个底色
                 color: Theme.surfaceContainerHigh
 
-            Ripple {
+            DRipple {
+                id: expandRipple
                 anchors.fill: parent
                 cornerRadius: parent.height / 2
             }
 
-            DankIcon {
+            DIcon {
                 anchors.centerIn: parent
                 name: "keyboard_arrow_down"
                 size: Math.round(candArea.controller.quickH * 0.5)
@@ -194,14 +180,25 @@ Item {
             }
 
                 MouseArea {
+                    id: expandMouse
                     anchors.fill: parent
-                    onClicked: candArea.controller.toggleCandList()
+                    // 点击逻辑抽成函数：模拟点击和手指点走同一份
+                    function tapAt() {
+                        candArea.controller.toggleCandList()
+                    }
+                    onClicked: tapAt()
+                    onPressed: mouse => expandRipple.trigger(mouse.x, mouse.y)
                 }
             }
         }
     }
 
-    // ---------- 原文（在候选区上方，溢出卡片顶边）----------
+    // 模拟使用流程：点候选栏右侧的展开按钮（见 scripts/acceptance.py）
+    function pointerTapExpand() {
+        expandMouse.tapAt()
+        return true
+    }
+
     Rectangle {
         id: preeditBadge
 

@@ -1,6 +1,5 @@
 // 浮动模式的键盘窗口：可拖动、位置夹在屏幕内，尺寸用名义值（metrics.cardW / kbHeight）。
 // 注意：不能用 card.width 夹边界 —— 卡片是 anchors.fill，会形成正反馈把窗口压窄。
-// 几何推导集中在 KeyboardMetrics（与停靠窗口共用）。
 
 import QtQuick
 import Quickshell
@@ -19,10 +18,6 @@ PanelWindow {
     property real candH: 44
     // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
     // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
-    //   · rime 中文（万）：会 → 有候选时显示
-    //   · rime abc：英文直接上屏，fcitx5 不弹候选窗 → 不显示
-    //   · keyboard-us：纯键盘布局 → 不显示
-    // 高度由 topArea 固定预留（candH），所以显隐不会让键盘跳动。
     property bool showCandBar:
         root.fcitxCandidates.length > 0 || root.debugCandItems.length > 0
 
@@ -165,8 +160,6 @@ PanelWindow {
 
     // 窗口**必须铺满整屏**。浮在屏幕上的键盘不能用一个「和键盘一样大」的窗口：
     // 调整尺寸时窗口尺寸跟着变，margins 重算，键盘位置就会漂；
-    // 而且窗口边缘之外的点按和拖拽全落在窗口外，表现很怪。
-    // 触控范围交给下面的 mask 精确限定在卡片上。
     anchors {
         top: true
         bottom: true
@@ -187,12 +180,11 @@ PanelWindow {
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:floating"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
     // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），
-    // 「避让不够」是窗口自身最小高度的限制，与层无关
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     // 关键：不参与独占区计算，否则会一直被 DMS 条栏的 exclusive zone 推开，
     // 永远压不到条栏上面，而且条栏换到底部时同样会被推
-    WlrLayershell.exclusionMode: WlrLayershell.Ignore
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
     // 输入区 = 卡片 + 卡片上方那条预编辑标签，其余整屏穿透。
     // 窗口铺满整屏，这里漏设或算 0 的话，要么全屏点不动、要么挡住桌面。
@@ -205,12 +197,10 @@ PanelWindow {
         height: root.visible ? Math.round(cardY + card.height - preeditTop) : 0
         // 注意：resize 拖动中卡片尺寸并不会变（卡片宽高由 metrics 算，而 metrics
         // 的输入是 daemon 的 savedW/H，松手落盘后才更新），所以拖动中 mask 也不变，
-        // 指针移出输入区靠隐式 grab 维持；松手后这里自然重算。
     }
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
     // 用 onCompleted 赋值而不是 `property var cardRef: card`：
-    // 引用 id 的前向绑定在构造期可能拿到 undefined，且之后不会重算（docked 那边就踩到了）
     property var cardRef: null
     Component.onCompleted: cardRef = card
 
@@ -262,7 +252,6 @@ PanelWindow {
         onResizeCommitRequested: root.resizeCommitRequested()
         // 落盘后尺寸变了，位置补一下：拖左边/上边时对侧要钉住不动。
         // 补偿完再统一夹回屏幕：新尺寸可能把卡片顶出右/下沿，而别处没有
-        // 位置 clamp 把它拉回来（拖动改位置那条路径只在自己那条链里夹）。
         onResizeOriginShift: (dx, dy) => {
             const maxX = Math.max(0, metrics.screenW - metrics.cardW)
             const maxY = Math.max(0, metrics.screenH - Math.round(card.height))

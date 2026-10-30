@@ -1,7 +1,5 @@
 // 停靠模式的键盘窗口：layer-shell 贴在屏幕底部，宽度铺满。
-// 几何推导集中在 KeyboardMetrics（与浮动窗口共用），本文件只负责锚定与避让。
 // implicitWidth/Height 必须用名义值（metrics.cardW / kbHeight）：绑 card.width
-// 会形成「窗口 ← 卡片 ← 窗口」的循环，浮动窗口一拖就自我收缩。
 
 import QtQuick
 import Quickshell
@@ -70,10 +68,6 @@ PanelWindow {
     property real candH: 44
     // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
     // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
-    //   · rime 中文（万）：会 → 有候选时显示
-    //   · rime abc：英文直接上屏，fcitx5 不弹候选窗 → 不显示
-    //   · keyboard-us：纯键盘布局 → 不显示
-    // 高度由 topArea 固定预留（candH），所以显隐不会让键盘跳动。
     property bool showCandBar:
         root.fcitxCandidates.length > 0 || root.debugCandItems.length > 0
 
@@ -138,47 +132,29 @@ PanelWindow {
 
     // 避让：reserve 面板实际高度（cardHeight，已扣掉上下留白与把手前的间隙）。
     // 用 saveH 的原始 kbHeight 会多留 pad+gap，下面的窗口被无谓地推远一截。
-    // 预编辑预留区不算 —— 那块是浮在卡片上方的标签，压在应用内容上没关系。
     exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(metrics.cardHeight) : 0
 
-    // 窗口只包住键盘本体 + 预编辑标签的预留高度。
-    //
-    // 试过铺满整屏（implicitHeight: screenH）来让上方区域也能点穿，但那样
-    // exclusiveZone 就失效了：窗口覆盖全屏后 niri 把它当全屏窗口，
-    // 不再为下面窗口预留空间，应用内容会被键盘盖住。
-    // 避让和全屏不可兼得，取避让。
+// 只包住键盘本体：铺满整屏会让 exclusiveZone 失效（避让和全屏不可兼得）
     implicitWidth: metrics.screenW
     // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
     // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），
-    // 标签不会被窗口裁掉。
-    // 预编辑标签浮在卡片上方，所以窗口要预留它的高度。
-    // 关键：**恒定预留**。原来按「当前有没有 preedit」动态加减 42px，
-    // 打字时整个键盘（连 exclusiveZone）会忽高忽低，下面的窗口跟着抖。
     readonly property real preeditReserve: Math.round(root.candH * 0.95)
     implicitHeight: metrics.cardHeight + preeditReserve
 
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
     // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），
-    // 「避让不够」是窗口自身最小高度的限制，与层无关
     WlrLayershell.layer: WlrLayer.Overlay
     // 键盘自己不发按键（由 ydotool 注入），绝不能抢焦点
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。
-    //
     // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，
-    // 键盘以外那整条屏幕宽都是不透明输入区——下面的窗口点不动。
-    // 所以这里用绝对坐标算出卡片的实际范围。
-    //
-    // 上边界取 card.y - preeditReserve：预编辑标签浮在卡片上方，
-    // 虽然现在可能没显示，但恒定留出来比按状态动态算稳（不会让 mask 抖动）。
     mask: Region {
         x: Math.round(card.x)
         y: Math.max(0, Math.round(card.y - root.preeditReserve))
         // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，
         // layer surface 的 mask 还留在屏幕上继续吃点击
-        //（语音模式下主键盘隐藏，但它的 mask 正好盖住胶囊，按钮全点不动）
         width: root.visible ? Math.round(card.width) : 0
         height: root.visible ? Math.max(0, Math.round(root.height - Math.max(0,
                 Math.round(card.y - root.preeditReserve)))) : 0
@@ -186,7 +162,6 @@ PanelWindow {
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
     // 用 onCompleted 赋值而不是 `property var cardRef: card`：
-    // 引用 id 的前向绑定在构造期可能拿到 undefined，且之后不会重算（docked 那边就踩到了）
     property var cardRef: null
     Component.onCompleted: cardRef = card
 

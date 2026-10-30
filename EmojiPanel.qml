@@ -1,13 +1,11 @@
 // 表情 / 符号页的主体：中间滚动网格 + 底部一行（返回 / 表情·符号切换 / 退格）。
 // 顶部那行分类条是 EmojiCategoryBar（在 KeyboardCard 的 topArea 里）。
-//
-// 上屏：点一个字符 → controller.textCommitRequested(ch) → 窗口 → daemon。
-// daemon 优先让 fcitx5 addon 直接 commitString，没有 addon 才退回剪贴板。
 import QtQuick
 import qs.Common
 import qs.Widgets
 import "layouts/emoji.js" as Emoji
 import "Motion.js" as Motion
+import qs.DCommon.Widgets
 
 Item {
     id: panel
@@ -41,7 +39,6 @@ Item {
     // 列数按「一格大概 1.35 键高」推，窄键盘不至于挤成一排小点
     readonly property int columns: Math.max(6, Math.floor(width / (controller.keyH * 1.35)))
 
-    // ---------------- 网格 ----------------
     Item {
         id: gridArea
         anchors.left: parent.left
@@ -56,7 +53,7 @@ Item {
         readonly property real cellH: height / rows
         readonly property real cellW: width / panel.columns
 
-        GridView {
+        DGridView {
             id: grid
             anchors.fill: parent
             cellWidth: gridArea.cellW
@@ -99,7 +96,7 @@ Item {
 
                 // 涟漪：由 TapHandler 的 pressed 驱动 —— 这里不能挂 MouseArea，
                 // 那会抢走 GridView 的拖动，表情列表就滑不动了
-                Ripple {
+                DRipple {
                     id: cellRipple
                     anchors.fill: parent
                     anchors.margins: 2
@@ -116,9 +113,7 @@ Item {
                         if (pressed) {
                             const pt = (p && !isNaN(p.x) && !isNaN(p.y))
                                        ? p : Qt.point(cell.width / 2, cell.height / 2)
-                            cellRipple.press(pt.x, pt.y)
-                        } else {
-                            cellRipple.release()
+                            cellRipple.trigger(pt.x, pt.y)
                         }
                     }
                 }
@@ -135,7 +130,6 @@ Item {
         }
     }
 
-    // ---------------- 底部一行 ----------------
     Item {
         id: actionRow
         anchors.left: parent.left
@@ -156,7 +150,7 @@ Item {
             color: backTap.pressed ? Theme.withAlpha(Theme.primary, 0.18)
                                    : Theme.surfaceContainer
 
-            DankIcon {
+            DIcon {
                 id: backIcon
                 anchors.left: parent.left
                 anchors.leftMargin: Math.round(parent.height * 0.32)
@@ -177,7 +171,7 @@ Item {
             }
 
             // 涟漪：和格子一样挂在 TapHandler 上（centroid 这版是 null，用 point）
-            Ripple {
+            DRipple {
                 id: backRipple
                 anchors.fill: parent
                 cornerRadius: height / 2
@@ -189,10 +183,8 @@ Item {
                 onPressedChanged: {
                     if (pressed) {
                         const p = backTap.point ? backTap.point.position : null
-                        backRipple.press(p && !isNaN(p.x) ? p.x : backBtn.width / 2,
+                        backRipple.trigger(p && !isNaN(p.x) ? p.x : backBtn.width / 2,
                                          p && !isNaN(p.y) ? p.y : backBtn.height / 2)
-                    } else {
-                        backRipple.release()
                     }
                 }
             }
@@ -243,7 +235,7 @@ Item {
                             font.weight: parent.active ? Font.DemiBold : Font.Normal
                         }
 
-                        Ripple {
+                        DRipple {
                             id: segRipple
                             anchors.fill: parent
                             cornerRadius: height / 2
@@ -264,10 +256,8 @@ Item {
                                 if (pressed) {
                                     const p = segTap.point ? segTap.point.position : null
                                     const w = segLabel.width + segmentBox.height * 0.70
-                                    segRipple.press(p && !isNaN(p.x) ? p.x : w / 2,
+                                    segRipple.trigger(p && !isNaN(p.x) ? p.x : w / 2,
                                                     p && !isNaN(p.y) ? p.y : segmentBox.height * 0.41)
-                                } else {
-                                    segRipple.release()
                                 }
                             }
                         }
@@ -287,14 +277,14 @@ Item {
             color: (bsTap.pressed || backRepeat.running)
                    ? Theme.withAlpha(Theme.primary, 0.18) : Theme.surfaceContainer
 
-            DankIcon {
+            DIcon {
                 anchors.centerIn: parent
                 name: "backspace"
                 size: Math.round(parent.height * 0.5)
                 color: Theme.withAlpha(panel.controller.fg, 0.85)
             }
 
-            Ripple {
+            DRipple {
                 id: bsRipple
                 anchors.fill: parent
                 cornerRadius: height / 2
@@ -305,12 +295,11 @@ Item {
                 onPressedChanged: {
                     if (pressed) {
                         const p = bsTap.point ? bsTap.point.position : null
-                        bsRipple.press(p && !isNaN(p.x) ? p.x : backspaceBtn.width / 2,
+                        bsRipple.trigger(p && !isNaN(p.x) ? p.x : backspaceBtn.width / 2,
                                        p && !isNaN(p.y) ? p.y : backspaceBtn.height / 2)
                         panel.didRepeat = false
                         backDelay.start()
                     } else {
-                        bsRipple.release()
                         backDelay.stop()
                         backRepeat.stop()
                     }
