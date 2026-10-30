@@ -4,6 +4,7 @@
 // 免得两个都变半透明反而看不清拖的是什么。
 import QtQuick
 import qs.Common
+import "Motion.js" as Motion
 
 Rectangle {
     id: root
@@ -12,7 +13,10 @@ Rectangle {
 
     visible: root.controller.editing && root.controller.ghostAction !== null
     opacity: root.controller.ghostFading ? 0 : 1
-    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on opacity {
+        enabled: controller ? controller.animateCells : true
+        NumberAnimation { duration: Motion.ghost; easing.type: Easing.OutCubic }
+    }
     z: 300
     width: root.controller.keyH
     height: root.controller.keyH

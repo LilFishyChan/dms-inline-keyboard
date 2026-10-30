@@ -19,6 +19,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "Motion.js" as Motion
 
 Item {
     id: candList
@@ -381,7 +382,10 @@ Item {
             radius: Math.min(Theme.cornerRadius, candList.sideKeyH * 0.16)
             color: Theme.surfaceContainerHighest
             opacity: press.pressed ? 0.72 : 1
-            Behavior on opacity { NumberAnimation { duration: 90 } }
+            Behavior on opacity {
+                enabled: controller ? controller.animateCells : true
+                NumberAnimation { duration: Motion.quick }
+            }
 
             DankIcon {
                 anchors.centerIn: parent

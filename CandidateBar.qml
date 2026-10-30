@@ -12,6 +12,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "Motion.js" as Motion
 
 Item {
     id: candArea
@@ -187,7 +188,8 @@ Item {
                 // 展开状态下转 180°，变成「收起」
                 rotation: candArea.controller.candListOpen ? 180 : 0
                 Behavior on rotation {
-                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    enabled: controller ? controller.animateCells : true
+                    NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
                 }
             }
 

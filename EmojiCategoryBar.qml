@@ -5,6 +5,7 @@
 import QtQuick
 import qs.Common
 import "layouts/emoji.js" as Emoji
+import "Motion.js" as Motion
 
 Item {
     id: bar
@@ -56,7 +57,8 @@ Item {
                     radius: height / 2
                     color: active ? Theme.primary : Theme.surfaceContainer
                     Behavior on color {
-                        ColorAnimation { duration: 120 }
+                        enabled: controller ? controller.animateCells : true
+                        ColorAnimation { duration: Motion.micro }
                     }
 
                     Text {
