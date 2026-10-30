@@ -26,6 +26,9 @@ Item {
     // 键盘是否打开。由 daemon 同步过来：决定 imlist 兜底轮询要不要跑。
     property bool keyboardOpen: false
 
+    // 该不该连着 addon（最小化时不该，见 daemon 里 shouldConnect 的说明）
+    property bool connectEnabled: true
+
     readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
     readonly property string socketPath: runtimeDir + "/inline-keyboard.sock"
     readonly property string statusPath: runtimeDir + "/inline-keyboard-status.json"
@@ -319,11 +322,12 @@ Item {
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
     Timer {
         interval: 1000
-        // 只有键盘打开时才连。
+        // 只有键盘打开、且该连时才连。
         // 无条件 running: true 会让插件在键盘收起后仍每秒重连，
         // 一直占着 addon 的唯一客户端槽位 —— 任何别的客户端
         // （scripts/test-addon.py、排障工具）刚连上就被顶掉。
-        running: keyboardOpen
+        // 最小化时不连：只剩圆按钮，没地方画候选，连着只会把 classicui 顶掉。
+        running: keyboardOpen && connectEnabled
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -334,6 +338,13 @@ Item {
                 bridge.lastSeenAt = 0
             }
         }
+    }
+
+    // 不该连时（最小化）立刻断，不等重连 Timer 的下一拍：
+    // addon 收到 EOF 会马上把 UI 交还 classicui，用户在那儿打字就能看到候选窗
+    onConnectEnabledChanged: {
+        if (!connectEnabled && socket.connected)
+            socket.connected = false
     }
 
     // 心跳超时：addon 每 2s 发一次 ping，5s 一条消息都没有就当它卡死。

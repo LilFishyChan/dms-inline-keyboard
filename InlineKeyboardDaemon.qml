@@ -24,6 +24,7 @@ PluginComponent {
     FcitxBridge {
         id: fcitxBridge
         keyboardOpen: root.open
+        connectEnabled: root.shouldConnect
     }
 
     // 按键路由（修饰键状态机 + 直通/ydotool 选择）
@@ -555,9 +556,8 @@ PluginComponent {
         root.stopVoice()
         root.destroyKeyboards()
         // 最小化**仍然算键盘开着**（open 保持 true），所以不能走 open=false：
-        // 那会连带触发「关闭」语义。但输入法 UI 不该被一个看不见的键盘占着，
-        // 这里只让 syncKeyboardFlag 把 flag 撤掉 → addon setShown(false)
-        // → classicui 拿回候选窗。onMinimizedChanged 负责触发。
+        // 那会连带触发「关闭」语义。但输入法 UI 不该被一个看不见的键盘占着 ——
+        // shouldConnect 变 false 会让桥断开连接，addon 收到 EOF 就交还 UI。
     }
 
     function restoreFromMinimize() {
@@ -867,35 +867,15 @@ PluginComponent {
         }
     }
 
-    // ---- 键盘开关 ↔ addon 的 flag 文件 ----
-    // addon 每次 tick 都会 syncMode()：flag 在就 setShown(true)（接管候选窗），
-    // 不在就 setShown(false)（把候选窗还给 classicui）。
-    // 这个文件以前根本没人写，所以 addon 一直认为键盘是关着的 ——
-    // 收起后 classicui 接管不了、打开时两者来回抢，都是这个原因。
-    Process {
-        id: flagWriter
-        command: ["true"]
-    }
-
-    /**
-     * 写 addon 读的那个 flag 文件（决定它是否接管输入法 UI）。
-     *
-     * 判据是 open && !minimized，不是单独的 open：
-     *   · open=false            → 键盘关掉，交还 UI
-     *   · open=true  + 最小化   → 键盘逻辑上开着，但界面上只剩一个小按钮，
-     *                             同样要交还 UI，否则候选窗被一个看不见的键盘占着
-     *   · open=true  + 正常     → 接管 UI
-     */
-    function syncKeyboardFlag() {
-        const ownsUi = root.open && !root.minimized
-        flagWriter.command = ["sh", "-c", ownsUi
-            ? "touch \"$XDG_RUNTIME_DIR/inline-keyboard-active\""
-            : "rm -f \"$XDG_RUNTIME_DIR/inline-keyboard-active\""]
-        flagWriter.running = true
-    }
-
-    onOpenChanged: syncKeyboardFlag()
-    onMinimizedChanged: syncKeyboardFlag()
+    // 该不该连着 addon（连着它就会接管键盘内 UI）。
+    //
+    // 只有最小化该断开：那时只剩一个圆按钮，屏幕上没有任何地方能显示
+    // 候选或预编辑，连着只会让 classicui 被 suspend，用户在输入框里
+    // 打字却一个候选都看不到。
+    //
+    // 语音模式**保持连接**：语音条要用预编辑显示识别文字 ——
+    // vinput 录音时只 setPreedit、从不设候选，断了就没数据。
+    readonly property bool shouldConnect: !root.minimized
 
     Component.onCompleted: {
         root.migrateBuiltinActions()
