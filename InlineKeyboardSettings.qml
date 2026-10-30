@@ -354,7 +354,7 @@ PluginSettings {
         const version = root.localeVersion      // 让调用处的绑定跟随版本重算
         if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
             return term
-        return I18n.trFor(root.pluginId, term)
+        return I18n.trFor("inlineKeyboard", term)
     }
 
     // ydotoold 没跑：警告 + 两种做法（临时启动 / 设为开机自启）
@@ -927,10 +927,12 @@ PluginSettings {
         onClicked: root.startAdd()
     }
 
-    // 图标选择器浮窗：搜索 + 可滚动网格
-    // 用 DCommon.DDialog 的 popout 模式承载，尺寸交给 DDialog 限制
+    // 图标选择器浮窗：搜索 + 可滚动网格。
+    // DDialog 的 embedded 默认 true（直接排在设置页列表里），浮起必须显式关掉；
+    // popout 只影响内边距，不控制浮起。
     DCommon.DDialog {
         id: iconPopup
+        embedded: false
         popout: true
         opened: root.pickingIcon
         title: root.tr("Choose an icon")
@@ -1079,10 +1081,10 @@ PluginSettings {
         }
     }
 
-    // 确认框：DCommon.DDialog 的 popout 模式，不参与设置页的流式排版
-    // （embedded 模式会占掉一整屏，必须走 popout）
+    // 确认框：embedded 默认 true 会把整块排进设置页列表，浮起必须显式关掉
     DCommon.DDialog {
         id: debugConfirm
+        embedded: false
         popout: true
         opened: root.debugConfirmOpen
         title: root.tr("Turn on debug mode?")

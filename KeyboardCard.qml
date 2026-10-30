@@ -997,7 +997,7 @@ Rectangle {
         const version = root.localeVersion      // 让调用处的绑定跟随版本重算
         if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
             return term
-        return I18n.trFor(root.pluginId, term)
+        return I18n.trFor("inlineKeyboard", term)
     }
 
     // 键位 → 修饰键状态：映射规则在 modifiers.js（有单测），这里只查表

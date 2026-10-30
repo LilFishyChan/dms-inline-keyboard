@@ -227,7 +227,7 @@ PluginComponent {
                 ? "Copied — long press the text field to paste"
                 : "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)"
             ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor)
-                                  ? I18n.trFor(root.pluginId, term) : term)
+                                  ? I18n.trFor("inlineKeyboard", term) : term)
         }
         return lastTextCommitVia
     }
