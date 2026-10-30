@@ -39,6 +39,7 @@ PanelWindow {
     // 语音模式：只留顶部语音行
     property bool voiceMinimal: false
     signal voiceMicRequested()
+    signal opacityAdjusted(real bg, real key)
     // vinput 是否可用（可选扩展，没装就禁用语音动作）
     property bool voiceAvailable: false
     property real bgOpacity: 1.0
@@ -193,6 +194,8 @@ PanelWindow {
 
     KeyboardCard {
         id: card
+
+        onOpacityAdjusted: (bg, key) => root.opacityAdjusted(bg, key)
 
         // 窗口是全屏的，卡片绝对定位。宽高不在这里设 ——
         // 卡片自己绑了 resizeW/H，拖动时才会实时跟着变

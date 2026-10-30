@@ -474,16 +474,6 @@ PluginSettings {
     }
 
     SliderSetting {
-        settingKey: "bgOpacity"
-        label: root.tr("Background opacity")
-        description: root.tr("Opacity of the keyboard panel itself.")
-        minimum: 10
-        maximum: 100
-        defaultValue: 100
-        unit: "%"
-    }
-
-    SliderSetting {
         settingKey: "repeatInterval"
         label: root.tr("Key repeat interval")
         description: root.tr("Delay between repeated keystrokes while a key is held down.")
@@ -491,16 +481,6 @@ PluginSettings {
         maximum: 200
         defaultValue: 60
         unit: " ms"
-    }
-
-    SliderSetting {
-        settingKey: "keyOpacity"
-        label: root.tr("Key opacity")
-        description: root.tr("Opacity of each key; disabled actions multiply with it.")
-        minimum: 10
-        maximum: 100
-        defaultValue: 100
-        unit: "%"
     }
 
     // ---------------- 行为 ----------------

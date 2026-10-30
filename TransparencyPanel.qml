@@ -53,7 +53,10 @@ Item {
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
             label: root.controller.tr("Background opacity")
             value: root.controller.bgOpacity
-            onMoved: v => root.controller.bgOpacity = v
+            onMoved: v => {
+                root.controller.bgOpacity = v;
+                root.controller.opacityAdjusted(root.controller.bgOpacity, root.controller.keyOpacity);
+            }
         }
 
         OpacitySliderRow {
@@ -62,7 +65,10 @@ Item {
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
             label: root.controller.tr("Key opacity")
             value: root.controller.keyOpacity
-            onMoved: v => root.controller.keyOpacity = v
+            onMoved: v => {
+                root.controller.keyOpacity = v;
+                root.controller.opacityAdjusted(root.controller.bgOpacity, root.controller.keyOpacity);
+            }
         }
     }
 }

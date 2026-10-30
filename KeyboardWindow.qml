@@ -20,6 +20,7 @@ PanelWindow {
     // 语音模式：只留顶部语音行
     property bool voiceMinimal: false
     signal voiceMicRequested()
+    signal opacityAdjusted(real bg, real key)
     // vinput 是否可用（可选扩展，没装就禁用语音动作）
     property bool voiceAvailable: false
     property real bgOpacity: 1.0
@@ -239,6 +240,7 @@ PanelWindow {
         onVoiceMinimalRequested: root.voiceMinimalRequested()
         onVoiceMicRequested: root.voiceMicRequested()
         onModeChangeRequested: mode => root.modeChangeRequested(mode)
+        onOpacityAdjusted: (bg, key) => root.opacityAdjusted(bg, key)
         dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates

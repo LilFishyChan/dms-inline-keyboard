@@ -1069,6 +1069,10 @@ PluginComponent {
             voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            onOpacityAdjusted: (bg, key) => {
+                root.bgOpacity = bg
+                root.keyOpacity = key
+            }
             specialKeyStyle: root.specialKeyStyle
             winKeyStyle: root.winKeyStyle
             winKeyCustomIcon: root.winKeyCustomIcon
@@ -1154,6 +1158,10 @@ PluginComponent {
             voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            onOpacityAdjusted: (bg, key) => {
+                root.bgOpacity = bg
+                root.keyOpacity = key
+            }
             specialKeyStyle: root.specialKeyStyle
             winKeyStyle: root.winKeyStyle
             winKeyCustomIcon: root.winKeyCustomIcon

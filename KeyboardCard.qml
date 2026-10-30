@@ -114,6 +114,8 @@ Rectangle {
     property string slotActionId: "float"
     property var quickBarActions: []
     signal quickBarChanged(var list)
+    // 透明度面板改值只落在卡片上（绑定被打断），要往上抛给 daemon 才能保存
+    signal opacityAdjusted(real bg, real key)
     // 槽里的动作从列表里按 id 找，找不到就用默认的语音输入
     readonly property var rightSlot: {
         if (!slotActionId)
