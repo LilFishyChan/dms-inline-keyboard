@@ -45,6 +45,12 @@ Item {
     // 还有没显示的候选。rime 的 bulk 列表没有 pageable，hasNext 恒 false，
     // 这个字段由 addon 另外算（第 19 个候选还取不取得到）。
     property bool hasMore: false
+    // 当前有没有输入框拿着焦点（addon 的 focus:0/1 消息）
+    property bool inputFocused: false
+    // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
+    // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），
+    // 这时继续显示的是过期状态。
+    property double lastSeenAt: 0
 
     // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，
     // 带下标是为了让显示层做去重/剔除时不破坏选词准确性。
@@ -73,18 +79,17 @@ Item {
     // 不认识的指令、内部异常都会走到这里，不再静默丢弃。
     property string lastError: ""
 
-    // fcitx5 当前正在用的 UI 实现名（addon 的 state.ui）。
-    // 键盘开着但这个值不等于 selfUi，说明 UI 被 classicui 顶掉了。
+    // fcitx5 当前正在用的 UI 实现名（addon 的 state.ui），只作状态展示。
+    // 「被顶掉要不要抢」由 addon 心跳自己判定，这里不再参与决策。
     property string currentUi: ""
 
-    // addon 自己的 UI 名（由 addon 在 state 里给出），用来判断 UI 是否被顶掉
+    // addon 自己的 UI 名（由 addon 在 state 里给出）
     property string selfUi: ""
 
     // 应用是否已把预编辑渲染进自己的输入框（true 时键盘不再重复显示）
     property bool preeditEmbedded: false
 
     // 上次 reclaim 的时间戳（ms），用来做 5 秒限流
-    property double lastReclaimAt: 0
 
     // 平铺的「输入法 + 子模式」列表：地球键循环和下拉菜单共用同一份数据。
     // 构造逻辑在 data.js（有单测覆盖 current 唯一性）。
@@ -198,25 +203,9 @@ Item {
         currentUi = st.ui
         selfUi = st.self
         preeditEmbedded = st.embedded
-
-        // UI 被 classicui 顶掉时自己抢回来。
-        //
-        // addon 那边完全按 fcitx5 官方语义走：InputContextFocusOut 会调
-        // hideVirtualKeyboard()，它就把 shown_ 置 false 并把 UI 交还 classicui。
-        // 但失焦不等于用户收起键盘（截图、切窗口都会失焦），键盘是否真的
-        // 还开着只有插件知道，所以「要不要抢回来」在这里判断。
-        //
-        // 限流 5 秒：reclaim 会触发 setInputMethodMode -> updateAvailability，
-        // 本身又会发一次 UIChanged，不限流会绕着回调链打转。
-        if (bridge.keyboardOpen && st.ui !== "" && st.self !== ""
-                && st.ui !== st.self) {
-            const nowMs = Date.now()
-            if (nowMs - bridge.lastReclaimAt >= 5000) {
-                bridge.lastReclaimAt = nowMs
-                console.error("[inline-keyboard/fcitx] ui=" + st.ui + " 不是自己，reclaim")
-                sendFcitx("reclaim")
-            }
-        }
+        // UI 被 classicui 顶掉这件事交给 addon 自己处理：它的心跳每 2s 比一次
+        // currentUI()，不是自己就 claim —— 比这里 5s 限流地发 reclaim 更早，
+        // 而且只依赖一套判据。
     }
 
     function applyImList(raw) {
@@ -226,7 +215,14 @@ Item {
     function handleSocketData(data) {
         // SplitParser 已按 \n 切好一条完整消息，这里不能再找 \n。
         const line = String(data || "")
-        if (line.startsWith("state:")) {
+        // 任何一条消息都说明 addon 活着
+        lastSeenAt = Date.now()
+        if (line.startsWith("ping:")) {
+            // 心跳：回一声，addon 靠它判断客户端还在
+            sendFcitx("pong")
+        } else if (line.startsWith("focus:")) {
+            inputFocused = line.substring(6) === "1"
+        } else if (line.startsWith("state:")) {
             applyStatus(line.substring(6))
         } else if (line.startsWith("imlist:")) {
             applyImList(line.substring(7))
@@ -331,8 +327,28 @@ Item {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            if (!socket.connected)
+            if (!socket.connected) {
                 socket.connected = true
+                // 新一轮连接从零算：不清的话上一轮的旧时间戳会让超时判定
+                // 在刚连上时就成立
+                bridge.lastSeenAt = 0
+            }
+        }
+    }
+
+    // 心跳超时：addon 每 2s 发一次 ping，5s 一条消息都没有就当它卡死。
+    // 断开之后上面那个 Timer 会重连，恢复时 addon 会重新推一份完整状态。
+    Timer {
+        interval: 2000
+        running: socket.connected
+        repeat: true
+        onTriggered: {
+            // lastSeenAt 为 0 = 这一轮还没收到任何消息，交给重连 Timer 处理
+            if (bridge.lastSeenAt > 0 && Date.now() - bridge.lastSeenAt > 5000) {
+                console.error("[inline-keyboard/fcitx] 心跳超时，断开重连")
+                bridge.lastSeenAt = 0
+                socket.connected = false
+            }
         }
     }
 
@@ -344,30 +360,16 @@ Item {
     // setInputMethodMode -> hide/showVirtualKeyboard 回调链撞在一起。
     onKeyboardOpenChanged: {
         if (keyboardOpen && socket.connected) {
-            // 每次打开都重新申领一次 UI。
-            // addon 的 markShown(true) 有状态去重：socket 一直连着时 shown_
-            // 已经是 true，再开键盘不会调 setInputMethodMode/updateAvailability，
-            // UI 角色就留在 classicui 手里（候选窗又冒出来，键盘自己的候选栏空着）。
+            // 打开瞬间要 UI：addon 连上时已经 claim 过一次，这里补一发是因为
+            // 「键盘早就开着、又切了显示模式」时连接没重建，但 UI 可能被顶掉
             bridge.sendFcitx("reclaim")
             return
         }
         if (!keyboardOpen && socket.connected) {
-            // 关键盘：先显式让 addon 交还 UI，再断 socket。
-            // 只断 socket 时 addon 走 peer-eof -> markShown(false)，
-            // 而 markShown 里 shown_ 可能已经是 false（上一轮交还后没重置），
-            // 状态去重会把这次交还吞掉 —— 这就是"有时没移交"的来源。
-            bridge.sendFcitx("release")
-            releaseCloseTimer.restart()
+            // 直接断就行：addon 的 UI 归属只跟活着的连接走，收到 peer-eof
+            // 就会交还。release 命令已经退休，不用再等 40ms 往返
+            socket.connected = false
         }
-    }
-
-    // 给 release 一条命令的往返时间，再断开
-    Timer {
-        id: releaseCloseTimer
-        interval: 40
-        // socket 是同级对象的 id，不是 bridge 的属性：写 bridge.socket
-        // 取到的是 undefined，赋值时抛 TypeError
-        onTriggered: socket.connected = false
     }
 
     // 剪贴板兜底：dms cl copy 直接吃文本参数，不经过 shell
