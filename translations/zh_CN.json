@@ -109,6 +109,13 @@
     "This key sends Super. Show it as text or an icon.": "这个键实际发的是 Super，可以显示成文字或图标。",
     "Custom icon": "自定义图标",
     "Showing image files in that folder. Pick one, or press Enter to use the path itself.": "下面是这个目录里的图片文件，点一个用，或者直接回车用这个路径。",
-    "Not set — tap the icon to choose": "未设置 · 点图标选择"
+    "Not set — tap the icon to choose": "未设置 · 点图标选择",
+    "Debugging": "调试",
+    "Debug mode": "调试模式",
+    "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": "只提供 acceptance.py 验收脚本要用的 IPC，普通使用不需要打开。",
+    "Turn on debug mode?": "开启调试模式？",
+    "Enable": "启用",
+    "Command, e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\"",
+    "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": "调试模式会加载插件的调试 IPC，供 scripts/acceptance.py 驱动：只读诊断、几何读取，以及按键 / 候选 / 动作 / 浮动开关的模拟点击。\n\n普通使用不需要它，测完记得关掉。"
   }
 }

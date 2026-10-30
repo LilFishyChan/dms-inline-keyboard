@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick.Controls
 import qs.Common
+import qs.Services
 import qs.Widgets
 import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
@@ -67,6 +68,22 @@ PluginSettings {
         daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"']
         daemonCheck.running = true
         bridgeCheck.running = true
+        root.refreshDebugMode()
+    }
+
+    // ---- 调试模式 ----
+    // 调试 IPC（只读诊断 + 模拟点击 / 长按 / 拖动）给 scripts/acceptance.py 用，
+    // 普通使用用不到，所以打开前必须过一次确认框。
+    property bool debugModeOn: false
+    property bool debugConfirmOpen: false
+
+    function refreshDebugMode() {
+        root.debugModeOn = PluginService.loadPluginData(root.pluginId, "debugMode", false);
+    }
+
+    function writeDebugMode(on) {
+        PluginService.savePluginData(root.pluginId, "debugMode", on);
+        root.debugModeOn = on;
     }
 
     // ---- 可选扩展：fcitx5 桥接 ----
@@ -319,9 +336,7 @@ PluginSettings {
             return
         if (root.pickForWin) {
             winIconSetting.value = value
-            // ⚠ DMS 的 StringSetting 只在输入框 commit()（回车/失焦）时写盘，
-            // 这个值走的是图标选择器、没有输入框参与，只赋值不会持久化。
-            // 表现就是「选完图标当时看着对了，重开设置又变回未设置」。
+// StringSetting 只在 commit() 时写盘，图标选择器没有输入框，要显式持久化
             root.saveValue("winKeyCustomIcon", value)
         } else if (root.pickForDraft) {
             root.draftIcon = value
@@ -408,7 +423,6 @@ PluginSettings {
         wrapMode: Text.WordWrap
     }
 
-    // ---------------- 可选扩展 ----------------
     // 装了就收成一行「已连接」，没装才展开安装步骤 —— 已经把说明塞满页面了
     Column {
         width: parent.width
@@ -463,7 +477,6 @@ PluginSettings {
         }
     }
 
-    // ---------------- 外观 ----------------
     StyledText {
         width: parent.width
         text: root.tr("Appearance")
@@ -483,7 +496,6 @@ PluginSettings {
         unit: " ms"
     }
 
-    // ---------------- 行为 ----------------
     StyledText {
         width: parent.width
         text: root.tr("Behaviour")
@@ -572,14 +584,14 @@ PluginSettings {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Math.round(Theme.spacingM)
 
-            // 当前选中图标的预览：有值就渲染（图标名走 DankIcon，路径走 Image）
+            // 当前选中图标的预览：有值就渲染（图标名走 DIcon，路径走 Image）
             Rectangle {
                 width: 44
                 height: 44
                 radius: width / 2
                 color: Theme.surfaceContainer
 
-                DankIcon {
+                DCommon.DIcon {
                     visible: !String(winIconSetting.value || "").startsWith("/")
                     anchors.centerIn: parent
                     name: String(winIconSetting.value || "") || "keyboard_command_key"
@@ -635,7 +647,6 @@ PluginSettings {
         defaultValue: ""
     }
 
-    // ---------------- 动作 ----------------
     StyledText {
         width: parent.width
         text: root.tr("Actions")
@@ -645,7 +656,6 @@ PluginSettings {
         topPadding: Theme.spacingL
     }
 
-    // ---------------- 动作管理 ----------------
     // 用 ListSetting 而不是自己读写 pluginData：设置页没有 pluginService 可用，
     // ListSetting 自带存取，并提供 items / addItem / removeItem。
     ToggleSetting {
@@ -724,7 +734,7 @@ PluginSettings {
                     radius: width / 2
                     color: isHidden ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.centerIn: parent
                         name: isHidden ? "visibility_off" : "visibility"
                         size: 19
@@ -750,7 +760,7 @@ PluginSettings {
                     radius: width / 2
                     color: "transparent"
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.centerIn: parent
                         name: "edit"
                         size: 19
@@ -775,7 +785,7 @@ PluginSettings {
                     radius: width / 2
                     color: "transparent"
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.centerIn: parent
                         name: "delete"
                         size: 19
@@ -964,7 +974,7 @@ PluginSettings {
                 onAccepted: root.applyIcon(text)
             }
 
-            GridView {
+            DCommon.DGridView {
                 id: iconGrid
                 width: parent.width
                 // 给标题 / 搜索框 / 底部说明（可能两行）都留足空间
@@ -995,7 +1005,7 @@ PluginSettings {
                     color: selected ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
 
                     // 图标字体
-                    DankIcon {
+                    DCommon.DIcon {
                         visible: !parent.isFile
                         anchors.centerIn: parent
                         name: parent.isFile ? "" : parent.modelData
@@ -1032,6 +1042,122 @@ PluginSettings {
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.withAlpha(Theme.surfaceVariantText, 0.9)
                 wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    StyledText {
+        width: parent.width
+        text: root.tr("Debugging")
+        font.pixelSize: Theme.fontSizeLarge
+        font.weight: Font.Bold
+        color: Theme.surfaceText
+        topPadding: Theme.spacingL
+    }
+
+    // 调试 IPC：只读诊断 + 模拟操作（点击 / 长按 / 拖动），给 scripts/acceptance.py 用。
+    // 开关走受控 DToggle：点开只弹确认框，确认后才落盘。
+    Row {
+        width: parent.width
+        spacing: Theme.spacingM
+
+        Column {
+            width: parent.width - debugToggle.width - Theme.spacingM
+            spacing: Theme.spacingS
+
+            StyledText {
+                width: parent.width
+                text: root.tr("Debug mode")
+                font.pixelSize: Theme.fontSizeMedium
+                color: Theme.surfaceText
+            }
+
+            StyledText {
+                width: parent.width
+                text: root.tr("Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.")
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.Wrap
+            }
+        }
+
+        DCommon.DToggle {
+            id: debugToggle
+            anchors.verticalCenter: parent.verticalCenter
+            hideText: true
+            text: root.tr("Debug mode")
+            checked: root.debugModeOn
+
+            onToggled: value => {
+                if (value)
+                    root.debugConfirmOpen = true;
+                else
+                    root.writeDebugMode(false);
+            }
+        }
+    }
+
+    // 确认框：用不参与布局流的 Popup（设置页的子项是按顺序排版的，
+    // 把 DDialog 直接放进来会占掉一整屏、把其它选项挤出去）。
+    // 文案和按钮仍然用 DMS 的 StyledText / DButton。
+    Popup {
+        id: debugConfirm
+        // 挂到窗口覆盖层上居中：设置页本身是长列表，直接 centerIn parent 会跑到内容顶部
+        parent: Overlay.overlay
+        anchors.centerIn: Overlay.overlay
+        visible: root.debugConfirmOpen
+        modal: true
+        width: Math.min(420, Overlay.overlay.width - Theme.spacingL * 4)
+        padding: Theme.spacingL
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        onClosed: root.debugConfirmOpen = false
+
+        background: StyledRect {
+            color: Theme.surfaceContainerHigh
+            radius: Theme.cornerRadius
+        }
+
+        contentItem: Column {
+            width: debugConfirm.availableWidth
+            spacing: Theme.spacingM
+
+            StyledText {
+                width: parent.width
+                text: root.tr("Turn on debug mode?")
+                font.pixelSize: Theme.fontSizeLarge
+                color: Theme.surfaceText
+                wrapMode: Text.Wrap
+            }
+
+            StyledText {
+                width: parent.width
+                text: root.tr("Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.Wrap
+            }
+
+            Row {
+                spacing: Theme.spacingS
+                anchors.right: parent.right
+
+                DCommon.DButton {
+                    text: root.tr("Cancel")
+                    backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                    textColor: Theme.surfaceText
+                    onClicked: root.debugConfirmOpen = false
+                }
+
+                DCommon.DButton {
+                    text: root.tr("Enable")
+                    backgroundColor: Theme.primary
+                    textColor: Theme.onPrimary
+                    onClicked: {
+                        root.writeDebugMode(true);
+                        root.debugConfirmOpen = false;
+                    }
+                }
             }
         }
     }

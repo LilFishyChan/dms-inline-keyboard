@@ -1,7 +1,5 @@
 // Inline Keyboard 的守护插件：唯一持有持久状态的地方。
 // 职责：读写插件设置与运行状态、提供 IPC 命令、按需创建/销毁两个键盘窗口、
-// 向卡片下发动作表与设置。fcitx5 通信在 FcitxBridge、按键路由在 KeyRouter。
-// 卡片和窗口不直接读配置文件，全部通过这里的属性和信号。
 
 import QtQuick
 import "data.js" as Data
@@ -42,10 +40,12 @@ PluginComponent {
     property bool avoidWindows: PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
     readonly property bool fnActive: root.fnState > 0
 
-    // 调试 IPC（debug* 系列）默认关闭：其中 debugAddCommandAction 能把任意 sh -c
-    // 存成持久动作、debugRunAction 会执行它，不能对任何本地进程开放。
-    // 需要时用 `INLINE_KEYBOARD_DEV=1 systemctl --user restart dms` 打开。
-    readonly property bool devMode: Quickshell.env("INLINE_KEYBOARD_DEV") === "1"
+    // 调试 IPC（debug* 系列）的开关：设置页那个「调试模式」，环境变量兜底。
+    // 只剩只读诊断和模拟操作 —— 执行任意命令的能力（旧 debugRunAction /
+    // debugAddCommandAction）已经移除，不随插件发布。
+    property bool debugModeSetting: PluginService.loadPluginData(root.pluginId, "debugMode", false)
+    readonly property bool devMode: root.debugModeSetting
+                                    || Quickshell.env("INLINE_KEYBOARD_DEV") === "1"
     // 键位页 id：page1 主键区 / page2 F 区 / emoji 表情 & 符号页
     // （卡片的 page 属性是绑定到这里的，任何地方都别直接给卡片赋值，否则绑定断掉）
     property string page: "page1"
@@ -57,7 +57,21 @@ PluginComponent {
             return root.page
         }
         root.page = p
+        // 切页时让 page 键的状态跟上，否则按钮的激活态和当前页对不上
+        keyRouter.pageState = p === "page2" ? 2 : 0
         return root.page
+    }
+
+    // 页面键状态 → 当前页。page 键和 Shift / Ctrl 走同一套状态机，
+    // 1 = 一次性（按一个键后自动回第一页）/ 2 = 锁定在第二页。
+    Connections {
+        target: keyRouter
+
+        function onPageStateChanged() {
+            if (root.page === "emoji")
+                return
+            root.page = keyRouter.pageState > 0 ? "page2" : "page1"
+        }
     }
     // keys = 正常键盘 / functions = 快捷功能列表（顶部四格按钮切换）
     property string mode: "keys"
@@ -86,20 +100,23 @@ PluginComponent {
     readonly property alias fcitxPreedit: fcitxBridge.preedit
 
     // addon 推回来的 label 已经是目标值了 → 立刻收起乐观态，
-    // 这样正常情况下切换是「瞬间到位」，不会白压 1 秒
-    onFcitxImLabelChanged: {
-        // 只关「乐观显示」，**不清 optimisticImIdx**：
-        // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从
-        // 真实值重算，连续点击就会一直在同一项上打转。
-        if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
-            root.optimisticImActive = false
+    // 这样正常情况下切换是「瞬间到位」，不会白压 1 秒。
+    // 必须监听数据源：fcitxImLabel 是由乐观态算出来的，在里面写乐观态就是绑定循环。
+    Connections {
+        target: fcitxBridge
+
+        function onImLabelChanged() {
+            // 只关「乐观显示」，**不清 optimisticImIdx**：
+            // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从
+            if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
+                root.optimisticImActive = false
+        }
     }
     readonly property alias fcitxVisible: fcitxBridge.panelVisible
     readonly property alias fcitxImKeyboard: fcitxBridge.imKeyboard
     readonly property alias fcitxImName: fcitxBridge.imName
     // 切换输入法时的乐观显示：点下地球键的那一刻就把图标/标签换成目标值，
     // 不等 addon 回推。否则从 en 切到万象会先闪一下 abc 再变「万」——
-    // D-Bus 切输入法是异步的，中间那几百毫秒就在显示旧状态。
     property string optimisticImLabel: ""
     property string optimisticImIcon: ""
     property bool optimisticImActive: false
@@ -132,7 +149,6 @@ PluginComponent {
 
     // 预编辑是否由应用自己画（fcitx5 的 clientPreedit 非空）。
     // 应用自己把拼音串画进输入框时（embedded），键盘就不再重复显示。
-    // alwaysShowPreedit 打开则无视这个判断，键盘内始终画一行。
     readonly property bool fcitxPreeditEmbedded: !root.alwaysShowPreedit && fcitxBridge.preeditEmbedded
     // 全量候选（候选列表页用）
     readonly property var allCandidates: fcitxBridge.allCandidates
@@ -147,14 +163,23 @@ PluginComponent {
     function applyImList(raw) { fcitxBridge.applyImList(raw) }
 
     // ---- 按键注入 / 修饰键：全部在 KeyRouter 里，这里转发 ----
-    function injectKey(code, sym) { keyRouter.injectKey(code, sym) }
-    // 换页键（k = "page"）改的是键盘自身的状态，状态在 daemon 上，所以在这里拦下；
-    // 其余键交给 KeyRouter 决定「直通 fcitx5 / ydotool」。
-    // 拆组件时这个分支漏掉过一次：page 键没有键码，走到 injectKey 直接 return，点击静默无效。
+    function injectKey(code, sym, kind) { keyRouter.injectKey(code, sym, kind) }
+    // 换页键（k = "page"）分三种：
+    //   ① 表情页返回 —— 当前不在两页之内，直接跳，别让状态机循环
+    //   ② 两页之间 —— 走 keyRouter 的修饰键状态机（单击切换 / 双击锁定）
+    //   ③ 表情页这样的其它目标 —— 普通跳转
     function handleKey(keyData) {
         if (!keyData)
             return
         if (keyData.k === "page") {
+            if (root.page === "emoji") {
+                root.setPage(keyData.to)
+                return
+            }
+            if (keyData.to === "page1" || keyData.to === "page2") {
+                keyRouter.handleKey(keyData)
+                return
+            }
             root.setPage(keyData.to)
             return
         }
@@ -172,7 +197,6 @@ PluginComponent {
 
     // ---- 表情 / 符号上屏 ----
     // 优先级：addon 进程内 commit（直接进输入框，用户不用再操作）
-    //        > 复制到剪贴板（没有 fcitx5 扩展时唯一可行的一条）。
     property string lastTextCommit: ""
     property string lastTextCommitVia: ""
     // 提示节流：同一条消息 3 秒内只弹一次
@@ -206,8 +230,6 @@ PluginComponent {
 
     // ---- 错误捕获 ----
     // QML 里函数抛异常时，IPC 调用方拿到的是空字符串，分不清「没返回」
-    // 和「抛了」——排查时极浪费时间（actionById 不存在那次就是）。
-    // 所有对外入口都过 safeCall，异常变成可读的 ERR:... 字符串。
     property string lastError: ""
 
     function safeCall(name, fn) {
@@ -223,7 +245,6 @@ PluginComponent {
 
     // ---- 动作命令执行 ----
     // 所有动作共用一条 Process，忙时排队一条。
-    // 直接改 running 中的 command 会被 Qt 丢掉，用户看到的就是「点了没反应」。
     property var pendingCommand: null
 
     Process {
@@ -271,7 +292,6 @@ PluginComponent {
 
     // 快捷动作分发：内置动作先判，剩下的当自定义动作按 cmd 跑
     // 进透明度面板：记下当前值（「取消」用它还原），然后切模式。
-    // 固定栏走 handleQuick，列表页走 modeChangeRequested，两条路都要这份快照。
     function enterTransparency() {
         root.prevBgOpacity = root.bgOpacity
         root.prevKeyOpacity = root.keyOpacity
@@ -280,7 +300,6 @@ PluginComponent {
 
     // 内置动作的处理函数表：id → 要执行的插件内部逻辑。
     // 新增内置动作只需要在 actions.js 里加一条（带 kind: "builtin"）再加上这里的函数，
-    // 不用再动 UI —— 三个入口都只发 id，执行永远走 handleQuick 这一条路。
     readonly property var builtinHandlers: ({
         "close": function() { root.hideKeyboard() },
         "float": function() { root.toggleFloating() },
@@ -346,8 +365,6 @@ PluginComponent {
 
     // ---- 尺寸设置（设置页可调）----
     // 动作表：kind=builtin 走内部逻辑；dms / compositor / cmd 都执行 cmd 里的完整命令。
-    // label 存英文源串，显示时由卡片过一遍 tr()（用户自定义动作的名字原样返回）
-    // 内置动作表在 actions.js 里（设置页也用同一份）
     readonly property var defaultActions: Actions.defaultActions()
 
     // 用户可配置的动作表（存设置里）
@@ -362,7 +379,6 @@ PluginComponent {
         if (!v || !v.length)
             return root.defaultActions
         // 插件升级后新增的内置动作不会自动出现在老配置里，
-        // 这里补到末尾（hidden: true，不挤进功能页），
         // 否则「设置页看不到、动作表也调不到」
         return Actions.mergeNewBuiltins(root.sanitizeActions(v), root.defaultActions)
     }
@@ -394,9 +410,6 @@ PluginComponent {
     }
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
-    // 表现成「点透明度没反应」，很容易误判成面板本身坏了。
-    // vinput 是**可选**扩展：没装的时候语音动作显示为禁用，
-    // 键盘其它功能完全不受影响。探测一次即可（不装/装了不会在运行中变）。
     property bool voiceAvailable: false
 
     Process {
@@ -410,7 +423,6 @@ PluginComponent {
 
     // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
     // （只有 daemon status，那是服务本身的状态），所以这里记一份乐观状态：
-    // 点一次开始、再点一次停止，键盘关闭时兜底停掉。
     property bool voiceActive: false
 
     // 动作列表 / 固定槽里的麦克风：开始或结束语音输入。
@@ -428,7 +440,6 @@ PluginComponent {
 
     // 语音行右侧的麦克风：按当前显示方式分流
     //   普通模式（全键盘）  → 结束语音输入，语音行一起退掉
-    //   语音模式（只剩语音行）→ 暂停 / 继续，语音行留着
     function voiceMicPressed() {
         if (!root.voiceAvailable)
             return
@@ -478,7 +489,6 @@ PluginComponent {
 
     // VoiceBar 的两个按钮统一调 controller.voiceMicRequested() /
     // controller.voiceMinimalRequested()。主键盘里 controller 是卡片（信号），
-    // 胶囊里 controller 是 daemon，所以这里补同名方法，让两种宿主都能调。
     function voiceMicRequested() {
         root.voiceMicPressed()
     }
@@ -550,14 +560,11 @@ PluginComponent {
             return
         // 先标记再收语音：stopVoice() 内部会调 syncVoiceWindows()，它看到键盘
         // 窗口已经销毁会 showKeyboard() 重建一整套窗口，紧接着又被下面
-        // destroyKeyboards() 拆掉 —— 白建一次、界面上还会闪一下。
-        // minimized 先置 true，syncVoiceWindows 就不会再重建。
         root.minimized = true
         root.stopVoice()
         root.destroyKeyboards()
         // 最小化**仍然算键盘开着**（open 保持 true），所以不能走 open=false：
         // 那会连带触发「关闭」语义。但输入法 UI 不该被一个看不见的键盘占着 ——
-        // shouldConnect 变 false 会让桥断开连接，addon 收到 EOF 就交还 UI。
     }
 
     function restoreFromMinimize() {
@@ -629,7 +636,6 @@ PluginComponent {
 
     // 键盘实际尺寸：由「调整大小」拖出来并保存，默认就是名义尺寸。
     // 原来的 scale 设置项已移除 —— 整体缩放和拖拽调大小是同一件事，
-    // 留两个概念会让人分不清「拖到 80% 再乘 90%」到底多大。
     property real savedW: PluginService.loadPluginData(
         root.pluginId, "keyboardWidth", baseKbWidth)
     property real savedH: PluginService.loadPluginData(
@@ -649,7 +655,6 @@ PluginComponent {
 
     // ---- 调整大小：拖拽中的预览值，确认后写进 savedW/savedH ----
     // 初值必须是**已保存的尺寸**，不能是名义尺寸：键盘可能已被拖成 840×355，
-    // 而名义是 1050×444，用名义值会让预览框一进调整态就跳一大截
     property real resizeW: root.savedW
     property real resizeH: root.savedH
     // 进入调整态时的尺寸，取消要用它还原
@@ -672,12 +677,7 @@ PluginComponent {
         }
         // 先回到键盘主页：从功能列表或表情页点「调整大小」时，
         // 遮罩底下的必须是主键区，否则用户看到的是表情面板。
-        //
-        // 必须写 "page1"，不是 "keys"：page 的合法值是 page1/page2/emoji，
-        // 卡片的 spaceEntry 判据是 `page !== "page1"` 就返回 null。
-        // 写成 "keys" 会让空格上的输入法标识整块消失，而且退出调整态后
-        // page 不会自愈，图标一直不回来。
-        root.page = "page1"
+        root.setPage("page1")
         if (root.activeCard)
             root.activeCard.candListOpen = false
         root.mode = "resize"
@@ -697,9 +697,7 @@ PluginComponent {
         root.resizeOrigH = r.h
     }
 
-    // resizeW/H 的**唯一真相在卡片上**（DragHandler 改的是卡片那份）。
-    // daemon 里曾经也存了一份，结果拖拽改卡片、commit 读 daemon，
-    // 两个值从不同步 —— 松手后尺寸"没变"就是这么来的。
+// 尺寸唯一真相在卡片上；daemon 再存一份会两边不同步
     readonly property var resizeCard: root.activeCard
 
     function commitResize() {
@@ -745,9 +743,7 @@ PluginComponent {
     }
 
     // 设置页改完立刻生效。
-    // 本插件自己保存动作 / 槽 / 快捷栏时也会触发这里，所以逐项比较后再赋值：
     // 值没变就不写，避免 Repeater 被无谓重建（拖动刚结束那一下尤其明显）。
-    // ---- 展开候选：实际在 FcitxBridge 里（addon 一次取完所有页）----
     function selectCandidateByIndex(index) { fcitxBridge.selectCandidate(index) }
 
     function reloadSettings() {
@@ -764,6 +760,9 @@ PluginComponent {
         const nextAvoid = PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
         if (nextAvoid !== root.avoidWindows)
             root.avoidWindows = nextAvoid
+        const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false)
+        if (nextDebugMode !== root.debugModeSetting)
+            root.debugModeSetting = nextDebugMode
         const nextAlwaysPreedit = PluginService.loadPluginData(root.pluginId, "alwaysShowPreedit", false)
         if (nextAlwaysPreedit !== root.alwaysShowPreedit)
             root.alwaysShowPreedit = nextAlwaysPreedit
@@ -774,9 +773,7 @@ PluginComponent {
             if (!root.keyboardVisible)
                 root.floating = nextDefaultFloating
         }
-        // 外观类设置：这些属性都是「构造时读一次」（loadPluginData 不是通知属性），
-        // 不在这里显式重读的话，设置页改完键盘一点反应都没有 —— 要重开才生效。
-        // 踩过：Win 键选「自定义图标」后键盘还是老样子。
+// loadPluginData 不是通知属性，设置页改完必须在这里显式重读
         const nextSpecialKeyStyle = SpecialKeys.normalizeStyle(
             PluginService.loadPluginData(root.pluginId, "specialKeyStyle", "full"))
         if (nextSpecialKeyStyle !== root.specialKeyStyle)
@@ -826,7 +823,6 @@ PluginComponent {
     readonly property bool keyboardVisible:
         // 语音模式下主键盘窗口被销毁（item 为 null），但键盘在用户眼里是开着的。
         // 不算进来的话，状态栏小部件 / ipc toggle 会以为键盘没开、
-        // 反而去 showKeyboard()，永远收不起来。
         root.voiceMinimal || root.minimized
         || (dockedLoader.item && dockedLoader.item.keyboardVisible)
         || (floatingLoader.item && floatingLoader.item.keyboardVisible)
@@ -843,9 +839,7 @@ PluginComponent {
             return
         }
         loader.item.show()
-        // 打开 / 切换停靠↔浮动都回到主键盘页，别停在上次的编辑态或功能页。
-        // ⚠ mode 必须改 daemon 自己的属性：直接写 card.mode 会**打断**
-        // window→card 的绑定，之后 setMode 就再也传不进去了（踩过）
+// 改 mode 要改 daemon 自己的属性：写 card.mode 会打断 window→card 绑定
         root.mode = "keys"
         const card = loader.item.cardRef
         if (card)
@@ -855,9 +849,7 @@ PluginComponent {
         // 打开瞬间先取一次输入法状态，不用等定时器
         root.refreshImState()
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
-        // 会把刚起来的实例又拆掉。
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
-        // 又把自己最小化，圆按钮永远点不开。
         if (restoreLastMode !== false) {
             const lastMode = PluginService.loadPluginData(root.pluginId, "lastMode", "keys")
             if (lastMode === "voice" && root.voiceAvailable)
@@ -868,13 +860,7 @@ PluginComponent {
     }
 
     // 该不该连着 addon（连着它就会接管键盘内 UI）。
-    //
     // 只有最小化该断开：那时只剩一个圆按钮，屏幕上没有任何地方能显示
-    // 候选或预编辑，连着只会让 classicui 被 suspend，用户在输入框里
-    // 打字却一个候选都看不到。
-    //
-    // 语音模式**保持连接**：语音条要用预编辑显示识别文字 ——
-    // vinput 录音时只 setPreedit、从不设候选，断了就没数据。
     readonly property bool shouldConnect: !root.minimized
 
     Component.onCompleted: {
@@ -903,10 +889,7 @@ PluginComponent {
     readonly property var floatingLoaderItem: floatingLoader.item
 
     // 当前活动的键盘卡片（dock / float 两个 LazyLoader 之一）
-    // 两个名字都在：daemon 上是 floating（真实状态，会持久化），
-    // card 上是 isFloating（由窗口传进去，给 actionStates 判断激活态用）。
     // 这里必须读 floating —— 写成 isFloating 会读到 undefined，
-    // 浮动模式下 activeCard 永远是 null，调试 IPC 全失效。
     readonly property var activeCard: {
         const win = root.floating ? floatingLoader.item : dockedLoader.item
         return win ? win.cardRef : null
@@ -959,9 +942,7 @@ PluginComponent {
     function requestImList() {}
 
 
-    // 切中英文：用 rime 自己的 D-Bus 接口。
-    // 不用 ydotool 发 Shift —— 键盘窗口持焦点时那个 Shift 落不到输入框里，
-    // rime 收不到（实测点了没反应）。
+// 切中英走 rime 的 D-Bus：键盘窗口持焦点时 ydotool 发的 Shift 落不到输入框
     function setImAscii(want) {
         root.runCommand(["busctl", "--user", "call",
             "org.fcitx.Fcitx5", "/rime", "org.fcitx.Fcitx.Rime1",
@@ -1004,7 +985,6 @@ PluginComponent {
 
     // 平铺的输入法/子模式列表：地球键循环切换和下拉列表共用同一份数据，
     // 两处各写一套是「点了没反应」「高亮对不上」的常见来源。
-    // 构造逻辑在 data.js 的 buildImRows（有单测覆盖 current 唯一性）。
 
     // 地球键单击：循环到列表里的下一项（不只是换输入法，也覆盖 rime 的中英文态）
     function cycleIm() {
@@ -1050,11 +1030,7 @@ PluginComponent {
         // 乐观显示：中文行（非 ascii）的标签/图标先顶上
         root.optimisticTo(root.imRows.find(r => r.name === name && !r.ascii))
 
-        // 走 fcitx5 官方 D-Bus。
-        // addon 里不能切：fcitx5 的 setCurrentInputMethod / enumerate 在第三方
-        // addon 里（键盘窗口抢占焦点后）调用一律 ABORT，两种 API 都实测崩过。
-        // 所以这里用 Controller1.SetCurrentIM —— 它就是控制台里
-        // `fcitx5-remote -s` 走的同一条路，不受焦点影响。
+// 用 Controller1.SetCurrentIM（同 fcitx5-remote -s）：addon 里调 API 会被 ABORT
         root.runCommand(["busctl", "--user", "call",
             "org.fcitx.Fcitx5", "/controller",
             "org.fcitx.Fcitx.Controller1", "SetCurrentIM", "s", name])
@@ -1277,37 +1253,11 @@ PluginComponent {
             return root.floating ? "INLINE_KEYBOARD_FLOATING" : "INLINE_KEYBOARD_DOCKED"
         }
 
-        function debugCardHeight(): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "INLINE_KEYBOARD_H:-1"
-            // win 的高度才决定 exclusiveZone；card 自己没有 implicitHeight
-            const win = root.floating ? root.floatingLoaderItem
-                                      : root.dockedLoaderItem
-            return "INLINE_KEYBOARD_H:card=" + Math.round(card.height)
-                   + ":win=" + (win ? Math.round(win.implicitHeight) : "-")
-                   + ":zone=" + (win ? Math.round(win.exclusiveZone) : "-")
-                   + ":kbHeight=" + Math.round(root.kbHeight)
-                   + ":page=" + root.page + ":mode=" + root.mode
-        }
 
         function setPage(p: string): string {
             return "INLINE_KEYBOARD_PAGE:" + root.setPage(p)
         }
 
-        // 调试用：表情页的段 / 分类（写的是卡片上的属性，和点分类条效果一致）
-        function setEmojiFilter(segment: string, category: string): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "INLINE_KEYBOARD_EMOJI:no-card"
-            if (segment)
-                card.emojiSegment = segment
-            if (category)
-                card.emojiCategory = category
-            return "INLINE_KEYBOARD_EMOJI:" + card.emojiSegment + ":" + card.emojiCategory
-        }
 
         // 调试用：走和点表情一模一样的上屏通路（addon commit / 剪贴板兜底）
         function typeText(text: string): string {
@@ -1360,22 +1310,7 @@ PluginComponent {
 
 
 
-        // 调试用：模拟按一个普通键（键码），返回所有修饰键状态
-        function pressDebugKey(code: int, sym: string): string {
-            if (!root.devMode) return "dev mode off"
-            // 带键名才会走 socket 直通；不带时退回 ydotool（和真实按键一致）
-            root.handleKey({ k: "char", c: code, l: sym })
-            return root.stateSummary()
-        }
 
-        // 调试：绕过卡片直接走 socket 直通，用来单独验证这条通道
-        function debugDirectKey(sym: string): string {
-            if (!root.devMode) return "dev mode off"
-            const ok = root.sendFcitx("key:" + sym)
-            return "INLINE_KEYBOARD_DIRECT:" + sym + ":sent=" + ok
-                + ":engine=" + (!root.fcitxImKeyboard)
-                + ":combo=" + root.hasComboModifier
-        }
 
         function modifierStates(): string {
             if (!root.devMode) return "dev mode off"
@@ -1390,38 +1325,9 @@ PluginComponent {
             return "INLINE_KEYBOARD_MODIFIER_MODE:" + root.modifierMode
         }
 
-        // 调试用：keys / functions 之间切换
-        // 临时：走用户的真实路径（点动作 → handleQuick → beginResize）
-        // 调试：等价于点语音行右侧的麦克风（走 voiceMicPressed 那条路）
-        function debugVoiceMic(): string {
-            if (!root.devMode) return "dev mode off"
-            root.voiceMicPressed()
-            return "voice=" + (root.voiceActive ? "rec" : "idle")
-                + "/" + (root.voiceMinimal ? "mini" : "full")
-        }
 
-        // 调试：直接切语音模式（等价于点语音行左侧按钮）
-        function debugVoiceMinimal(on: bool): string {
-            if (!root.devMode) return "dev mode off"
-            if (root.voiceMinimal !== on)
-                root.toggleVoiceMinimal()
-            return "minimal=" + root.voiceMinimal + " floating=" + root.floating
-        }
 
-        function debugMinimize(): string {
-            if (!root.devMode) return "dev mode off"
-            root.toggleMinimize()
-            return "min=" + (root.minimized ? 1 : 0) + " open=" + root.open
-        }
 
-        function debugQuickAction(id: string): string {
-            if (!root.devMode) return "dev mode off"
-            root.handleQuick(id)
-            const card = root.activeCard
-            return "mode=" + (card ? card.mode : "-")
-                + " page=" + (card ? card.page : "-")
-                + " listOpen=" + (card ? card.candListOpen : "-")
-        }
 
         function setMode(m: string): string {
             if (!root.devMode) return "dev mode off"
@@ -1446,34 +1352,8 @@ PluginComponent {
             return "INLINE_KEYBOARD_EDITING:" + v
         }
 
-        // 调试用：模拟「把列表第 index 个动作拖到卡片坐标 (x,y)」，
-        // 用来在没有人手的情况下检查拖动预览（幽灵块 / 让位 / 挤出）
-        function debugDrag(index: int, x: real, y: real): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "INLINE_KEYBOARD_NO_CARD"
-            const list = card.availableActions || []
-            if (index < 0 || index >= list.length)
-                return "INLINE_KEYBOARD_BAD_INDEX"
-            card.dragOwner = "cell:" + index
-            card.dragFrom = ""
-            card.dragIndex = index
-            card.dragFromIndex = -1
-            card.dragActive = true
-            card.ghostAction = list[index]
-            card.ghostX = x
-            card.ghostY = y
-            card.updateTargetFromGhost()
-            card.updateDropTargets()
-            return "INLINE_KEYBOARD_DRAG:" + list[index].id
-                   + ":barIndex=" + card.dragBarIndex
-                   + ":listIndex=" + card.dragTarget
-        }
 
         // 调试用：一次导出卡片 / daemon 的关键数组长度，定位「该显示的不显示」类问题
-        // 一行诊断串。排查键盘问题时这是第一个该看的东西：
-        // socket / 输入法 / 候选数 / 预编辑 / ydotool / 修饰键状态。
         // 注意不能用可选链 ?. —— QML 的 JS 引擎不支持，整个文件会语法错误。
         function diag(): string {
             const parts = []
@@ -1510,14 +1390,15 @@ PluginComponent {
                           ? (root.activeCard.children.length > 0 ? "?" : "?") : "-"))
             parts.push("cand=" + root.fcitxCandidates.length
                        + " dbg=" + root.debugCandItems.length
-                       + " all=" + root.allCandidates.length)
+                       + " all=" + root.allCandidates.length
+                       + " bar=" + (root.activeCard ? root.activeCard.candBarItems.length : -1)
+                       + " list=" + (root.activeCard ? root.activeCard.candListItems.length : -1))
             parts.push("preedit=" + JSON.stringify(root.fcitxPreedit))
             parts.push("ydotoold=" + root.ydotooldUp)
             parts.push("winKey=" + root.winKeyStyle + "/"
                        + (root.winKeyCustomIcon !== "" ? root.winKeyCustomIcon : "-")
                        + " special=" + root.specialKeyStyle)
-            // 卡片实际收到的值：daemon → 窗口 → 卡片这条链断一次就白搭
-            // （踩过：窗口声明了 winKeyCustomIcon 却没传给 KeyboardCard）
+// daemon → 窗口 → 卡片这条链断一次，属性就传不到
             parts.push("cardWin=" + (root.activeCard
                        ? (root.activeCard.winKeyStyle + "/"
                           + (root.activeCard.winKeyCustomIcon || "-")) : "-"))
@@ -1531,205 +1412,35 @@ PluginComponent {
             return parts.join(" | ")
         }
 
-        // dms ipc call inlineKeyboard debugCand "一,二,三" 注入假候选；空串清除
-        // 参数必须标类型：不标会被推断成 QVariant，DMS 的 IPC
-        // 直接拒收（Error parsing function "debugCand": Type of argument 1
-        // (csv: QVariant) cannot be used across IPC）。
-        function debugCand(csv: string): string {
-            if (!root.devMode) return "dev mode off"
-            const text = String(csv || "")
-            root.debugCandItems = text === ""
-                ? [] : text.split(",").map(s => s.trim()).filter(s => s !== "")
-            return root.debugCandItems.length + " 项"
-        }
-
-        // dms ipc call inlineKeyboard debugCandList   切换候选列表页
-        function debugCandList(): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "no-card"
-            const before = card.candListOpen
-            card.toggleCandList()
-            const after = card.candListOpen
-            return "before=" + before + " after=" + after
-                + " model=" + card.candListModel.length
-                + " bar=" + card.candBarItems.length
-                + " n=" + card.candBarCount
-                + " list=" + card.candListItems.length
-                + " barFirst=" + (card.candBarItems.length > 0
-                                  ? card.candBarItems[0].t : "-")
-                + " listFirst=" + (card.candListItems.length > 0
-                                   ? card.candListItems[0].t : "-")
-        }
-
-        // 临时：验证候选列表页右侧按钮（滚动 / 退格 / 回车）
-        function debugSideButton(act: string): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "no-card"
-            const panel = card.candListPanel
-            if (!panel)
-                return "no-panel"
-            if (act === "up" || act === "down") {
-                const before = panel.contentYOf()
-                panel.scrollBy(act === "up" ? -1 : 1)
-                return "act=" + act + " y=" + Math.round(before)
-                    + " -> " + Math.round(panel.contentYOf())
-            }
-            if (act === "backspace") {
-                card.keyPressed({ k: "key", l: "Backspace", c: 14 })
-                return "act=backspace sent"
-            }
-            if (act === "enter") {
-                card.keyPressed({ k: "key", l: "Enter", c: 28 })
-                return "act=enter sent"
-            }
-            return "unknown:" + act
-        }
-
-        function debugPanel(): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "no-card"
-            const panel = card.candListPanel
-            if (!panel)
-                return "no-panel open=" + card.candListOpen
-            return "open=" + card.candListOpen
-                + " slice=" + card.candListSlice.length
-                + " items=" + panel.items.length
-                + " contentH=" + Math.round(panel.contentH)
-                + " w=" + Math.round(panel.width)
-                + " listW=" + Math.round(panel.listW)
-                + " active=" + panel.active
-        }
-
-        function debugRows(): string {
-            if (!root.devMode) return "dev mode off"
-            let out = ["im=" + root.fcitxImName,
-                       "ascii=" + root.imAsciiMode,
-                       "list=" + root.imList.length,
-                       "rows=" + root.imRows.length]
-            for (let i = 0; i < root.imRows.length; i++) {
-                const r = root.imRows[i]
-                out.push("  [" + i + "] " + r.name
-                    + " ascii=" + r.ascii
-                    + " kb=" + r.keyboard
-                    + " cur=" + r.current
-                    + " label=" + r.label
-                    + " text=" + r.text)
-            }
-            return out.join("\n")
-        }
-
-        function debugCycleIm(): string {
-            if (!root.devMode) return "dev mode off"
-            root.cycleIm()
-            return "im=" + root.fcitxImName
-                + " rows=" + root.imRows.length
-                + " list=" + root.imList.length
-        }
 
 
-        // 调试用：直接走 handleQuick 执行一次动作（验证自定义动作的命令链路）
-        // 调试：直接把一次按键交给 handleKey（模拟点键盘）
-        function debugKey(kind: string, to: string): string {
-            if (!root.devMode) return "dev mode off"
-            root.handleKey({ k: kind, to: to })
-            return "INLINE_KEYBOARD_KEY:" + kind + ":to=" + to + ":page=" + root.page
-        }
 
-        // 调试：直接注入一个键码（不经过卡片，方便无触摸屏验证输入后端）
-        function debugType(code: string): string {
-            if (!root.devMode) return "dev mode off"
-            root.injectKey(Number(code))
-            return "INLINE_KEYBOARD_TYPE:" + code + ":ydotoold=" + (root.ydotooldUp ? "up" : "down")
-        }
 
-        function debugRunAction(id: string): string {
-            if (!root.devMode) return "dev mode off"
-            const action = root.actionById(id)
-            if (!action)
-                return "INLINE_KEYBOARD_NO_ACTION:" + id
-            root.handleQuick(id)
-            return "INLINE_KEYBOARD_RAN:" + id + ":cmd=" + (action.cmd || "")
-        }
 
-        // 调试用：写一个带命令的自定义动作（用于验证 cmd 链路）
-        function debugAddCommandAction(label: string, icon: string, cmd: string): string {
-            if (!root.devMode) return "dev mode off"
-            const list = Actions.toArray(root.actions).slice()
-            list.push({
-                id: "u" + Date.now(),
-                label: label,
-                icon: icon || "bolt",
-                cmd: cmd || "",
-                hidden: false,
-                builtin: false
-            })
-            root.actions = list
-            root.saveOrder(list)
-            return "INLINE_KEYBOARD_ADDED:" + label
-        }
 
-        // 调试用：生成 count 个占位动作（测滚动、容量、拖放用）。
-        // 同时清空固定栏和槽，避免它们指向已经不存在的 id。
-        function debugSetActions(count: int): string {
-            if (!root.devMode) return "dev mode off"
-            const icons = ["label", "star", "circle", "square", "flag",
-                           "bookmark", "bolt", "eco", "face", "cake"]
-            const list = []
-            for (let i = 0; i < count; i++) {
-                list.push({
-                    id: "p" + (i + 1),
-                    label: "Placeholder " + (i + 1),
-                    icon: icons[i % icons.length]
-                })
-            }
-            root.actions = list
-            root.saveOrder(list)
-            root.quickBarActions = []
-            root.saveQuickBar([])
-            root.slotActionId = ""
-            root.saveSlot("")
-            return "INLINE_KEYBOARD_ACTIONS:" + list.length
-        }
 
-        // 调试用：模拟「从固定栏第 index 个动作拖到卡片坐标 (x,y)」
-        function debugDragFromBar(index: int, x: real, y: real): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "INLINE_KEYBOARD_NO_CARD"
-            const bar = card.quickBarActions || []
-            if (index < 0 || index >= bar.length)
-                return "INLINE_KEYBOARD_BAD_INDEX:" + bar.length
-            card.dragOwner = "bar:" + index
-            card.dragFrom = "bar"
-            card.dragFromIndex = index
-            card.dragIndex = -1
-            card.dragActive = true
-            card.ghostAction = bar[index]
-            card.ghostX = x
-            card.ghostY = y
-            card.updateTargetFromGhost()
-            card.updateDropTargets()
-            return "INLINE_KEYBOARD_DRAG_FROM_BAR:" + bar[index].id
-                   + ":barIndex=" + card.dragBarIndex
-                   + ":listIndex=" + card.dragTarget
-        }
 
-        // 调试用：结束上面模拟的拖动（走真实落盘路径）
-        function debugDrop(): string {
-            if (!root.devMode) return "dev mode off"
-            const card = root.activeCard
-            if (!card)
-                return "INLINE_KEYBOARD_NO_CARD"
-            card.endDrag()
-            return "INLINE_KEYBOARD_DROPPED"
-        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // 调试用：直接设置固定栏动作（逗号分隔的动作 id），验证编辑态视觉用
         function setQuickBar(ids: string): string {
@@ -1748,5 +1459,152 @@ PluginComponent {
             root.saveQuickBar(bar)
             return "INLINE_KEYBOARD_QUICKBAR:" + bar.map(a => a.id).join(",")
         }
+
+        // ---- 调试 / 测试入口（实现见 DebugIpc.qml，调试模式关着时统一返回 dev mode off）----
+
+        function debugCardHeight(): string {
+            return root.debugIpc("debugCardHeight", [])
+        }
+
+        function setEmojiFilter(segment: string, category: string): string {
+            return root.debugIpc("setEmojiFilter", [segment, category])
+        }
+
+        function pressDebugKey(code: int, sym: string): string {
+            return root.debugIpc("pressDebugKey", [code, sym])
+        }
+
+        function debugDirectKey(sym: string): string {
+            return root.debugIpc("debugDirectKey", [sym])
+        }
+
+        function debugVoiceMic(): string {
+            return root.debugIpc("debugVoiceMic", [])
+        }
+
+        function debugVoiceMinimal(on: bool): string {
+            return root.debugIpc("debugVoiceMinimal", [on])
+        }
+
+        function debugMinimize(): string {
+            return root.debugIpc("debugMinimize", [])
+        }
+
+        function debugQuickAction(id: string): string {
+            return root.debugIpc("debugQuickAction", [id])
+        }
+
+        function debugDrag(index: int, x: int, y: int): string {
+            return root.debugIpc("debugDrag", [index, x, y])
+        }
+
+        function debugCand(csv: string): string {
+            return root.debugIpc("debugCand", [csv])
+        }
+
+        function debugCandList(): string {
+            return root.debugIpc("debugCandList", [])
+        }
+
+        function debugSideButton(act: string): string {
+            return root.debugIpc("debugSideButton", [act])
+        }
+
+        function debugPanel(): string {
+            return root.debugIpc("debugPanel", [])
+        }
+
+        function debugRows(): string {
+            return root.debugIpc("debugRows", [])
+        }
+
+        function debugCycleIm(): string {
+            return root.debugIpc("debugCycleIm", [])
+        }
+
+        function debugKey(kind: string, to: string): string {
+            return root.debugIpc("debugKey", [kind, to])
+        }
+
+        function debugSetDryRun(on: bool): string {
+            return root.debugIpc("debugSetDryRun", [on])
+        }
+
+        function debugInjected(): string {
+            return root.debugIpc("debugInjected", [])
+        }
+
+        function debugClearInjected(): string {
+            return root.debugIpc("debugClearInjected", [])
+        }
+
+
+
+
+
+
+
+
+
+        function debugGeometry(): string {
+            return root.debugIpc("debugGeometry", [])
+        }
+
+        function debugSetSize(w: int, h: int): string {
+            return root.debugIpc("debugSetSize", [w, h])
+        }
+
+        function debugSetOpacity(bg: int, key: int): string {
+            return root.debugIpc("debugSetOpacity", [bg, key])
+        }
+
+        function debugSetPosition(x: int, y: int): string {
+            return root.debugIpc("debugSetPosition", [x, y])
+        }
+
+
+        function debugType(code: string): string {
+            return root.debugIpc("debugType", [code])
+        }
+
+        function debugSetActions(count: int): string {
+            return root.debugIpc("debugSetActions", [count])
+        }
+
+        function debugDragFromBar(index: int, x: int, y: int): string {
+            return root.debugIpc("debugDragFromBar", [index, x, y])
+        }
+
+        function debugDrop(): string {
+            return root.debugIpc("debugDrop", [])
+        }
+        function debugTap(target: string, a: string, b: int): string {
+            return root.debugIpc("debugTap", [target, a, b])
+        }
+        function debugKeyList(): string {
+            return root.debugIpc("debugKeyList", [])
+        }
+        function debugSetSetting(key: string, value: string): string {
+            return root.debugIpc("debugSetSetting", [key, value])
+        }
+    }
+
+
+    // 调试实现的入口：DebugIpc.qml 只在调试模式打开时实例化，关着的时候这些转发无实体可调。
+    function debugIpc(method, args) {
+        const ipc = debugLoader.item
+        if (!ipc)
+            return "dev mode off"
+        const fn = ipc[method]
+        return typeof fn === "function" ? fn.apply(ipc, args) : "dev mode off"
+    }
+
+    Loader {
+        id: debugLoader
+        active: root.devMode
+        source: "DebugIpc.qml"
+
+        onLoaded: if (item)
+            item.controller = root
     }
 }
