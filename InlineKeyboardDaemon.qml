@@ -77,7 +77,6 @@ PluginComponent {
     }
     // keys = 正常键盘 / functions = 快捷功能列表（顶部四格按钮切换）
     property string mode: "keys"
-    // 动作列表编辑态
     property bool editing: false
 
     // ---- 修饰键状态（实际存在 KeyRouter 里，这里 alias 给卡片和设置页用）----
@@ -1099,8 +1098,6 @@ PluginComponent {
             mode: root.mode
             editing: root.editing
             imList: root.imList
-            // addon 给了图标路径就直接用（内嵌状态没有托盘图标可用），
-            // 否则才看托盘抓图是否成功
             onQuickBarChanged: list => root.saveQuickBar(list)
             onOrderChanged: list => root.saveOrder(list)
             onSlotChanged: actionId => root.saveSlot(actionId)
@@ -1183,9 +1180,6 @@ PluginComponent {
             slotActionId: root.slotActionId
             quickBarActions: root.quickBarActions
             imList: root.imList
-            // addon 给了图标路径就直接用（内嵌状态没有托盘图标可用），
-            // 否则才看托盘抓图是否成功
-
             onQuickBarChanged: list => root.saveQuickBar(list)
             onOrderChanged: list => root.saveOrder(list)
             onSlotChanged: actionId => root.saveSlot(actionId)

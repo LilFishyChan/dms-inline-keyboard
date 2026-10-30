@@ -88,8 +88,6 @@ Item {
             enabled: controller ? controller.animateCells : true
             NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
         }
-        // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
-        // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
         Behavior on x {
             enabled: controller ? controller.animateCells : true
             NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
