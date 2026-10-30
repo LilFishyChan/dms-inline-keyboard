@@ -64,8 +64,6 @@ PanelWindow {
     // 用户设置的键盘名义宽高（逻辑像素），按键尺寸由它们推导
     property real kbWidth: 1050
     property real kbHeight: 444
-    property real gap: 6
-    property real candH: 44
     // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
     // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
     property bool showCandBar:
@@ -100,8 +98,6 @@ PanelWindow {
         id: metrics
         kbWidth: root.kbWidth
         kbHeight: root.kbHeight
-        gap: root.gap
-        candH: root.candH
         showCandBar: root.showCandBar
         screenW: root.screen ? root.screen.width : 1280
         screenH: root.screen ? root.screen.height : 800
@@ -137,19 +133,19 @@ PanelWindow {
 // 只包住键盘本体：铺满整屏会让 exclusiveZone 失效（避让和全屏不可兼得）
     implicitWidth: metrics.screenW
     // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
-    // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），
-    readonly property real preeditReserve: Math.round(root.candH * 0.95)
+    // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），不会把键盘顶上去。
+    readonly property real preeditReserve: Math.round(metrics.candH * 0.95)
     implicitHeight: metrics.cardHeight + preeditReserve
 
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
-    // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），
+    // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），它占的高度是实打实的。
     WlrLayershell.layer: WlrLayer.Overlay
     // 键盘自己不发按键（由 ydotool 注入），绝不能抢焦点
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。
-    // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，
+    // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，下面所有应用都点不到。
     mask: Region {
         x: Math.round(card.x)
         y: Math.max(0, Math.round(card.y - root.preeditReserve))
@@ -173,9 +169,10 @@ PanelWindow {
 
         unit: metrics.unit
         keyH: metrics.keyH
-        gap: root.gap
+        gap: metrics.gap
         pad: metrics.pad
-        candH: root.candH
+        candH: metrics.candH
+        designScale: metrics.uiScale
         showCandBar: root.showCandBar
         debugCandItems: root.debugCandItems
         allCandidates: root.allCandidates

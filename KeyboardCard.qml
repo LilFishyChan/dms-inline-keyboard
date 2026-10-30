@@ -16,6 +16,19 @@ import qs.DCommon.Widgets
 Rectangle {
     id: root
 
+    // 打开时淡入：只动 opacity，不动几何（layer-shell 改尺寸会抖）
+    readonly property bool hostVisible: root.Window.window ? root.Window.window.visible : true
+
+    opacity: hostVisible ? 1 : 0
+
+    Behavior on opacity {
+        NumberAnimation {
+            duration: Motion.fade
+            easing.type: Easing.OutCubic
+        }
+    }
+
+
     // 尺寸（由窗口按屏幕宽度/用户设置算好后传进来）
     property real unit: 63
     property real keyH: 64
@@ -1123,17 +1136,38 @@ Rectangle {
                 anchors.fill: parent
                 // resize 模式下键区要留着：遮罩半透明盖在上面，
                 // 底下必须是真实的键盘主页面
-                visible: (root.mode === "keys" || root.mode === "resize")
-                         && root.page !== "emoji"
-                         && !root.candListOpen
+                // 面板切换走交叉淡入：visible 跟着 opacity 走，否则动画看不到；
+                // 淡出那一半不接点击，避免和新面板抢输入
+                readonly property bool shown: (root.mode === "keys" || root.mode === "resize")
+                                              && root.page !== "emoji" && !root.candListOpen
+                visible: opacity > 0.01
+                opacity: shown ? 1 : 0
+                enabled: shown && opacity > 0.5
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
             }
 
             // ---- 表情 / 符号页 ----
             EmojiPanel {
                 controller: root
                 anchors.fill: parent
-                visible: root.mode === "keys" && root.page === "emoji"
-                         && !root.candListOpen
+                readonly property bool shown: root.mode === "keys" && root.page === "emoji"
+                                              && !root.candListOpen
+                visible: opacity > 0.01
+                opacity: shown ? 1 : 0
+                enabled: shown && opacity > 0.5
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
             }
 
             // ---- 透明度调整面板 ----
@@ -1141,7 +1175,17 @@ Rectangle {
                 id: transparencyArea
                 controller: root
                 anchors.fill: parent
-                visible: root.mode === "transparency"
+                readonly property bool shown: root.mode === "transparency"
+                visible: opacity > 0.01
+                opacity: shown ? 1 : 0
+                enabled: shown && opacity > 0.5
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
             }
 
             // ---- 快捷功能列表 ----
@@ -1149,7 +1193,17 @@ Rectangle {
                 id: functionsArea
                 controller: root
                 anchors.fill: parent
-                visible: root.mode === "functions"
+                readonly property bool shown: root.mode === "functions"
+                visible: opacity > 0.01
+                opacity: shown ? 1 : 0
+                enabled: shown && opacity > 0.5
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
             }
         }
 

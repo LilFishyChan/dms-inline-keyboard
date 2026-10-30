@@ -156,8 +156,8 @@ test("resize: normalizeSize 对缺省/非法值回落到名义尺寸", () => {
 
 test("resize: normalizeSize 的下限也有 80% 保护", () => {
     const got = R.normalizeSize({ w: 1, h: 1 }, 1050, 444, 1920, 1080, 1);
-    assert.equal(got.w, 840, "1050 * 0.8");
-    assert.equal(got.h, Math.round(444 * 0.8));
+    assert.equal(got.w, Math.round(1050 * R.MIN_FACTOR), "1050 * MIN_FACTOR");
+    assert.equal(got.h, Math.round(444 * R.MIN_FACTOR));
 });
 
 test("planResize: 纵向只动被拖的那条边（没有对称模式）", () => {

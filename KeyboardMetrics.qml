@@ -14,13 +14,25 @@ QtObject {
     readonly property real handleRatio: 0.75
     readonly property int keyRowCount: Layout.pageRows("page1").length
 
+    // ---- 写死像素值的统一缩放 ----
+    // 840 宽时 uiScale = 1，下面 base 值就是原值；键盘拖小/放大时等比跟着变。
+    // 不缩放的话，candH 44 在 222 高的键盘上要占 20%（正常只有 10%），
+    // gap 6×6 个间隙在 525 宽上也要吃掉 7%。
+    readonly property real designW: 840
+    readonly property real uiScale: Math.max(0.5, Math.min(1.6, root.cardW / root.designW))
+
     // ---- 输入（窗口绑定，或用户设置换算后的名义值）----
     property real kbWidth: 1050
     property real kbHeight: 444
-    property real gap: 6
-    property real pad: 8
-    property real candH: 44
+    // 基准值（840 宽时生效），实际用的是下面三个 readonly 的缩放结果
+    property real gapBase: 6
+    property real padBase: 8
+    property real candHBase: 44
     property real screenH: 800
+
+    readonly property real gap: Math.round(root.gapBase * root.uiScale)
+    readonly property real pad: Math.round(root.padBase * root.uiScale)
+    readonly property real candH: Math.round(root.candHBase * root.uiScale)
 
     property bool showCandBar: false
     property real screenW: 1280

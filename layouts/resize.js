@@ -93,10 +93,15 @@ function resetSize(baseW, baseH, minW, minH) {
 }
 
 // 把设置里存的尺寸夹进当前允许的范围（屏幕旋转、缩放改了之后要用）
+// 最小尺寸 = 名义尺寸 × 这个系数（1050×444 → 最小 525×222）。
+// 拖拽（planResize 的 minW/minH）和代码设置（normalizeSize）都引这一个值，
+// 否则两条路径的下限会走偏。
+const MIN_FACTOR = 0.5;
+
 function normalizeSize(stored, baseW, baseH, maxW, maxH, factor) {
     const k = factor > 0 ? factor : 1;
-    const minW = baseW * 0.8;
-    const minH = baseH * 0.8;
+    const minW = baseW * MIN_FACTOR;
+    const minH = baseH * MIN_FACTOR;
     // 存的是「拖拽结果」，乘上缩放后不能超出屏幕 → 上限要除以缩放
     const limitW = maxW / k;
     const limitH = maxH / k;
@@ -117,6 +122,7 @@ if (typeof module !== "undefined" && module.exports) {
         clamp: clamp,
         planResize: planResize,
         resetSize: resetSize,
+        MIN_FACTOR: MIN_FACTOR,
         normalizeSize: normalizeSize
     };
 }

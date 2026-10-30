@@ -14,8 +14,6 @@ PanelWindow {
     property bool keyboardVisible: false
     property real kbWidth: 1050
     property real kbHeight: 444
-    property real gap: 6
-    property real candH: 44
     // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
     // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
     property bool showCandBar:
@@ -120,8 +118,6 @@ PanelWindow {
         id: metrics
         kbWidth: root.kbWidth
         kbHeight: root.kbHeight
-        gap: root.gap
-        candH: root.candH
         showCandBar: root.showCandBar
         screenW: root.screen ? root.screen.width : 1280
         screenH: root.screen ? root.screen.height : 800
@@ -169,7 +165,7 @@ PanelWindow {
 
     implicitWidth: metrics.screenW
     implicitHeight: metrics.screenH
-    readonly property real preeditReserve: Math.round(root.candH * 0.95)
+    readonly property real preeditReserve: Math.round(metrics.candH * 0.95)
     // 卡片位置在这里统一算，mask 和卡片本体共用。
     // mask 声明在 card 之前，直接读 card.x/card.y 会拿到 undefined（输入区变 0、点不动）
     readonly property real cardX: Math.round(Math.max(0, root.posX))
@@ -179,7 +175,7 @@ PanelWindow {
 
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:floating"
     // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
-    // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），
+    // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），所以它确实会把下面的内容顶起来。
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     // 关键：不参与独占区计算，否则会一直被 DMS 条栏的 exclusive zone 推开，
@@ -196,7 +192,7 @@ PanelWindow {
         width: root.visible ? Math.round(card.width) : 0
         height: root.visible ? Math.round(cardY + card.height - preeditTop) : 0
         // 注意：resize 拖动中卡片尺寸并不会变（卡片宽高由 metrics 算，而 metrics
-        // 的输入是 daemon 的 savedW/H，松手落盘后才更新），所以拖动中 mask 也不变，
+        // 的输入是 daemon 的 savedW/H，松手落盘后才更新），所以拖动中 mask 也不变，不用跟着重算。
     }
 
     // 供外部（daemon 的调试 IPC）访问卡片状态
@@ -216,9 +212,10 @@ PanelWindow {
 
         unit: metrics.unit
         keyH: metrics.keyH
-        gap: root.gap
+        gap: metrics.gap
         pad: metrics.pad
-        candH: root.candH
+        candH: metrics.candH
+        designScale: metrics.uiScale
         showCandBar: root.showCandBar
         debugCandItems: root.debugCandItems
         allCandidates: root.allCandidates
