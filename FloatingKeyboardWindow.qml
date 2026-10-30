@@ -100,8 +100,21 @@ PanelWindow {
     signal textCommitRequested(string text)
 
     // 窗口左上角位置（拖动把手时更新）
+    property var controller: null
     property real posX: 100
     property real posY: 100
+
+    // 拖动中每帧都在改位置，停手再写盘
+    Timer {
+        id: posSaveTimer
+        interval: 400
+        onTriggered: {
+            if (root.controller)
+                root.controller.saveFloatPosition(root.posX, root.posY)
+        }
+    }
+    onPosXChanged: posSaveTimer.restart()
+    onPosYChanged: posSaveTimer.restart()
     // 拖动开始时的位置（translation 是累计位移，必须基于起点算，不能拿当前值累加）
     property real dragStartX: 0
     property real dragStartY: 0
@@ -125,8 +138,17 @@ PanelWindow {
     function show() {
         keyboardVisible = true
         if (!posInitialized) {
-            posX = Math.max(0, (metrics.screenW - metrics.cardW) / 2)
-            posY = Math.max(0, metrics.screenH - root.kbHeight - 120)
+            // 上次拖到的位置；没记录过就用默认（居中、距底 120）
+            const sx = root.controller ? root.controller.floatPosX : -1
+            const sy = root.controller ? root.controller.floatPosY : -1
+            if (sx >= 0 && sy >= 0) {
+                // 记下的位置可能来自别的分辨率，先夹回屏幕内再摆
+                posX = Math.max(0, Math.min(metrics.screenW - metrics.cardW, sx))
+                posY = Math.max(0, Math.min(metrics.screenH - root.kbHeight, sy))
+            } else {
+                posX = Math.max(0, (metrics.screenW - metrics.cardW) / 2)
+                posY = Math.max(0, metrics.screenH - root.kbHeight - 120)
+            }
             posInitialized = true
         }
     }

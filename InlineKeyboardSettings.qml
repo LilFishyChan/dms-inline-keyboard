@@ -501,6 +501,13 @@ PluginSettings {
     }
 
     ToggleSetting {
+        settingKey: "alwaysShowPreedit"
+        label: root.tr("Always show the preedit in the keyboard")
+        description: root.tr("Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.")
+        defaultValue: false
+    }
+
+    ToggleSetting {
         settingKey: "defaultFloating"
         label: root.tr("Use the floating keyboard by default")
         description: root.tr("Off opens the docked keyboard.")

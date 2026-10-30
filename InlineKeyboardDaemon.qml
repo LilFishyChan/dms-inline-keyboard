@@ -126,11 +126,13 @@ PluginComponent {
     readonly property var imRows: fcitxBridge.imRows
     readonly property alias imAsciiMode: fcitxBridge.isAsciiMode
 
+    // 键盘内始终显示预编辑（不因应用自己渲染了 preedit 就隐藏）
+    property bool alwaysShowPreedit: PluginService.loadPluginData(root.pluginId, "alwaysShowPreedit", false)
+
     // 预编辑是否由应用自己画（fcitx5 的 clientPreedit 非空）。
-    // 为 true 时输入框里已经有拼音串了，键盘不要再重复显示。
-    // 预编辑去重的实现先撤了：属性保留给 UI 引用，值恒 false，
-    // 键盘照常画自己的预编辑行。
-    readonly property bool fcitxPreeditEmbedded: fcitxBridge.preeditEmbedded
+    // 应用自己把拼音串画进输入框时（embedded），键盘就不再重复显示。
+    // alwaysShowPreedit 打开则无视这个判断，键盘内始终画一行。
+    readonly property bool fcitxPreeditEmbedded: !root.alwaysShowPreedit && fcitxBridge.preeditEmbedded
     // 全量候选（候选列表页用）
     readonly property var allCandidates: fcitxBridge.allCandidates
     readonly property int candRevision: fcitxBridge.candRevision
@@ -293,7 +295,7 @@ PluginComponent {
             root.mode = "keys"
             root.toggleVoice()
         },
-        "minimize": function() { root.minimizeKeyboard() },
+        "minimize": function() { root.toggleMinimize() },
         "size": function() { root.beginResize() },
         "opacity": function() { root.enterTransparency() },
         "avoid": function() {
@@ -444,6 +446,22 @@ PluginComponent {
     // 小圆按钮的位置（距右/下边缘的像素；-1 = 还没拖过，由窗口用默认边距）
     property real miniPosRight: PluginService.loadPluginData(root.pluginId, "miniPosRight", -1)
     property real miniPosBottom: PluginService.loadPluginData(root.pluginId, "miniPosBottom", -1)
+    // 浮动键盘的位置（-1 = 还没拖过，由窗口按默认位置摆）
+    property real floatPosX: PluginService.loadPluginData(root.pluginId, "floatPosX", -1)
+    property real floatPosY: PluginService.loadPluginData(root.pluginId, "floatPosY", -1)
+
+    /** 浮动键盘拖完落盘：下次浮动打开回到同一位置。 */
+    function saveFloatPosition(x, y) {
+        // 先取局部值再存：第一次 save 会触发 pluginDataChanged → reloadSettings，
+        // 第二次读到的东西可能已经被改过了
+        const px = Math.round(x)
+        const py = Math.round(y)
+        root.floatPosX = px
+        root.floatPosY = py
+        root.lastSelfSaveAt = Date.now()
+        PluginService.savePluginData(root.pluginId, "floatPosX", px)
+        PluginService.savePluginData(root.pluginId, "floatPosY", py)
+    }
 
     /** 小圆按钮拖完落盘：下次最小化回到同一个地方。 */
     function saveMiniPos(right, bottom) {
@@ -547,7 +565,7 @@ PluginComponent {
             return
         root.minimized = false
         // showKeyboard 会把 open 置 true，onMinimizedChanged 重新 touch flag
-        root.showKeyboard()
+        root.showKeyboard(false)
     }
 
     function toggleMinimize() {
@@ -714,10 +732,10 @@ PluginComponent {
             const want = PluginService.getGlobalVar(root.pluginId, "open", false)
             if (want && !root.keyboardVisible)
                 root.showKeyboard()
-            else if (!want && root.keyboardVisible && !root.minimized)
+            else if (!want && root.keyboardVisible)
+                // 最小化状态也要彻底关掉：hideKeyboard 会清掉 minimized，
+                // 浮窗跟着消失，而不是留一个恢复按钮在屏幕上
                 root.hideKeyboard()
-            // 最小化时不走 hideKeyboard：它会清掉 minimized，
-            // 而且 UI 交还已经由 open=false 那条链路完成了
         }
         function onPluginDataChanged(pluginId) {
             if (pluginId !== root.pluginId)
@@ -746,6 +764,9 @@ PluginComponent {
         const nextAvoid = PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
         if (nextAvoid !== root.avoidWindows)
             root.avoidWindows = nextAvoid
+        const nextAlwaysPreedit = PluginService.loadPluginData(root.pluginId, "alwaysShowPreedit", false)
+        if (nextAlwaysPreedit !== root.alwaysShowPreedit)
+            root.alwaysShowPreedit = nextAlwaysPreedit
         const nextDefaultFloating = PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
         if (nextDefaultFloating !== root.defaultFloating) {
             root.defaultFloating = nextDefaultFloating
@@ -810,7 +831,7 @@ PluginComponent {
         || (dockedLoader.item && dockedLoader.item.keyboardVisible)
         || (floatingLoader.item && floatingLoader.item.keyboardVisible)
 
-    function showKeyboard() {
+    function showKeyboard(restoreLastMode) {
         // 从最小化恢复（或任何途径打开键盘）都要退出最小化，
         // 否则小圆按钮会和键盘同时在场
         root.minimized = false
@@ -833,6 +854,17 @@ PluginComponent {
         PluginService.setGlobalVar(root.pluginId, "open", true)
         // 打开瞬间先取一次输入法状态，不用等定时器
         root.refreshImState()
+        // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
+        // 会把刚起来的实例又拆掉。
+        // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
+        // 又把自己最小化，圆按钮永远点不开。
+        if (restoreLastMode !== false) {
+            const lastMode = PluginService.loadPluginData(root.pluginId, "lastMode", "keys")
+            if (lastMode === "voice" && root.voiceAvailable)
+                Qt.callLater(root.toggleVoice)
+            else if (lastMode === "minimized")
+                Qt.callLater(root.minimizeKeyboard)
+        }
     }
 
     // ---- 键盘开关 ↔ addon 的 flag 文件 ----
@@ -872,6 +904,10 @@ PluginComponent {
     }
 
     function hideKeyboard() {
+        // 先记下关闭时是哪种形态，下次打开接着用（此时还没清理状态）
+        const lastMode = root.minimized ? "minimized" : (root.voiceActive ? "voice" : "keys")
+        root.lastSelfSaveAt = Date.now()
+        PluginService.savePluginData(root.pluginId, "lastMode", lastMode)
         // 键盘关掉就别让麦克风继续录
         root.stopVoice()
         root.minimized = false
@@ -1144,6 +1180,7 @@ PluginComponent {
         active: false
 
         FloatingKeyboardWindow {
+            controller: root
             kbWidth: root.kbWidth
             kbHeight: root.kbHeight
             fnActive: root.fnActive

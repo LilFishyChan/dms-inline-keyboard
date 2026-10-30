@@ -15,6 +15,8 @@
     "Hide the touch keyboard as soon as you type on a real keyboard.": "在实体键盘上打字时自动把触摸键盘收起来。",
     "Avoid windows when docked": "停靠时避让窗口",
     "Shrink other windows so the keyboard does not cover them.": "键盘出现时把其它窗口往上收，不让键盘挡住内容",
+    "Always show the preedit in the keyboard": "始终在键盘内显示预编辑",
+    "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.": "有些应用会在输入框里自己画拼音串；打开这个开关后键盘里也显示一份。",
     "Use the floating keyboard by default": "默认使用浮动键盘",
     "Off opens the docked keyboard.": "关掉时按停靠模式打开",
     "Modifier tap behaviour": "修饰键切换方式",
