@@ -236,6 +236,9 @@ Item {
     Process {
         id: ydotoolProc
         command: ["true"]
+        // 注入失败才重探（ydotoold 掉了 / socket 没了）。成功时什么都不做，
+        // 键盘开着也不会有定时进程。
+        onExited: if (exitCode !== 0) router.probeYdotoold()
     }
 
     function runCommand(cmd) {
@@ -259,11 +262,6 @@ Item {
         ydotooldProbe.running = true
     }
 
-    Timer {
-        interval: 3000
-        running: router.active
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: router.probeYdotoold()
-    }
+    // 打开键盘时探一次；之后只在注入失败时重探
+    onActiveChanged: if (active) router.probeYdotoold()
 }

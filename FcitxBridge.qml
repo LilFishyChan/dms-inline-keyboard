@@ -370,6 +370,9 @@ Item {
     // 开关信号）。这里如果也发 mode:osk，会和 addon 内部的
     // setInputMethodMode -> hide/showVirtualKeyboard 回调链撞在一起。
     onKeyboardOpenChanged: {
+        // 打开时读一次文件兜底：addon 还没连上时先有初始状态
+        if (keyboardOpen && !socket.connected)
+            bridge.readFallbackFiles()
         if (keyboardOpen && socket.connected) {
             // 打开瞬间要 UI：addon 连上时已经 claim 过一次，这里补一发是因为
             // 「键盘早就开着、又切了显示模式」时连接没重建，但 UI 可能被顶掉
@@ -389,7 +392,7 @@ Item {
         command: ["true"]
     }
 
-    // socket 没连上时（fcitx5 没起 / addon 没加载）退回文件读取兜底
+    // socket 没连上时（fcitx5 没起 / addon 没加载）读一次文件兜底
     Process {
         id: statusRead
         command: ["sh", "-c", "cat \"" + bridge.statusPath + "\" 2>/dev/null"]
@@ -408,17 +411,13 @@ Item {
         }
     }
 
-    Timer {
-        interval: 3000
-        running: bridge.keyboardOpen && !socket.connected
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!imListRead.running)
-                imListRead.running = true
-            if (!statusRead.running)
-                statusRead.running = true
-        }
+    // 文件兜底只在打开键盘时读一次（addon 还没连上那一刻的初始状态），
+    // 之后全靠 addon 通过 socket 推送，不再定时起 cat 进程。
+    function readFallbackFiles() {
+        if (!statusRead.running)
+            statusRead.running = true
+        if (!imListRead.running)
+            imListRead.running = true
     }
 
 }
