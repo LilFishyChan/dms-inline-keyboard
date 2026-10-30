@@ -71,7 +71,8 @@ def settings():
     c.check("点槽执行的是最小化", "min=1" in c.diag(), c.diag()[:150])
     c.ipc("open")
     time.sleep(1.2)
-    c.check("恢复后不再是 min", "min=0" in c.diag(), c.diag()[:150])
+    # lastMode 记着 minimized，open 会真的恢复成最小化 → 显式切回完整键盘
+    c.check("恢复后不再是 min", c.ensure_full_keyboard(), c.diag()[:150])
     _restore("slotActionId", orig)
 
     # 5. keyOpacity / bgOpacity：改完 debugGeometry 要读得到

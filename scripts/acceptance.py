@@ -67,10 +67,14 @@ def main(argv):
         c.ipc("open")
         time.sleep(2)
     c.check("键盘能打开", "open=true" in c.diag(), c.diag()[:120])
+    # 上次可能停在最小化（lastMode 记在 state 里），先恢复成完整键盘，否则读不到键表
+    c.check("键盘是完整形态（非最小化）", c.ensure_full_keyboard(), c.diag()[:120])
 
     for name in picked:
         desc, fns = BLOCKS[name]
         print("\n### %s —— %s" % (name, desc))
+        # 上一块可能把卡片点没了（no-card），每块开始前确认一次
+        c.check("%s: 卡片就绪" % name, c.ensure_card(), c.ipc("debugPanel")[:120])
         for fn in fns:
             fn()
 

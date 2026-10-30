@@ -44,7 +44,7 @@ def minimize():
     c.check("min 标记置位", "min=1" in c.diag(), c.diag()[:150])
     c.ipc("open")
     time.sleep(1.2)
-    c.check("恢复后不再是 min", "min=0" in c.diag(), c.diag()[:150])
+    c.check("恢复后不再是 min", c.ensure_full_keyboard(), c.diag()[:150])
 
 
 def openclose():

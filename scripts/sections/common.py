@@ -82,6 +82,34 @@ def set_debug_mode(on):
     return restart_dms()
 
 
+def ensure_full_keyboard():
+    """确保是完整键盘而不是最小化圆钮。
+
+    lastMode 记在 state 里后，关一次最小化的键盘、再 open 会真的恢复成最小化，
+    卡片不渲染 → 读不到键表。任何要读布局的块都先过这一步。
+    """
+    if "min=1" in diag():
+        ipc("debugQuickAction", "minimize")
+        time.sleep(1.2)
+    return "min=0" in diag()
+
+
+def ensure_card():
+    """确认 activeCard 真的在（键盘开着 ≠ 卡片渲染了）。
+
+    keys 块连点几百下之后，后续块经常拿到 no-card；这一步把它拉回可用状态。
+    """
+    if "no-card" not in ipc("debugPanel"):
+        return True
+    for _ in range(3):
+        ipc("open")
+        time.sleep(2.0)
+        ensure_full_keyboard()
+        if "no-card" not in ipc("debugPanel"):
+            return True
+    return False
+
+
 def ensure_dev():
     """调试模式已经开着、插件也 loaded 就别重启 —— 重启会打断用户正在做的事。
 

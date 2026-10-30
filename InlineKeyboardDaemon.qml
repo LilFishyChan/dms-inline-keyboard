@@ -37,7 +37,8 @@ PluginComponent {
     // ---- 状态（窗口销毁后仍保留）----
     property bool open: PluginService.getGlobalVar(root.pluginId, "open", false)
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
-    property bool avoidWindows: PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
+    readonly property bool avoidWindows: root.pluginData && root.pluginData.avoidWindows !== undefined
+                                          ? root.pluginData.avoidWindows : true
     readonly property bool fnActive: root.fnState > 0
 
     // 调试 IPC（debug* 系列）的开关：设置页那个「调试模式」，环境变量兜底。
@@ -93,7 +94,8 @@ PluginComponent {
     // 切换方式：noLock / toggle / tapLock / doubleTapLock（设置页可选）
     property string modifierMode: PluginService.loadPluginData(root.pluginId, "modifierMode", "doubleTapLock")
     // 长按自动重复的间隔（毫秒）
-    property int repeatInterval: PluginService.loadPluginData(root.pluginId, "repeatInterval", 60)
+    readonly property int repeatInterval: root.pluginData && root.pluginData.repeatInterval !== undefined
+                                          ? root.pluginData.repeatInterval : 60
 
     // ---- fcitx5 状态（实际存在 FcitxBridge 里，这里 alias 给卡片和窗口用）----
     readonly property alias fcitxCandidates: fcitxBridge.candidates
@@ -145,7 +147,8 @@ PluginComponent {
     readonly property alias imAsciiMode: fcitxBridge.isAsciiMode
 
     // 键盘内始终显示预编辑（不因应用自己渲染了 preedit 就隐藏）
-    property bool alwaysShowPreedit: PluginService.loadPluginData(root.pluginId, "alwaysShowPreedit", false)
+    readonly property bool alwaysShowPreedit: root.pluginData && root.pluginData.alwaysShowPreedit !== undefined
+                                              ? root.pluginData.alwaysShowPreedit : false
 
     // 预编辑是否由应用自己画（fcitx5 的 clientPreedit 非空）。
     // 应用自己把拼音串画进输入框时（embedded），键盘就不再重复显示。
@@ -319,8 +322,8 @@ PluginComponent {
         "size": function() { root.beginResize() },
         "opacity": function() { root.enterTransparency() },
         "avoid": function() {
-            root.avoidWindows = !root.avoidWindows
-            PluginService.savePluginData(root.pluginId, "avoidWindows", root.avoidWindows)
+            // 只落盘：avoidWindows 是响应式绑定，写盘后自动跟上
+            PluginService.savePluginData(root.pluginId, "avoidWindows", !root.avoidWindows)
         },
         "undo": function() {
             root.runCommand(["ydotool", "key", "29:1", "44:1", "44:0", "29:0"])
@@ -371,8 +374,9 @@ PluginComponent {
     // 顶部快捷栏中间那组动作
     property var quickBarActions: PluginService.loadPluginData(root.pluginId, "quickBarActions", [])
 
-    // 右上角槽里的动作 id
-    property string slotActionId: PluginService.loadPluginData(root.pluginId, "slotActionId", "float")
+    // 右上角槽里的动作 id（响应式：设置一变这里就跟着变）
+    readonly property string slotActionId: root.pluginData && root.pluginData.slotActionId !== undefined
+                                            ? root.pluginData.slotActionId : "float"
 
     property var actions: {
         const v = PluginService.loadPluginData(root.pluginId, "actions", null)
@@ -456,8 +460,8 @@ PluginComponent {
     // 最小化：整个键盘收成屏幕角上一个浮动的小按钮
     property bool minimized: false
     // 小圆按钮的位置（距右/下边缘的像素；-1 = 还没拖过，由窗口用默认边距）
-    property real miniPosRight: PluginService.loadPluginData(root.pluginId, "miniPosRight", -1)
-    property real miniPosBottom: PluginService.loadPluginData(root.pluginId, "miniPosBottom", -1)
+    property real miniPosRight: root.loadRuntime("miniPosRight", -1)
+    property real miniPosBottom: root.loadRuntime("miniPosBottom", -1)
     // 浮动键盘的位置（-1 = 还没拖过，由窗口按默认位置摆）
     property real floatPosX: PluginService.loadPluginData(root.pluginId, "floatPosX", -1)
     property real floatPosY: PluginService.loadPluginData(root.pluginId, "floatPosY", -1)
@@ -480,8 +484,19 @@ PluginComponent {
         root.miniPosRight = right
         root.miniPosBottom = bottom
         root.lastSelfSaveAt = Date.now()
-        PluginService.savePluginData(root.pluginId, "miniPosRight", right)
-        PluginService.savePluginData(root.pluginId, "miniPosBottom", bottom)
+        PluginService.savePluginState(root.pluginId, "miniPosRight", right)
+        PluginService.savePluginState(root.pluginId, "miniPosBottom", bottom)
+    }
+
+    // 运行时状态该走 State 文件（~/.local/state/dms/plugins/<id>_state.json），
+    // 写 plugin_settings.json 会触发全插件 reloadSettings。
+    // 老版本把这几项存在 Settings 里，所以 state 没有时回落到 Settings 读一次。
+    function loadRuntime(key, fallback) {
+        const st = PluginService.loadPluginState(root.pluginId, key, null)
+        if (st !== null && st !== undefined)
+            return st
+        const legacy = PluginService.loadPluginData(root.pluginId, key, null)
+        return legacy === null || legacy === undefined ? fallback : legacy
     }
 
     // 语音模式：切浮动 + 只显示顶部语音行
@@ -617,19 +632,23 @@ PluginComponent {
 
     // 特殊键（Backspace / Enter / Shift…）的表现：图标 / 缩写 / 完整。
     // 存的是字符串，非法值在读取时归一化，避免设置文件被手改坏后键帽全变空。
-    property string specialKeyStyle: SpecialKeys.normalizeStyle(
-        PluginService.loadPluginData(root.pluginId, "specialKeyStyle", "full"))
+    readonly property string specialKeyStyle: SpecialKeys.normalizeStyle(
+        root.pluginData && root.pluginData.specialKeyStyle !== undefined
+            ? root.pluginData.specialKeyStyle : "full")
 
     // Win 键单独的表现：mod（默认，显示「Mod」）/ system / windows
-    property string winKeyStyle: SpecialKeys.normalizeWinLook(
-        PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod"))
+    readonly property string winKeyStyle: SpecialKeys.normalizeWinLook(
+        root.pluginData && root.pluginData.winKeyStyle !== undefined
+            ? root.pluginData.winKeyStyle : "mod")
 
     // winKeyStyle === "custom" 时使用的图标名
-    property string winKeyCustomIcon: PluginService.loadPluginData(
-        root.pluginId, "winKeyCustomIcon", "")
+    readonly property string winKeyCustomIcon: root.pluginData
+        && root.pluginData.winKeyCustomIcon !== undefined
+        ? root.pluginData.winKeyCustomIcon : ""
     property bool defaultFloating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // Esc 与 \`~ 键对调（想要 Esc 在左上角的人用）
-    property bool escSwap: PluginService.loadPluginData(root.pluginId, "escSwap", false)
+    readonly property bool escSwap: root.pluginData && root.pluginData.escSwap !== undefined
+                                    ? root.pluginData.escSwap : false
     // 键盘名义尺寸（重置和下限都以它为基准）。窗口与卡片都按它推按键尺寸
     readonly property real baseKbWidth: 1050
     readonly property real baseKbHeight: 444
@@ -757,15 +776,9 @@ PluginComponent {
             if (nextKeyOpacity !== root.keyOpacity)
                 root.keyOpacity = nextKeyOpacity
         }
-        const nextAvoid = PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
-        if (nextAvoid !== root.avoidWindows)
-            root.avoidWindows = nextAvoid
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false)
         if (nextDebugMode !== root.debugModeSetting)
             root.debugModeSetting = nextDebugMode
-        const nextAlwaysPreedit = PluginService.loadPluginData(root.pluginId, "alwaysShowPreedit", false)
-        if (nextAlwaysPreedit !== root.alwaysShowPreedit)
-            root.alwaysShowPreedit = nextAlwaysPreedit
         const nextDefaultFloating = PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
         if (nextDefaultFloating !== root.defaultFloating) {
             root.defaultFloating = nextDefaultFloating
@@ -774,24 +787,6 @@ PluginComponent {
                 root.floating = nextDefaultFloating
         }
 // loadPluginData 不是通知属性，设置页改完必须在这里显式重读
-        const nextSpecialKeyStyle = SpecialKeys.normalizeStyle(
-            PluginService.loadPluginData(root.pluginId, "specialKeyStyle", "full"))
-        if (nextSpecialKeyStyle !== root.specialKeyStyle)
-            root.specialKeyStyle = nextSpecialKeyStyle
-        const nextWinKeyStyle = SpecialKeys.normalizeWinLook(
-            PluginService.loadPluginData(root.pluginId, "winKeyStyle", "mod"))
-        if (nextWinKeyStyle !== root.winKeyStyle)
-            root.winKeyStyle = nextWinKeyStyle
-        const nextWinCustomIcon = PluginService.loadPluginData(
-            root.pluginId, "winKeyCustomIcon", "")
-        if (nextWinCustomIcon !== root.winKeyCustomIcon)
-            root.winKeyCustomIcon = nextWinCustomIcon
-        const nextEscSwap = PluginService.loadPluginData(root.pluginId, "escSwap", false)
-        if (nextEscSwap !== root.escSwap)
-            root.escSwap = nextEscSwap
-        const nextRepeat = PluginService.loadPluginData(root.pluginId, "repeatInterval", 60)
-        if (nextRepeat !== root.repeatInterval)
-            root.repeatInterval = nextRepeat
 
         root.applyActionSettings()
         const nextModifierMode = PluginService.loadPluginData(root.pluginId, "modifierMode", "doubleTapLock")
@@ -812,9 +807,6 @@ PluginComponent {
             ? root.sanitizeActions(rawActions) : root.defaultActions
         if (JSON.stringify(nextActions) !== JSON.stringify(root.actions))
             root.actions = nextActions
-        const nextSlot = PluginService.loadPluginData(root.pluginId, "slotActionId", "float")
-        if (nextSlot !== root.slotActionId)
-            root.slotActionId = nextSlot
         const nextQuickBar = PluginService.loadPluginData(root.pluginId, "quickBarActions", [])
         if (JSON.stringify(nextQuickBar) !== JSON.stringify(root.quickBarActions))
             root.quickBarActions = nextQuickBar
@@ -851,7 +843,7 @@ PluginComponent {
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
         if (restoreLastMode !== false) {
-            const lastMode = PluginService.loadPluginData(root.pluginId, "lastMode", "keys")
+            const lastMode = root.loadRuntime("lastMode", "keys")
             if (lastMode === "voice" && root.voiceAvailable)
                 Qt.callLater(root.toggleVoice)
             else if (lastMode === "minimized")
@@ -872,7 +864,7 @@ PluginComponent {
         // 先记下关闭时是哪种形态，下次打开接着用（此时还没清理状态）
         const lastMode = root.minimized ? "minimized" : (root.voiceActive ? "voice" : "keys")
         root.lastSelfSaveAt = Date.now()
-        PluginService.savePluginData(root.pluginId, "lastMode", lastMode)
+        PluginService.savePluginState(root.pluginId, "lastMode", lastMode)
         // 键盘关掉就别让麦克风继续录
         root.stopVoice()
         root.minimized = false
@@ -929,7 +921,6 @@ PluginComponent {
 
     function saveSlot(actionId) {
         root.lastSelfSaveAt = Date.now()
-        root.slotActionId = actionId
         PluginService.savePluginData(root.pluginId, "slotActionId", actionId)
     }
 
@@ -1339,7 +1330,6 @@ PluginComponent {
         function resetActions(): string {
             if (!root.devMode) return "dev mode off"
             root.actions = root.defaultActions
-            root.slotActionId = "float"
             PluginService.savePluginData(root.pluginId, "actions", root.defaultActions)
             PluginService.savePluginData(root.pluginId, "slotActionId", "float")
             return "INLINE_KEYBOARD_ACTIONS_RESET"
