@@ -4,6 +4,8 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "Motion.js" as Motion
+import "actions.js" as Actions
 
 Item {
     id: functionsArea
@@ -65,22 +67,29 @@ Item {
         && controller.dragTarget < 0
         && !controller.dragOverBar && !controller.dragOverSlot
 
-    // 幽灵块该画在第几格 —— 必须是「松手后这一项实际会落到的格子」：
-    //   · 无效落点：留在原格（dropNoop）
-    //   · 列表内拖动：取出再插回，总数不变，所以最后能占的格子是 count-1。
-    //     不夹的话，拖最后一项到末尾时幽灵会多占一格，它自己原来的格子空出来
-    //     （看着就是「幽灵前面空一列」）。
-    //   · 从快捷栏 / 右上角槽拖进来：列表会多一项，真的落在 dragTarget
-    //     （可能等于 count，即新的一格）。
-    readonly property int ghostPlaceIndex: {
-        if (!controller)
+    // 幽灵块该画在第几格 —— 松手后这一项实际会落到的格子（见 listGhostIndex）。
+    // 无效落点（拖到键盘外）时松手不调整顺序，幽灵回它自己那一格。
+    // 拖到右上角槽时：源项去槽、槽里原来的动作回到列表。
+    // 它在列表里的落点 = 把被拖动作当作已进槽后重新算可见列表里的位置。
+    readonly property int slotInsertIndex: {
+        if (!controller || !controller.dragOverSlot || controller.dragIndex < 0)
             return -1
-        if (controller.dragTarget < 0)
-            return functionsArea.dropNoop ? controller.dragIndex : -1
-        const count = (controller.availableActions || []).length
-        if (controller.dragIndex < 0)
-            return controller.dragTarget
-        return Math.min(controller.dragTarget, Math.max(0, count - 1))
+        if (!controller.rightSlot)
+            return -1
+        // 交换：被抓项进槽，槽里那个动作回到**被抓项的初始位置**
+        return controller.dragIndex
+    }
+
+    readonly property int ghostPlaceIndex: {
+        if (!controller || !controller.ghostAction)
+            return -1
+        return Actions.listGhostIndex({
+            dragIndex: controller.dragIndex,
+            dragTarget: controller.dragTarget,
+            count: (controller.availableActions || []).length,
+            dropNoop: functionsArea.dropNoop,
+            insertAt: functionsArea.slotInsertIndex
+        })
     }
 
     // 编辑态顶部空出的一行：拖动提示
@@ -88,7 +97,10 @@ Item {
         id: editHint
         opacity: controller.editing ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -104,9 +116,13 @@ Item {
 
     // 编辑态底色：surfaceContainerLow，衬出可拖动的区域
     Rectangle {
-        opacity: controller.editing ? 1 : 0
+        // 跟随背景透明度
+        opacity: (controller.editing ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         anchors.left: fnScroll.left
         anchors.right: fnScroll.right
         y: fnScroll.y
@@ -124,9 +140,15 @@ Item {
         anchors.rightMargin: controller.unit / 2
         // 编辑态整体下移一行（带过渡）。这里只能用 y，不能同时设 anchors.top
         y: controller.editing ? controller.keyH : 0
-        Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on y {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.panel; easing.type: Easing.OutCubic }
+        }
         height: functionsArea.scrollH
         clip: true
+        // 按住 100ms 才把 press 送给格子（DragInitiator）：延时内就开始滑的话
+        // press 不送达，滚动照常。编辑态要同时能滚和能拖，靠这一条分工。
+        pressDelay: 100
         contentHeight: fnGrid.height
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.VerticalFlick
@@ -146,16 +168,24 @@ Item {
             // 目标位置：松开后动作会落到这里（幽灵块样式，和固定栏一致）
             GhostBlock {
                 id: dropShadow
-                active: controller.ghostAction !== null
-                        && (controller.dragTarget >= 0 || functionsArea.dropNoop)
-                        && !controller.dragOverSlot && !controller.dragOverBar
-                action: controller.ghostAction
-                label: controller.ghostAction ? controller.tr(controller.ghostAction.label) : ""
-                // 位置来自 functionsArea.ghostPlaceIndex（松手后实际落到的格子），
-                // 不是 dragTarget 原值 —— 见那边注释
-                x: (functionsArea.ghostPlaceIndex % functionsArea.columns)
+                // 拖到槽且源在列表：原槽动作会落到它腾出的那一格
+                // （固定栏源不画：那边落盘是摘掉源项，固定栏那格最终是空的）
+                readonly property var swapAction: (controller.dragOverSlot
+                                                   && controller.dragIndex >= 0)
+                    ? controller.rightSlot : null
+                // 交换时幽灵块站在「原槽动作会落到的那一格」，由 ghostPlaceIndex 给出
+                readonly property bool normalDrop: controller.ghostAction !== null
+                    && (controller.dragTarget >= 0 || functionsArea.dropNoop)
+                    && !controller.dragOverSlot && !controller.dragOverBar
+                readonly property int shownIndex: swapAction !== null
+                    ? functionsArea.ghostPlaceIndex : functionsArea.ghostPlaceIndex
+
+                active: swapAction !== null || normalDrop
+                action: swapAction !== null ? swapAction : controller.ghostAction
+                label: action ? controller.tr(action.label) : ""
+                x: (shownIndex % functionsArea.columns)
                    * (functionsArea.cellW + controller.gap)
-                y: Math.floor(functionsArea.ghostPlaceIndex / functionsArea.columns)
+                y: Math.floor(shownIndex / functionsArea.columns)
                    * (controller.keyH + controller.gap)
                 width: functionsArea.cellW
                 height: controller.keyH
@@ -179,66 +209,47 @@ Item {
                 model: controller.availableActions || []
 
                 delegate: Rectangle {
+                    id: listCell
                     required property var modelData
                     required property int index
 
                     readonly property bool isDragging: controller.editing
                                                       && controller.dragIndex === index
-                    // 拖进固定栏并且会挤出时，第一个位置让给幽灵块，整体后移一位
-                    readonly property int barShift: (controller.barDropPlan !== null
-                                                     && controller.listEjected !== null) ? 1 : 0
                     readonly property real cellW: functionsArea.cellW
                     // 动作状态：active 主题色底 / default 普通 / disabled 半透明
                     // 状态判断收在卡片里（actionStateOf），列表和固定栏共用
                     readonly property string actState: controller.actionStates[modelData.id] || "default"
-                    // 拖动时其它格子的视觉让位（不改 model，避免打断拖动）
-                    readonly property int shift: {
-                        if (!controller.editing || !controller.dragActive)
-                            return 0
-                        // 拖出列表、落在有效目标（固定栏 / 槽）：源格之后整体前移一格，
-                        // 源格自己已经 opacity 0，不能留一个空位。
-                        // 落在无效位置（键盘外）：什么都不动 —— 松手后顺序也不会调整。
-                        if (controller.dragIndex >= 0 && controller.dragTarget < 0)
-                            return functionsArea.dropNoop
-                                ? 0 : (index > controller.dragIndex ? -1 : 0)
-                        if (controller.dragTarget < 0)
-                            return 0
-                        // 从快捷栏/槽拖进列表：没有源索引，target 之后的全部后移一位
-                        if (controller.dragIndex < 0)
-                            return index >= controller.dragTarget ? 1 : 0
-                        if (index === controller.dragIndex)
-                            return 0
-                        if (controller.dragIndex < controller.dragTarget
-                            && index > controller.dragIndex && index <= controller.dragTarget)
-                            return -1
-                        if (controller.dragIndex > controller.dragTarget
-                            && index < controller.dragIndex && index >= controller.dragTarget)
-                            return 1
-                        return 0
-                    }
-
+                    // 拖动时这一格的让位偏移（纯计算，见 actions.js 的 listShift）
+                    readonly property int shift: Actions.listShift({
+                        index: index,
+                        editing: controller.editing,
+                        dragActive: controller.dragActive,
+                        dragIndex: controller.dragIndex,
+                        dragTarget: controller.dragTarget,
+                        dropNoop: functionsArea.dropNoop,
+                        insertAt: functionsArea.slotInsertIndex
+                    })
+                    // 拖进固定栏且挤出时，首位让给被挤出的动作
+                    readonly property int barShift: Actions.listBarShift({
+                        hasBarPlan: controller.barDropPlan !== null,
+                        hasEjected: controller.listEjected !== null
+                    })
                     readonly property int placed: index + shift + barShift
                     x: (placed % functionsArea.columns) * (cellW + controller.gap)
-                    y: Math.floor(placed / functionsArea.columns)
-                       * (controller.keyH + controller.gap)
+                    y: Math.floor(placed / functionsArea.columns) * (controller.keyH + controller.gap)
                     Behavior on x {
-                        enabled: controller.animateCells
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                        enabled: controller ? controller.animateCells : true
+                        NumberAnimation { duration: Motion.listShift; easing.type: Easing.OutCubic }
                     }
                     Behavior on y {
-                        enabled: controller.animateCells
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                        enabled: controller ? controller.animateCells : true
+                        NumberAnimation { duration: Motion.listShift; easing.type: Easing.OutCubic }
                     }
-                    // 拖动中的格子：抬高、半透明、跟手位移
-                    z: isDragging ? 100 : 1
+                    z: 1
                     // 拖动时原格子隐去，由跟手的 ghost 代表；禁用 50% / 按键透明度照样相乘
                     opacity: (isDragging ? 0 : 1)
                              * (actState === "disabled" ? 0.5 : 1)
                              * controller.keyOpacity
-                    scale: isDragging ? 1.04 : 1
-                    Behavior on scale {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                    }
                     width: cellW
                     height: controller.keyH
                     radius: height / 2
@@ -246,9 +257,6 @@ Item {
                     color: actState === "active"
                            ? Theme.primary
                            : Theme.surfaceContainer
-                    // 平常不要边框；只有正被拖着的那一格用主题色描边
-                    border.width: isDragging ? 1 : 0
-                    border.color: Theme.primary
 
                     Ripple {
                         id: fnRipple
@@ -283,16 +291,7 @@ Item {
                         onPressed: mouse => fnRipple.press(mouse.x, mouse.y)
                         onReleased: fnRipple.release()
                         onCanceled: fnRipple.release()
-                        onClicked: {
-                            if (modelData.id === "opacity") {
-                                // 快照由 daemon 在切模式时自己记：这里拿到的
-                                // controller 是卡片，卡片上没有 prevBgOpacity，
-                                // 直接写会抛 ReferenceError，后面切模式执行不到
-                                controller.modeChangeRequested("transparency")
-                                return
-                            }
-                            controller.quickAction(modelData.id)
-                        }
+                        onClicked: controller.quickAction(modelData.id)
                     }
 
                     // 编辑态：长按拖动排序
@@ -302,11 +301,12 @@ Item {
                         controller: functionsArea.controller
                         owner: "cell"
                         ownerIndex: index
+                        dragItem: listCell
                         payload: modelData
                         // 拖到可视区上/下边缘 → 设定滚动速度（越靠边越快）
                         onDragged: translation => {
                             // ghost 已经离开列表（拖去固定栏/槽）就别再滚了
-                            if (!controller.ghostInList()) {
+                            if (!controller.ghostOverList) {
                                 functionsArea.autoScrollSpeed = 0
                                 return
                             }
@@ -329,9 +329,12 @@ Item {
 
     // 编辑态：列表外圈主题色边框
     Rectangle {
-        opacity: controller.editing ? 1 : 0
+        opacity: (controller.editing ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         anchors.left: fnScroll.left
         anchors.right: fnScroll.right
         anchors.top: fnScroll.top
@@ -354,7 +357,8 @@ Item {
         opacity: (fnScroll.contentHeight > fnScroll.height + 1
                   && fnScroll.contentY < fnScroll.contentHeight - fnScroll.height - 1) ? 1 : 0
         Behavior on opacity {
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.panel; easing.type: Easing.OutCubic }
         }
         gradient: Gradient {
             GradientStop { position: 0.0; color: Theme.withAlpha(Theme.surfaceContainer, 0.0) }
@@ -370,7 +374,8 @@ Item {
         z: 5
         opacity: fnScroll.contentY > 1 ? 1 : 0
         Behavior on opacity {
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.panel; easing.type: Easing.OutCubic }
         }
         gradient: Gradient {
             GradientStop { position: 0.0; color: Theme.withAlpha(Theme.surfaceContainer, 0.94) }
@@ -387,7 +392,10 @@ Item {
         height: controller.keyH
         opacity: controller.editing ? 0 : 1
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.ghost; easing.type: Easing.OutCubic }
+        }
 
         Rectangle {
             id: editBtn

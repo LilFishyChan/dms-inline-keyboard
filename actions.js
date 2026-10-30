@@ -11,7 +11,7 @@
 //
 // ⚠ 所有对外函数的第一步都要过 toArray()。QML 会把 .js 模块返回的数组、
 // 以及 property var 里存的数组包成「类数组对象」，此时 Array.isArray() 是 false ——
-// 直接判 Array.isArray 会让整个列表变成空（实测：拖一次动作进固定栏，列表就空了）。
+// QML 的数组/类数组不一定是真 Array，直接判 Array.isArray 会把列表判成空。
 
 /**
  * 转成真正的数组。Array.isArray 为真就原样返回，否则按 length 逐项搬运。
@@ -112,6 +112,93 @@ function moveActionById(list, fromId, toId) {
  * @param {Array} quickBarActions 快捷栏动作数组
  * @returns {Array} 可见动作，保持 all 的相对顺序
  */
+// 把 action 插到「可见列表」的第 at 位，返回全量列表的新顺序。
+//
+// at 是**可见列表**里的下标（拖放落点就是这么算的），而 all 是全量动作表，
+// 里面还包含固定栏 / 槽里的动作（它们在列表里不显示）。直接拿 at 去 all 上
+// splice 会插偏，必须先找到「可见列表第 at 个动作」在 all 里的位置。
+function insertAtVisibleIndex(all, action, visible, at) {
+    const list = toArray(all).slice().filter(a => a && action && a.id !== action.id)
+    if (!action)
+        return list
+    const vis = toArray(visible)
+    const pos = Math.max(0, Math.min(Number.isFinite(at) ? at : vis.length, vis.length))
+    if (pos >= vis.length) {
+        list.push(action)
+        return list
+    }
+    const target = vis[pos]
+    const idx = target ? list.findIndex(a => a && a.id === target.id) : -1
+    list.splice(idx >= 0 ? idx : list.length, 0, action)
+    return list
+}
+
+// ---------------- 列表（网格）的拖动预览 ----------------
+// 纯计算，不放在 delegate 里：让位规则分支多，内联在 QML 里既难读也没法测。
+
+// 第 index 个格子拖动时该偏移几格（负=往前挪，正=往后挪）
+function listShift(o) {
+    const opts = o || {}
+    const index = opts.index
+    const from = Number.isFinite(opts.dragIndex) ? opts.dragIndex : -1
+    const to = Number.isFinite(opts.dragTarget) ? opts.dragTarget : -1
+    if (!opts.editing || !opts.dragActive)
+        return 0
+    // 源在列表里、落点不在列表（拖去固定栏 / 槽 / 键盘外）
+    if (from >= 0 && to < 0) {
+        if (opts.dropNoop)
+            return 0
+        // 拖到槽：源项离开列表、原槽动作插到 insertAt（不然源格会被补位格占掉）
+        const ins = Number.isFinite(opts.insertAt) ? opts.insertAt : -1
+        if (ins < 0)
+            return index > from ? -1 : 0
+        if (index === from)
+            return 0
+        let placed = index > from ? index - 1 : index
+        if (placed >= ins)
+            placed += 1
+        return placed - index
+    }
+    if (to < 0)
+        return 0
+    // 从外部拖进列表：目标位及之后整体后移一格
+    if (from < 0)
+        return index >= to ? 1 : 0
+    if (index === from)
+        return 0
+    if (from < to && index > from && index <= to)
+        return -1
+    if (from > to && index < from && index >= to)
+        return 1
+    return 0
+}
+
+// 幽灵块该画在第几格（松手后动作实际会落到的位置）
+function listGhostIndex(o) {
+    const opts = o || {}
+    const from = Number.isFinite(opts.dragIndex) ? opts.dragIndex : -1
+    const to = Number.isFinite(opts.dragTarget) ? opts.dragTarget : -1
+    if (to < 0) {
+        if (opts.dropNoop)
+            return from
+        // 拖到槽：幽灵块站在槽里那个动作松手后要插入的格子
+        const ins = Number.isFinite(opts.insertAt) ? opts.insertAt : -1
+        return from >= 0 && ins >= 0 ? ins : -1
+    }
+    const count = opts.count || 0
+    // 从外部拖进来：列表会多一项，真的落在 to（可能等于 count）
+    if (from < 0)
+        return to
+    // 列表内拖动：取出再插回，总数不变，最后能占的格子是 count-1
+    return Math.min(to, Math.max(0, count - 1))
+}
+
+// 拖进固定栏且会挤出时，列表首位让给被挤出的动作，其余整体后移
+function listBarShift(o) {
+    const opts = o || {}
+    return (opts.hasBarPlan && opts.hasEjected) ? 1 : 0
+}
+
 function visibleActions(all, slotActionId, quickBarActions) {
     const source = toArray(all)
     if (source.length === 0)
@@ -143,6 +230,9 @@ function dropIndexAt(ghostX, ghostY, contentWidth, count, cellHeight, gap, colum
     if (count <= 0)
         return -1
     const cellWidth = (contentWidth - (columns - 1) * gap) / columns
+    // 列表按**格子左边界**取整：指针落在哪一格，就插到那一格前面。
+    // 固定栏用的是「指针过块中心线」，两套判据各自独立 —— 不要互相借，
+    // 网格和单行的手感本来就不一样。
     const col = Math.max(0, Math.min(columns - 1, Math.floor(ghostX / (cellWidth + gap))))
     const row = Math.max(0, Math.floor(ghostY / (cellHeight + gap)))
     const index = row * columns + col
@@ -188,36 +278,33 @@ function moveActionToEndById(list, id) {
  * @param {number} slotGap 动作块之间的间距（两端也有）
  * @returns {number} 0..count 的插入位置
  */
-function quickBarInsertIndex(ghostX, count, slotW, slotGap) {
+// 用**指针位置**判定，不看跟手块自己的尺寸：
+//   指针在某个动作块的**中心线左侧** → 插到这个块的左边
+//   指针在它的中心线右侧           → 插到它的右边
+//
+// ghostIndex 那一格（幽灵块自己占的位）整格都是死区：它只是「松手后会插在这」
+// 的显示，不是可比较的锚点。不跳过的话，指针在幽灵块里来回移动会让插入位置
+// 自己跳来跳去。
+function quickBarInsertIndex(pointerX, count, slotW, slotGap, ghostIndex) {
     if (count <= 0)
         return 0
+    const hasGhost = ghostIndex >= 0 && ghostIndex < count
+    // 返回值是「原始动作数组里的下标」，所以上限要扣掉幽灵那一格
+    const realCount = hasGhost ? count - 1 : count
     let index = 0
     for (let i = 0; i < count; i++) {
+        if (i === ghostIndex)
+            continue
         const center = (i + 1) * slotGap + i * slotW + slotW / 2
-        if (ghostX < center)
+        if (pointerX < center)
             break
-        index = i + 1
+        index += 1
     }
-    return Math.max(0, Math.min(count, index))
+    return Math.max(0, Math.min(realCount, index))
 }
 
-/**
- * 把动作落到固定栏时的最终结果。拖动预览和真正落盘共用这一份逻辑。
- *
- * 规则：插到 index；固定栏满了就把末尾那个挤出，放进动作表的最前面
- * （列表里它自然显示在第一个，因为它已经不在固定栏了）。
- *
- * @param {Object} opts
- * @param {Array} opts.bar 当前固定栏
- * @param {Array} opts.actionList 完整动作表（有序）
- * @param {Object} opts.action 被拖的动作
- * @param {number} opts.index 插入位置 0..bar.length
- * @param {number} opts.capacity 固定栏容量
- * @param {string} [opts.slotActionId] 右上角槽里的动作 id
- * @param {string} [opts.source] "" 列表 / "bar" 固定栏 / "slot" 槽
- * @param {number} [opts.sourceIndex] 源在固定栏里的索引（source === "bar" 时有效）
- * @returns {{bar: Array, actionList: Array, slotActionId: string, ejected: Object|null, insertedAt: number}}
- */
+// 松手落库的规划：先摘掉源项，再插到 index，最后处理容量溢出。
+// 拖动预览和真正落盘都用这一份，避免预览和结果不一致。
 function planQuickBarDrop(opts) {
     const options = opts || {}
     const bar = toArray(options.bar).slice()
@@ -254,16 +341,17 @@ function planQuickBarDrop(opts) {
     bar.splice(index, 0, action)
 
     // 满了：挤出末尾那一项（但不能把刚拖进来的自己挤掉，否则等于没插入）
+    // 直接原地改 actionList：被挤出的回到列表最前面，原来已在列表里的话先摘掉
     let ejected = null
     while (bar.length > capacity) {
         let outIndex = bar.length - 1
         if (bar[outIndex] === action && bar.length > 1)
             outIndex = bar.length - 2
         ejected = bar.splice(outIndex, 1)[0]
-        const rest = actionList.filter(a => a && a.id !== ejected.id)
-        rest.unshift(ejected)
-        actionList.length = 0
-        rest.forEach(a => actionList.push(a))
+        const dup = actionList.findIndex(a => a && a.id === ejected.id)
+        if (dup >= 0)
+            actionList.splice(dup, 1)
+        actionList.unshift(ejected)
     }
 
     return {
@@ -275,22 +363,6 @@ function planQuickBarDrop(opts) {
     }
 }
 
-/**
- * 固定栏在拖动过程中应该渲染成什么样。
- * 优先级：落点预览(plan) > 松手后的冻结(frozen) > 拖走源动作后的真实数组 > 真实数组。
- *
- * 「拖走源动作」这条容易漏：从固定栏往外拖时落点不在固定栏（plan 为 null），
- * 若不把源动作从预览里摘掉，它会一直留在固定栏上，后面那些动作也不会补齐。
- *
- * @param {Object} opts
- * @param {Array} opts.bar 真实固定栏动作
- * @param {Object|null} opts.plan 落在固定栏内时的 planQuickBarDrop 结果
- * @param {Array|null} opts.frozen 松手后短暂冻结的数组
- * @param {boolean} [opts.dragActive] 是否正在拖动
- * @param {string} [opts.dragFrom] 拖动源 "bar" / "slot" / ""
- * @param {number} [opts.dragFromIndex] 源在固定栏里的索引
- * @returns {Array} 用于渲染的数组（真数组）
- */
 function quickBarViewActions(opts) {
     const options = opts || {}
     if (options.plan)
@@ -443,8 +515,9 @@ function appendAction(list, action, seed) {
 // node 测试用；QML 的 import "actions.js" 不读这里
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-    mergeNewBuiltins,
-        toArray, sanitizeActions, moveActionById, visibleActions, dropIndexAt,
+        mergeNewBuiltins,
+        toArray, sanitizeActions, moveActionById, insertAtVisibleIndex,
+        visibleActions, dropIndexAt, listShift, listGhostIndex, listBarShift,
         quickBarInsertIndex, planQuickBarDrop, quickBarViewActions, moveActionToEndById,
         defaultActions, markBuiltin, removeAction, updateAction, appendAction
     }

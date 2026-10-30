@@ -880,7 +880,6 @@ PluginComponent {
     Component.onCompleted: {
         root.migrateBuiltinActions()
         root.migrateWinKeyStyle()
-        root.syncKeyboardFlag()
     }
 
     function hideKeyboard() {

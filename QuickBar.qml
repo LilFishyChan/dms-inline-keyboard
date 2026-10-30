@@ -5,6 +5,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "Motion.js" as Motion
 
 Item {
     id: quickBar
@@ -54,16 +55,23 @@ Item {
     Rectangle {
         readonly property bool hasItems: quickBar.slotCount > 0
 
-        opacity: controller.editing ? 1 : 0
+        // 跟随背景透明度：用户把键盘调透后，编辑态的框不该还是一片实心
+        opacity: (controller.editing ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
         // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
         Behavior on x {
-            enabled: controller.animateCells
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
         }
-        Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on width {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
+        }
         x: quickBar.midX + (hasItems ? quickBar.frameX : 0)
         y: 0
         width: hasItems ? quickBar.frameW : quickBar.midW
@@ -74,16 +82,23 @@ Item {
 
     // 编辑态边框：按内部动作的范围画（第一个动作左沿 - gap 到最后一个动作右沿 + gap）
     Rectangle {
-        opacity: controller.editing && quickBar.slotCount > 0 ? 1 : 0
+        opacity: (controller.editing && quickBar.slotCount > 0 ? 1 : 0)
+                 * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
         // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
         Behavior on x {
-            enabled: controller.animateCells
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
         }
-        Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on width {
+            enabled: controller ? controller.animateCells : true
+            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
+        }
         x: quickBar.midX + quickBar.frameX
         y: 0
         width: quickBar.frameW
@@ -95,10 +110,66 @@ Item {
     }
 
     // 真实动作块：胶囊形。拖动时按「松手后的位置」让位，被挤出的淡出
+    // 插入幽灵块：拖动时显示「松手后会出现在这里」的那个动作
+    GhostBlock {
+        id: insertGhost
+        readonly property var plan: controller.barDropPlan
+
+        active: plan !== null
+        action: controller.ghostAction
+        iconRatio: 0.6
+        z: 2
+        y: (quickBar.height - quickBar.cellH) / 2
+        width: quickBar.cellW
+        height: quickBar.cellH
+
+        // x 手动同步：绑定在 plan 为 null 时会 fallback 到第 0 格，首帧会滑过来。
+        // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
+        property bool allowAnim: false
+        property bool settling: false
+        readonly property real targetX: plan !== null
+            ? quickBar.slotX(plan.insertedAt) + (quickBar.slotW - quickBar.cellW) / 2
+            : x
+
+        function syncX(animate) {
+            if (!animate)
+                insertGhost.allowAnim = false
+            insertGhost.x = insertGhost.targetX
+            if (!animate)
+                Qt.callLater(function() { insertGhost.allowAnim = true })
+        }
+
+        onActiveChanged: {
+            if (!active) {
+                insertGhost.settling = false
+                return
+            }
+            insertGhost.settling = true
+            settleTimer.restart()
+            insertGhost.syncX(false)
+        }
+        onTargetXChanged: if (active) insertGhost.syncX(!insertGhost.settling)
+
+        // 手指在固定栏里持续移动时会给足时间；这段窗口只用来吸收
+        // 「刚出现那一帧」的绑定求值顺序问题
+        Timer {
+            id: settleTimer
+            interval: 80
+            onTriggered: insertGhost.settling = false
+        }
+
+        Behavior on x {
+            enabled: insertGhost.allowAnim
+                     && (controller ? controller.animateCells : true)
+            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
+        }
+    }
+
     Repeater {
         model: quickBar.items
 
         delegate: Rectangle {
+            id: barCell
             required property int index
             required property var modelData
 
@@ -110,8 +181,15 @@ Item {
             readonly property bool isActive: actState === "active"
             // 当前不可用（比如浮动模式下「避让窗口」没意义）→ 和列表一样降透明度
             readonly property bool isDisabled: actState === "disabled"
-
-            x: quickBar.slotX(Math.max(0, slotIndex)) + (quickBar.slotW - quickBar.cellW) / 2
+            // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，
+            // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，
+            // 看起来就是「从第一项冒出来又滑过去」。
+            property real lastValidX: 0
+            readonly property real cellX: slotIndex >= 0
+                ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2
+                : lastValidX
+            x: cellX
+            onCellXChanged: if (slotIndex >= 0) lastValidX = cellX
             y: (quickBar.height - quickBar.cellH) / 2
             width: quickBar.cellW
             height: quickBar.cellH
@@ -125,11 +203,17 @@ Item {
             opacity: leaving ? 0 : (isDisabled ? 0.5 : 1)
             z: leaving ? 0 : 1
             Behavior on x {
-                enabled: controller.animateCells
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                // slotIndex < 0 = 位置还没定（预览里已被摘掉 / 会被挤出）。
+                // 这时 x 停在最后有效位置（见上面的 cellX），不让它参与动画。
+                enabled: slotIndex >= 0 && !leaving
+                         && (controller ? controller.animateCells : true)
+                NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
             }
             Behavior on opacity {
-                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，
+                // 直接隐藏更干净。
+                enabled: !leaving && (controller ? controller.animateCells : true)
+                NumberAnimation { duration: Motion.fade; easing.type: Easing.OutCubic }
             }
 
             // 和右侧固定按钮一样的涟漪。写在 ActionIcon 之前，
@@ -171,34 +255,16 @@ Item {
                 owner: "bar"
                 ownerIndex: index
                 payload: modelData
+                dragItem: barCell
             }
         }
     }
 
-    // 插入幽灵块：拖动时显示「松手后会出现在这里」的那个动作
-    GhostBlock {
-        readonly property var plan: controller.barDropPlan
-
-        active: plan !== null
-        action: controller.ghostAction
-        iconRatio: 0.6
-        z: 2
-        x: quickBar.slotX(plan !== null ? plan.insertedAt : 0)
-           + (quickBar.slotW - quickBar.cellW) / 2
-        y: (quickBar.height - quickBar.cellH) / 2
-        width: quickBar.cellW
-        height: quickBar.cellH
-        Behavior on x {
-            enabled: controller.animateCells
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-        }
-    }
-
-    // 两端固定按钮：index 0 导航 / 确认，index 1 圆形动作槽
     Repeater {
         model: controller.quickBarItems
 
         delegate: Rectangle {
+            id: slotCell
             required property int index
             required property var modelData
 
@@ -270,7 +336,8 @@ Item {
             border.color: Theme.primary
             scale: controller.editing && isSlot && controller.dragOverSlot ? 1.12 : 1
             Behavior on scale {
-                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                enabled: controller ? controller.animateCells : true
+                NumberAnimation { duration: Motion.micro; easing.type: Easing.OutCubic }
             }
 
             Ripple {
@@ -324,6 +391,7 @@ Item {
                 owner: "slot"
                 ownerIndex: index
                 payload: controller.rightSlot
+                dragItem: slotCell
             }
 
             MouseArea {

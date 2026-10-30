@@ -15,6 +15,7 @@ import "layouts/phone.js" as Layout
 import "actions.js" as Actions
 import "modifiers.js" as Modifiers
 import "layouts/resize.js" as Resize
+import "Motion.js" as Motion
 
 // 键盘主体：顶部快捷条 + 候选/快捷栏 + 键区（或功能列表） + 底部把手条
 Rectangle {
@@ -36,8 +37,8 @@ Rectangle {
     // 不是当前有没有词。纯键盘布局（keyboard-us 这类）没有候选能力，不显示；
     // rime 的中英文模式都会出候选，所以即使这一刻 items 还空着也占位。
     //
-    // 注意写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成
-    // 「第一行求值 + 第二行变成独立语句」，值悄悄算错（踩过）。
+    // 必须写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成
+    // 「第一行求值 + 第二行变成独立语句」，值悄悄算错。
     property bool showCandBar: false
 
     // 状态
@@ -135,7 +136,7 @@ Rectangle {
     // 拖动来源："" 列表 / "bar" 快捷栏 / "slot" 右上角槽
     property string dragFrom: ""
     property int dragFromIndex: -1
-    // 跟手的拖动块（圆形+图标），坐标是场景坐标
+    // 跟手的拖动块（圆形+图标），坐标是卡片坐标系（不是场景坐标）
     property real ghostX: 0
     property real ghostY: 0
     property var ghostAction: null
@@ -156,8 +157,10 @@ Rectangle {
     property bool dragActive: false
     // 拖动锁：多点触控时只认第一个开始拖的，避免新触点把状态覆盖
     property string dragOwner: ""
-    // 松手瞬间关掉让位动画，直接落到目标位置
-    property bool animateCells: true
+    // 让位动画开关。默认 false：卡片构造期间功能栏的 x/width 会从默认值
+    // 算成实际值，用 Component.onCompleted 去关来不及。
+    // 布局稳定后由 animSettleTimer 打开。
+    property bool animateCells: false
     // 松手后幽灵块淡出，动画结束再真正移除
     property bool ghostFading: false
     // 按下点在"卡片"坐标系里的位置（按下时算一次，之后只加位移）
@@ -174,21 +177,30 @@ Rectangle {
     function beginDrag(source, index, centroidPos, item, action) {
         if (root.dragOwner !== "")
             return false
+        if (!item) {
+            console.error("[inline-keyboard] beginDrag 缺少 dragItem，忽略本次拖动")
+            return false
+        }
         root.dragOwner = source + ":" + index
         root.dragActive = true
         root.dragFrom = source === "cell" ? "" : source
         root.dragFromIndex = source === "cell" ? -1 : index
         root.dragIndex = source === "cell" ? index : -1
         root.dragTarget = source === "cell" ? index : -1
-        root.ghostAction = action
-        // 记下真实按下点；拖动时用「按下点 + 累计位移」，不能再叠加 centroid（会漂移）
+        // 先算坐标再设 ghostAction：ghostAction 一变 DragGhost 就 visible，
+        // 那时 ghostX/Y 若还是旧值（初始 0），第一帧会闪在卡片最左边 ——
+        // 从固定栏拖出时看着就是「跟手块从第一项的位置冒出来」。
         const origin = item.mapToItem(root, centroidPos.x, centroidPos.y)
         root.pressCardX = origin.x
         root.pressCardY = origin.y
         root.ghostX = origin.x
         root.ghostY = origin.y
-        if (root.actionListRef)
+        root.ghostAction = action
+        if (root.actionListRef) {
+            // 停掉还在跑的滚动惯性，否则它继续抢手势
+            root.actionListRef.cancelFlick()
             root.actionListRef.interactive = false
+        }
         return true
     }
 
@@ -201,7 +213,7 @@ Rectangle {
 
     // 松开：取快照 → 清状态 → 按落点分发。
     // 顺序不能反：落点写入会触发 Repeater 重建、销毁当前 delegate，
-    // 之后再去读 index / parent 就是 undefined（踩过）。
+    // 之后再去读 index / parent 就是 undefined。
     function endDrag() {
         const owner = root.dragOwner
         if (!owner) {
@@ -215,7 +227,7 @@ Rectangle {
             action: root.ghostAction,
             barTarget: root.dragBarIndex,
             overSlot: root.dragOverSlot,
-            inList: root.ghostInList(),
+            inList: root.ghostOverList,
             fromIndex: root.dragIndex,
             toIndex: root.dragTarget,
             sourceIndex: root.dragFromIndex
@@ -247,18 +259,35 @@ Rectangle {
             return
         }
         if (drop.overSlot) {
-            root.removeFromQuickBar(drop.sourceIndex)
+            // 交换：被抓项进槽，槽里原来的动作回到被抓项原来的位置。
+            // 只换 slotActionId 的话，那个动作会回到它在 actionList 里的旧位
+            // 置，而不是被抓项腾出来的那一格。
+            const slotAction = root.rightSlot
+            if (drop.source === "bar")
+                root.removeFromQuickBar(drop.sourceIndex)
             root.slotChanged(drop.action.id)
+            if (drop.fromIndex >= 0 && slotAction) {
+                // 两个都排除：被拖项进槽，原槽动作搬到它腾出的那一格
+                const visible = (root.availableActions || [])
+                    .filter(a => a && a.id !== drop.action.id && a.id !== slotAction.id)
+                root.commitListOrder(
+                    Actions.insertAtVisibleIndex(root.actionList, slotAction,
+                                                 visible, drop.fromIndex))
+            }
             return
         }
         if (drop.source === "bar") {
-            if (drop.inList)
-                root.removeFromQuickBar(drop.sourceIndex)
+            if (!drop.inList)
+                return
+            root.removeFromQuickBar(drop.sourceIndex)
+            root.commitListOrder(root.listWithActionAt(drop.action, drop.toIndex))
             return
         }
         if (drop.source === "slot") {
-            if (drop.inList)
-                root.returnSlotActionToList(drop.action)
+            if (!drop.inList)
+                return
+            root.slotChanged("")
+            root.commitListOrder(root.listWithActionAt(drop.action, drop.toIndex))
             return
         }
         if (drop.inList && drop.fromIndex >= 0 && drop.toIndex >= 0
@@ -269,6 +298,17 @@ Rectangle {
         }
     }
 
+    // 列表顺序落盘：先按最终顺序冻结（松手瞬间就摆好，不演动画），再发出去。
+    // 数据回来时顺序已经一样，不会再有第二段位移。
+    function commitListOrder(list) {
+        if (!list)
+            return
+        root.animateCells = false
+        root.frozenList = list
+        freezeListTimer.restart()
+        root.orderChanged(list)
+    }
+
     // 落到固定栏：与拖动预览共用同一份 plan，保证「看到什么就得到什么」
     function applyQuickBarDrop(action, index, source, sourceIndex) {
         const plan = Actions.planQuickBarDrop(
@@ -277,17 +317,28 @@ Rectangle {
         root.quickBarChanged(plan.bar)
         if (plan.slotActionId !== root.slotActionId)
             root.slotChanged(plan.slotActionId)
-        root.orderChanged(plan.actionList)
+        root.commitListOrder(plan.actionList)
     }
 
     // 松手后先把固定栏的最终顺序冻结住，等真实数据追上来再解除 ——
     // 否则位置会先弹回拖动前的样子、数据回来后再动一次（看着像演了两遍）
     function freezeBarTo(bar) {
         root.frozenBar = bar
-        freezeTimer.restart()
+        freezeBarTimer.restart()
     }
 
     // 从固定栏移除某一项（拖到槽 / 拖出到列表），顺带冻结结果
+    // 列表的最终顺序：把 action 放到可见列表的第 at 位。
+    // at 是可见列表下标，不能直接拿去 splice actionList（隐藏项也占名额）
+    function listWithActionAt(action, at) {
+        if (!action)
+            return null
+        // 先排除动作自身：槽清空后它就在 availableActions 里
+        const visible = (root.availableActions || [])
+            .filter(a => a && a.id !== action.id)
+        return Actions.insertAtVisibleIndex(root.actionList, action, visible, at)
+    }
+
     function removeFromQuickBar(index) {
         // 用 toArray：quickBarActions 可能是 QML 包过的类数组，直接 slice 会失效
         const bar = Actions.toArray(root.quickBarActions).slice()
@@ -308,7 +359,7 @@ Rectangle {
         if (toDisplay >= shown.length) {
             const moved = Actions.moveActionToEndById(root.actionList, fromAction.id)
             root.frozenList = moved
-            freezeTimer.restart()
+            freezeListTimer.restart()
             root.orderChanged(moved)
             return
         }
@@ -318,7 +369,7 @@ Rectangle {
         const moved = Actions.moveActionById(root.actionList, fromAction.id, toAction.id)
         // 冻结：松手后到数据回来之前，列表就按「移动后」的顺序摆，别先弹回去再动画一遍
         root.frozenList = moved
-        freezeTimer.restart()
+        freezeListTimer.restart()
         root.orderChanged(moved)
     }
 
@@ -329,6 +380,10 @@ Rectangle {
     }
 
     function reenableAnim() {
+        // 列表还在冻结中就先别开动画：数据回来时顺序万一差一点点，
+        // 开了会看到松手后补一段位移
+        if (root.frozenList)
+            return
         root.animateCells = true
     }
 
@@ -343,26 +398,19 @@ Rectangle {
 
 
     // 右上角槽 → 回到列表；槽留空
-    function returnSlotActionToList(action) {
-        root.slotChanged("")
-        if (!root.actionExists(action.id))
-            root.orderChanged((root.actionList || []).concat([action]))
-    }
 
 
     // 根据跟手块的位置算列表落点（快捷栏/槽拖回列表时用）
     function updateTargetFromGhost() {
-        if (!root.ghostInList()) {
+        const view = root.actionListRef
+        const inScroll = root.ghostInListView
+        if (!root.ghostOverList || !view || !inScroll) {
             // ghost 在列表外（拖去固定栏 / 槽）：列表显示「移除后的样子」——
             // 源格之后整体前移，不留空位。落点用 -1 表示"不在列表"，
             // 松手时 commitDrop 也据此跳过列表内排序。
             root.dragTarget = -1
             return
         }
-        const view = root.actionListRef
-        if (!view)
-            return
-        const inScroll = view.mapFromItem(root, root.ghostX, root.ghostY)
         root.dragTarget = Actions.dropIndexAt(
             inScroll.x,
             inScroll.y + view.contentY,
@@ -394,35 +442,52 @@ Rectangle {
             && root.ghostY <= barOrigin.y + quickBar.height
             && root.ghostX >= midLeft
             && root.ghostX <= midLeft + quickBar.midW
-        root.dragBarIndex = inBand
-            ? Actions.quickBarInsertIndex(root.ghostX - midLeft,
-                                          (root.quickBarActions || []).length,
-                                          quickBar.slotW, quickBar.slotGap)
+        // 插入索引必须按「眼睛看到的布局」算：slotGap 是按 previewCount 摊开的，
+        // 以前这里传的是原始长度，两者口径不同（拖入时 4 vs 5、拖出时 4 vs 3），
+        // 同一个手指位置会算出完全不同的格子。
+        const previewCount = (root.quickBarResolved || []).length
+        // 要跳过的格 = 幽灵块**实际显示**的那一格，也就是上一帧 plan 的 insertedAt。
+        // 不能传 dragBarIndex（那是原始数组里的下标，和预览布局差一位），
+        // 跳错格会让判定基准整体偏移。
+        const ghostCell = root.barDropPlan ? root.barDropPlan.insertedAt : -1
+        let rawIndex = inBand
+            ? Actions.quickBarInsertIndex(root.ghostX - midLeft, previewCount,
+                                          quickBar.slotW, quickBar.slotGap,
+                                          ghostCell)
             : -1
+        let barIndex = rawIndex
+        // 预览索引 → 原始数组索引：源项还在原始数组里，planQuickBarDrop 内部
+        // 摘掉源项时会把 index 减 1，这里先补回来
+        if (barIndex >= 0 && root.dragFrom === "bar"
+                && root.dragFromIndex >= 0 && barIndex >= root.dragFromIndex)
+            barIndex += 1
+        root.dragBarIndex = barIndex
     }
 
-    function ghostInList() {
+    // 跟手块在滚动容器里的坐标。拖动中每帧都会变，算一次缓存住：
+    // 落点计算、自动滚动、松手判定都用它，以前各自 mapFromItem 一遍。
+    readonly property var ghostInListView: {
         const view = root.actionListRef
-        if (!view)
+        if (!view || !root.dragActive)
+            return null
+        return view.mapFromItem(root, root.ghostX, root.ghostY)
+    }
+
+    readonly property bool ghostOverList: {
+        const pos = root.ghostInListView
+        const view = root.actionListRef
+        if (!pos || !view)
             return false
-        const inScroll = view.mapFromItem(root, root.ghostX, root.ghostY)
-        return inScroll.x >= 0 && inScroll.x <= view.width
-            && inScroll.y >= 0 && inScroll.y <= view.height
+        return pos.x >= 0 && pos.x <= view.width
+            && pos.y >= 0 && pos.y <= view.height
     }
 
 
 
 
 
+    // 拖动状态已由 clearDragState() 清过，这里只负责幽灵块的淡出
     function finishDrag() {
-        root.dragOwner = ""
-        root.dragIndex = -1
-        root.dragTarget = -1
-        root.dragBarIndex = -1
-        root.dragOverSlot = false
-        if (root.actionListRef)
-            root.actionListRef.interactive = true
-        // 幽灵块淡出后再移除
         root.ghostFading = true
         ghostFadeTimer.restart()
     }
@@ -602,7 +667,7 @@ Rectangle {
     // 而且要用列表**前面的项**去量宽度（而不是拿一个假想的平均数）。
     //
     // 不能写成 property 绑定：量文字要改 measure.text，而结果又依赖
-    // measure.advanceWidth，Qt 会判定成绑定循环（实测狂刷 Binding loop）。
+    // measure.advanceWidth，Qt 会判定成绑定循环。
     property int candBarCount: 0
 
     // 顶栏词区的可用宽度：卡片宽减去两侧内边距，再减右侧那一列
@@ -662,7 +727,16 @@ Rectangle {
     // 高度变了 keyH 就变，候选测量的字号跟着变（candMeasure.font 依赖 keyH），
     // 容量必须重算 —— 否则拖高键盘后候选栏仍按旧字号排版，出现早省略
     onKeyHChanged: recomputeCandBar()
-    Component.onCompleted: recomputeCandBar()
+    Component.onCompleted: {
+        recomputeCandBar()
+        animSettleTimer.restart()
+    }
+
+    Timer {
+        id: animSettleTimer
+        interval: 150
+        onTriggered: root.animateCells = true
+    }
 
     // 候选栏显示前一段
     // 候选栏实际显示的项，以及列表页的输入（不含顶栏部分）。
@@ -675,8 +749,7 @@ Rectangle {
     // 候选列表页显示后一段（不含顶栏已有的，避免重复）。
     //
     // 只切「现在要画的那一窗」，不是整个后段：候选页每换一次候选都会
-    // 重建 Repeater，切 2000 个再截断比切 400 个慢三倍多
-    // （实测展开状态连续换候选：57ms -> 预计 20ms 以内）。
+    // 重建 Repeater，切 2000 个再截断比切 400 个慢三倍多。
     // candListTotal 给面板算滚动位置和「还有多少」用。
     readonly property int candListTotal:
         Math.max(0, root.candListModel.length - Math.max(0, root.candBarCount))
@@ -756,7 +829,7 @@ Rectangle {
     Timer {
         id: candReloadTimer
         // 800ms：rime 的 BulkCandidateList 是懒加载，取一次要跨页生成，
-        // 展开状态下每打几个字就重拉太贵（实测是主要的 CPU 抖动来源）。
+        // 展开状态下每打几个字就重拉太贵，是主要的 CPU 抖动来源。
         interval: 800
         repeat: false
         onTriggered: {
@@ -799,7 +872,7 @@ Rectangle {
 
     // 动作当前状态：active（开着的开关）/ disabled（当前不可用）/ default。
     // 必须是**属性绑定**而不是函数：函数体里读的 avoidWindows/isFloating 不会被
-    // QML 绑定跟踪，状态变了图标也不会重算（踩过：固定栏的激活态一直不亮）
+    // QML 绑定跟踪，状态变了图标也不会重算。
     readonly property var actionStates: ({
         float: root.isFloating ? "active" : "default",
         avoid: root.isFloating ? "disabled" : (root.avoidWindows ? "active" : "default"),
@@ -837,10 +910,6 @@ Rectangle {
                                   root.dragFrom, root.dragFromIndex))
     }
 
-    // 调试用：用原始数组直接算一遍可见动作，和 availableActions 的绑定结果对照
-    function debugVisibleCount() {
-        return Actions.visibleActions(actionList, slotActionId, quickBarActions).length
-    }
 
     // 松手后短暂保留落盘后的顺序：真实数据要等一个 IPC 往返才回到卡片，
     // 中间若用旧数组，位置会先跳回去、再动画到新位置（看起来就是"松手后又演了一遍"）
@@ -922,7 +991,7 @@ Rectangle {
     // I18n.trFor 的上下文 id（= plugin.json 的 id），缺词条时回退英文原串
     readonly property string pluginId: "inlineKeyboard"
 
-    // 插件翻译表由 PluginService 异步注册，晚于卡片构造（实测 onCompleted 时还没就绪）。
+    // 插件翻译表由 PluginService 异步注册，晚于卡片构造。
     // 用一个短轮询把它变成 root.localeVersion 的变化，让所有 tr() 绑定重算；
     // 不用 Connections 监听 pluginTranslationsChanged —— 在这里收不到。
     property int localeVersion: 0
@@ -992,7 +1061,10 @@ Rectangle {
         border.color: Theme.primary
         opacity: root.mode === "transparency" ? 1 : 0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+            enabled: root.animateCells
+            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
+        }
         z: 200
     }
 
@@ -1020,7 +1092,7 @@ Rectangle {
                 controller: root
                 anchors.fill: parent
                 // 用 opacity 而不是 visible：visible:false 期间内部几何不重算，
-                // 切回主页面时槽会被摆到错误的键位上（踩过）
+                // 切回主页面时槽会被摆到错误的键位上。
                 opacity: (root.page === "emoji" || root.showCandBar
                           || root.voiceActive) ? 0 : 1
                 enabled: root.page !== "emoji" && !root.showCandBar && !root.voiceActive
@@ -1039,7 +1111,7 @@ Rectangle {
 
             // 候选栏：盖在快捷栏上面。
             // 表情页不显示：那一行要留给分类，而且预编辑/候选在表情页上没意义，
-            // 候选栏盖过去还会把左上角的返回 X 压住（踩过，X 点不到）。
+            // 候选栏盖过去会把左上角的返回 X 压住。
             CandidateBar {
                 id: candBar
                 controller: root
@@ -1077,8 +1149,8 @@ Rectangle {
                     + Math.max(0, root.layoutRowCount - 1) * root.gap
 
             // ---- 候选列表页 ----
-            // 常驻实例 + 切可见性，不用 Loader 的 active 来回开关：实测反复
-            // 展开/收起会在销毁那一刻把内存冲到 6GB 并搞崩 qs —— 大子树的
+            // 常驻实例 + 切可见性，不用 Loader 的 active 来回开关：反复
+            // 展开/收起时，销毁那一刻内存会冲到 6GB 并搞崩 qs —— 大子树的
             // 销毁/重建比一直持有贵得多。实际实例化数量由内部的 shownCount
             // 控制（默认一屏 60 项），所以「常驻」不等于把上千个 delegate 都建出来。
             CandidatePanel {
@@ -1150,12 +1222,20 @@ Rectangle {
     }
 
     // 冻结窗口：够一次 IPC 往返即可，太长会盖住别的变化
+    // 固定栏冻结：松手后到真实数据回来之前先按落盘结果摆
     Timer {
-        id: freezeTimer
+        id: freezeBarTimer
+        interval: 220
+        onTriggered: root.frozenBar = null
+    }
+
+    // 列表冻结：同理，两者互不影响（以前共用一个，清一个会顺手把另一个也解冻）
+    Timer {
+        id: freezeListTimer
         interval: 220
         onTriggered: {
-            root.frozenBar = null
             root.frozenList = null
+            root.animateCells = true
         }
     }
 
@@ -1389,7 +1469,7 @@ Rectangle {
 
         // 调整大小面板的中心按钮组：圆形底 + 图标。
         // 必须在 Repeater 之外（Repeater 只渲染 delegate，
-        // 放在里面的其它子项会被静默丢掉 —— 踩过一次）
+        // 放在里面的其它子项会被静默丢掉）
         Row {
             anchors.centerIn: parent
             spacing: root.gap * 2

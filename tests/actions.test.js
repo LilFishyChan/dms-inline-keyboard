@@ -5,6 +5,8 @@ const {
     sanitizeActions,
     moveActionById,
     visibleActions,
+    insertAtVisibleIndex,
+    listShift, listGhostIndex, listBarShift,
     dropIndexAt,
     quickBarInsertIndex,
     planQuickBarDrop,
@@ -78,6 +80,110 @@ test("moveActionById: 空数组不抛异常", () => {
     assert.deepEqual(moveActionById(null, "a", "b"), []);
 });
 
+test("insertAtVisibleIndex: 按可见下标插，不被隐藏项影响", () => {
+    // 全量 [a,b,c,d]，可见 [b,c]（a 在固定栏、d 在槽里）
+    const all = [A("a"), A("b"), A("c"), A("d")];
+    const vis = [A("b"), A("c")];
+    const x = A("x");
+
+    // 可见第 0 位之前 → 插在 b 前面
+    assert.deepEqual(
+        insertAtVisibleIndex(all, x, vis, 0).map(i => i.id),
+        ["a", "x", "b", "c", "d"]
+    );
+    // 可见第 1 位之前 → 插在 b 和 c 之间
+    assert.deepEqual(
+        insertAtVisibleIndex(all, x, vis, 1).map(i => i.id),
+        ["a", "b", "x", "c", "d"]
+    );
+    // 超出可见长度 → 追加到末尾
+    assert.deepEqual(
+        insertAtVisibleIndex(all, x, vis, 2).map(i => i.id),
+        ["a", "b", "c", "d", "x"]
+    );
+});
+
+test("insertAtVisibleIndex: 已在列表里的动作先摘掉再插", () => {
+    const all = [A("a"), A("b"), A("c")];
+    const vis = [A("b"), A("c")];
+    assert.deepEqual(
+        insertAtVisibleIndex(all, A("a"), vis, 1).map(i => i.id),
+        ["b", "a", "c"]
+    );
+});
+
+// ---------------- 列表让位 ----------------
+const LSI = (o) => ({ editing: true, dragActive: true, dropNoop: false, dragIndex: -1, dragTarget: -1, ...o });
+
+test("listShift: 没在拖动时不偏移", () => {
+    assert.equal(listShift(LSI({ index: 2, dragActive: false })), 0);
+    assert.equal(listShift(LSI({ index: 2, editing: false })), 0);
+});
+
+test("listShift: 列表内往后拖，中间的往前挪", () => {
+    // 从 1 拖到 3：2、3 往前一格
+    assert.equal(listShift(LSI({ index: 2, dragIndex: 1, dragTarget: 3 })), -1);
+    assert.equal(listShift(LSI({ index: 3, dragIndex: 1, dragTarget: 3 })), -1);
+    assert.equal(listShift(LSI({ index: 1, dragIndex: 1, dragTarget: 3 })), 0, "源自己不动");
+    assert.equal(listShift(LSI({ index: 4, dragIndex: 1, dragTarget: 3 })), 0, "范围外不动");
+});
+
+test("listShift: 列表内往前拖，中间的往后挪", () => {
+    // 从 3 拖到 1：1、2 往后一格
+    assert.equal(listShift(LSI({ index: 1, dragIndex: 3, dragTarget: 1 })), 1);
+    assert.equal(listShift(LSI({ index: 2, dragIndex: 3, dragTarget: 1 })), 1);
+    assert.equal(listShift(LSI({ index: 0, dragIndex: 3, dragTarget: 1 })), 0);
+});
+
+test("listShift: 从外部拖进列表，目标位之后整体后移", () => {
+    assert.equal(listShift(LSI({ index: 0, dragIndex: -1, dragTarget: 2 })), 0);
+    assert.equal(listShift(LSI({ index: 2, dragIndex: -1, dragTarget: 2 })), 1);
+    assert.equal(listShift(LSI({ index: 5, dragIndex: -1, dragTarget: 2 })), 1);
+});
+
+test("listShift: 拖出列表时后面的往前补位", () => {
+    assert.equal(listShift(LSI({ index: 3, dragIndex: 1, dragTarget: -1 })), -1);
+    assert.equal(listShift(LSI({ index: 0, dragIndex: 1, dragTarget: -1 })), 0);
+});
+
+test("listShift: 无效落点（拖到键盘外）不动", () => {
+    const o = LSI({ index: 3, dragIndex: 1, dragTarget: -1, dropNoop: true });
+    assert.equal(listShift(o), 0);
+});
+
+test("listGhostIndex: 无效落点回原位", () => {
+    assert.equal(listGhostIndex(LSI({ dragIndex: 2, dragTarget: -1 })), -1);
+    assert.equal(listGhostIndex(LSI({ dragIndex: 2, dragTarget: -1, dropNoop: true })), 2);
+});
+
+test("listGhostIndex: 列表内拖到末尾时夹到最后一格", () => {
+    assert.equal(listGhostIndex(LSI({ dragIndex: 0, dragTarget: 5, count: 5 })), 4);
+    assert.equal(listGhostIndex(LSI({ dragIndex: 0, dragTarget: 2, count: 5 })), 2);
+});
+
+test("listGhostIndex: 从外部拖进来可以落在 count（新的一格）", () => {
+    assert.equal(listGhostIndex(LSI({ dragIndex: -1, dragTarget: 5, count: 5 })), 5);
+});
+
+test("listShift: 拖到槽时源离开、原槽动作插入", () => {
+    // 列表 [A,B(src),C,D]，槽里的动作会插到 2
+    // 目标：[A, C, X, D] —— A 不动、C 前移一格、D 不动
+    const base = { editing: true, dragActive: true, dropNoop: false, dragIndex: 1, dragTarget: -1, insertAt: 2 };
+    assert.equal(listShift({ ...base, index: 0 }), 0, "A 不动");
+    assert.equal(listShift({ ...base, index: 2 }), -1, "C 前移到 1");
+    assert.equal(listShift({ ...base, index: 3 }), 0, "D 原地 3");
+});
+
+test("listGhostIndex: 拖到槽时站在插入位", () => {
+    assert.equal(listGhostIndex({ dragIndex: 1, dragTarget: -1, insertAt: 2, count: 4 }), 2);
+});
+
+test("listBarShift: 拖进固定栏且挤出时整体后移", () => {
+    assert.equal(listBarShift({ hasBarPlan: true, hasEjected: true }), 1);
+    assert.equal(listBarShift({ hasBarPlan: true, hasEjected: false }), 0);
+    assert.equal(listBarShift({ hasBarPlan: false, hasEjected: false }), 0);
+});
+
 test("visibleActions: 过滤掉槽内和快捷栏内的动作", () => {
     const all = [A("undo"), A("float"), A("mic"), A("settings")];
     const quick = [A("float")];
@@ -106,6 +212,12 @@ test("dropIndexAt: 第 2 行第 1 列", () => {
     assert.equal(dropIndexAt(100, 66, 400, 8, 60, 6, 4), 4);
 });
 
+test("dropIndexAt: 格内任意位置都算插到这一格前面", () => {
+    // cellW=100 gap=0：第 0 格占 0..100
+    assert.equal(dropIndexAt(20, 10, 400, 8, 60, 0, 4), 0);
+    assert.equal(dropIndexAt(80, 10, 400, 8, 60, 0, 4), 0);
+});
+
 test("dropIndexAt: 超出右下角时夹到最后一格", () => {
     assert.equal(dropIndexAt(9999, 9999, 400, 5, 60, 6, 4), 5, "末尾（可追加）");
 });
@@ -119,15 +231,34 @@ test("quickBarInsertIndex: 空栏 → 0", () => {
     assert.equal(quickBarInsertIndex(100, 0, 80, 10), 0);
 });
 
-test("quickBarInsertIndex: 落在第一个动作左半边 → 0", () => {
-    // slotW=80, slotGap=10：第 0 个中心 = 10 + 40 = 50
+// slotW=80, slotGap=10：各块中心 50 / 140 / 230
+test("quickBarInsertIndex: 指针在块中心左侧 → 插到它左边", () => {
     assert.equal(quickBarInsertIndex(20, 3, 80, 10), 0);
+    assert.equal(quickBarInsertIndex(49, 3, 80, 10), 0);
+    assert.equal(quickBarInsertIndex(139, 3, 80, 10), 1);
 });
 
-test("quickBarInsertIndex: 落在两个动作之间 → 中间索引", () => {
-    // 中心：50 / 140 / 230
-    assert.equal(quickBarInsertIndex(95, 3, 80, 10), 1);
-    assert.equal(quickBarInsertIndex(185, 3, 80, 10), 2);
+test("quickBarInsertIndex: 指针在块中心右侧 → 插到它右边", () => {
+    assert.equal(quickBarInsertIndex(51, 3, 80, 10), 1);
+    assert.equal(quickBarInsertIndex(141, 3, 80, 10), 2);
+    assert.equal(quickBarInsertIndex(231, 3, 80, 10), 3);
+});
+
+test("quickBarInsertIndex: 幽灵块那格是死区", () => {
+    // slotW=80, slotGap=10，count=5，幽灵块在格 2
+    // 各块中心 50 / 140 / 230(跳过) / 320 / 410
+    // 指针在格 2 内任意位置（230 左右）都应当保持 2
+    assert.equal(quickBarInsertIndex(200, 5, 80, 10, 2), 2);
+    assert.equal(quickBarInsertIndex(230, 5, 80, 10, 2), 2);
+    assert.equal(quickBarInsertIndex(260, 5, 80, 10, 2), 2);
+});
+
+test("quickBarInsertIndex: 出了幽灵块才变", () => {
+    // 越过格 3 的中心 320 才变成 3
+    assert.equal(quickBarInsertIndex(319, 5, 80, 10, 2), 2);
+    assert.equal(quickBarInsertIndex(321, 5, 80, 10, 2), 3);
+    // 回到格 1 中心 140 左边 → 1
+    assert.equal(quickBarInsertIndex(139, 5, 80, 10, 2), 1);
 });
 
 test("quickBarInsertIndex: 越过最后一个 → count", () => {
