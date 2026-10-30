@@ -349,6 +349,10 @@ IPC/diagnostic output backing the claim:
 Regressions found this way are listed as commits against the source, not as
 claims in this README.
 
+## Roadmap
+
+- **Auto-show on focus** — open the keyboard when an input field gains focus. The addon already receives `InputContextFocusIn`; the open question is telling a touch from an Alt+Tab, which Wayland does not report.
+
 ## AI assistance
 
 This plugin was **built with substantial AI assistance** — pair-programmed

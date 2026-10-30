@@ -136,11 +136,10 @@ PanelWindow {
         right: true
     }
 
-    // 避让：reserve 键盘实际高度（窗口自身高度，已含上下留白与快捷栏），关闭时归零
-    // 避让高度只算键盘本体（kbHeight），不含预编辑预留区。
-    // 那块是浮在卡片上方的标签，压在应用内容上没关系；
-    // 算进 exclusiveZone 会把下面的窗口无谓地往上推 42px。
-    exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(root.kbHeight) : 0
+    // 避让：reserve 面板实际高度（cardHeight，已扣掉上下留白与把手前的间隙）。
+    // 用 saveH 的原始 kbHeight 会多留 pad+gap，下面的窗口被无谓地推远一截。
+    // 预编辑预留区不算 —— 那块是浮在卡片上方的标签，压在应用内容上没关系。
+    exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(metrics.cardHeight) : 0
 
     // 窗口只包住键盘本体 + 预编辑标签的预留高度。
     //
