@@ -373,6 +373,22 @@ PluginComponent {
     // 外观：缩放 + 透明度，都从设置读（PluginSettings 存的是百分数）
     property real bgOpacity: PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100.0
     property real keyOpacity: PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100.0
+    onBgOpacityChanged: opacitySaveTimer.restart()
+    onKeyOpacityChanged: opacitySaveTimer.restart()
+
+    // 拖滑块时值每帧都变，停手 400ms 再写盘
+    Timer {
+        id: opacitySaveTimer
+        interval: 400
+        onTriggered: {
+            // 先取到局部值：第一次 save 会触发 pluginDataChanged → reloadSettings
+            // 把另一个属性覆盖回去，第二次 save 再读 root 就是旧值了。
+            const bg = Math.round(root.bgOpacity * 100)
+            const key = Math.round(root.keyOpacity * 100)
+            PluginService.savePluginData(root.pluginId, "bgOpacity", bg)
+            PluginService.savePluginData(root.pluginId, "keyOpacity", key)
+        }
+    }
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     // 表现成「点透明度没反应」，很容易误判成面板本身坏了。
@@ -717,12 +733,16 @@ PluginComponent {
     function selectCandidateByIndex(index) { fcitxBridge.selectCandidate(index) }
 
     function reloadSettings() {
-        const nextBgOpacity = PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100.0
-        if (nextBgOpacity !== root.bgOpacity)
-            root.bgOpacity = nextBgOpacity
-        const nextKeyOpacity = PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100.0
-        if (nextKeyOpacity !== root.keyOpacity)
-            root.keyOpacity = nextKeyOpacity
+        // 透明度面板开着时不回读这两个值：自己刚保存会触发 pluginDataChanged，
+        // 回读会把还没写盘的另一个值覆盖掉（保存顺序被打乱）。
+        if (root.mode !== "transparency") {
+            const nextBgOpacity = PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100.0
+            if (nextBgOpacity !== root.bgOpacity)
+                root.bgOpacity = nextBgOpacity
+            const nextKeyOpacity = PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100.0
+            if (nextKeyOpacity !== root.keyOpacity)
+                root.keyOpacity = nextKeyOpacity
+        }
         const nextAvoid = PluginService.loadPluginData(root.pluginId, "avoidWindows", true)
         if (nextAvoid !== root.avoidWindows)
             root.avoidWindows = nextAvoid
@@ -1436,6 +1456,7 @@ PluginComponent {
             parts.push("open=" + root.open)
             parts.push("floating=" + root.floating)
             parts.push("socket=" + root.fcitxSocketUp)
+            parts.push("op=" + Math.round(root.bgOpacity * 100) + "/" + Math.round(root.keyOpacity * 100))
             parts.push("addonLog=" + root.fcitxLastError)
             parts.push("im=" + root.fcitxImName + "/" + root.fcitxImLabel
                        + (root.fcitxImKeyboard ? "(kb)" : "(ime)"))
