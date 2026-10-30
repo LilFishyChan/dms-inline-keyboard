@@ -1,5 +1,5 @@
 // 动作的一行展示：图标 │ 分隔线 │ 标题。
-// 列表磁贴、拖动落点幽灵、被挤出的幽灵都用它 —— 这三处本来各写了一份，
+// 列表磁贴、拖动落点幽灵、被挤出的幽灵都用它 —— 这三处本来各写了一份，所以抽成一个组件。
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -36,7 +36,7 @@ Row {
         opacity: root.dividerOpacity
     }
 
-    Text {
+    StyledText {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.label !== ""
         // 行高跟着图标走，文字在行内垂直居中。

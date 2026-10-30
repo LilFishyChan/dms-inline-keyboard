@@ -4,7 +4,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
-import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
 import "layouts/special-keys.js" as SpecialKeys
 import qs.DCommon.Widgets
 
@@ -200,7 +200,7 @@ Item {
             anchors.centerIn: parent
             spacing: root.keyH * root.labelGapRatio
 
-            Text {
+            StyledText {
                 visible: root.topLabel !== ""
                 text: root.topLabel
                 width: Math.max(10, bg.width - 8)
@@ -244,10 +244,13 @@ Item {
                 smooth: true
                 // 染成按键文字色，跟字体图标一致
                 layer.enabled: visible
-                layer.effect: ColorOverlay { color: root.labelColor }
+                layer.effect: MultiEffect {
+                    colorization: 1.0
+                    colorizationColor: root.labelColor
+                }
             }
 
-            Text {
+            StyledText {
                 visible: root.iconName === ""
                 width: Math.max(10, bg.width - 8)
                 horizontalAlignment: Text.AlignHCenter

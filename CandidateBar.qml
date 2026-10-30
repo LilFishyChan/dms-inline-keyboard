@@ -90,7 +90,7 @@ Item {
                                : (isFirst ? Theme.withAlpha(Theme.primary, 0.13) : "transparent")
                     }
 
-                    Text {
+                    StyledText {
                         id: label
                         // 不能用 anchors.centerIn：锚点会反过来设置 width，
                         // 和下面的绑定打架，elide 就按错的值判断。
@@ -211,7 +211,7 @@ Item {
         radius: 8
         color: Theme.withAlpha(Theme.surface, controller.bgOpacity)
 
-        Text {
+        StyledText {
             id: preeditLabel
             anchors.centerIn: parent
             text: controller.preedit || ""

@@ -41,7 +41,7 @@ Item {
     // 当前有没有输入框拿着焦点（addon 的 focus:0/1 消息）
     property bool inputFocused: false
     // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
-    // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），
+    // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），超时判据就看这个时间戳。
     property double lastSeenAt: 0
 
     // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，
@@ -180,7 +180,7 @@ Item {
         selfUi = st.self
         preeditEmbedded = st.embedded
         // UI 被 classicui 顶掉这件事交给 addon 自己处理：它的心跳每 2s 比一次
-        // currentUI()，不是自己就 claim —— 比这里 5s 限流地发 reclaim 更早，
+        // currentUI()，不是自己就 claim —— 比这里 5s 限流地发 reclaim 更早，所以这块不用我们管。
     }
 
     function applyImList(raw) {
@@ -232,7 +232,7 @@ Item {
     }
 
     // ---- 文本提交（表情 / 符号页）----
-    // 为什么不用按键通道：一个表情是多个码位，key: 是 keysym 语义，
+    // 为什么不用按键通道：一个表情是多个码位，key: 是 keysym 语义，表达不了一整串文本。
     property bool textSupported: true
 
     function commitText(text) {
@@ -261,7 +261,7 @@ Item {
     }
 
     // 选第 N 个候选。index 是 addon 的 candidateFromAll 全局下标。
-    // 走 socket 的 select: 命令——addon 重写后不再读 inline-keyboard-select 文件，
+    // 走 socket 的 select: 命令——addon 重写后不再读 inline-keyboard-select 文件，统一走这条路。
     function selectCandidate(index) {
         if (index < 0)
             return false
@@ -284,13 +284,13 @@ Item {
     }
 
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
-    // 退避重连：1s → 2s → 4s → 8s 封顶。没装 addon 的用户整天开着键盘，
+    // 退避重连：1s → 2s → 4s → 8s 封顶。没装 addon 的用户整天开着键盘，不能一直按 1s 重试。
     property int reconnectDelay: 1000
 
     Timer {
         interval: bridge.reconnectDelay
         // 连上了就不跑；只有键盘打开、且该连时才连。
-        // 无条件 running: true 会让插件在键盘收起后仍然重连，
+        // 无条件 running: true 会让插件在键盘收起后仍然重连，所以这里把条件写全。
         running: bridge.keyboardOpen && bridge.connectEnabled && !socket.connected
         repeat: true
         triggeredOnStart: true

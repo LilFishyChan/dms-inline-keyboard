@@ -11,7 +11,7 @@ DragHandler {
     property int ownerIndex: -1
     property var payload: null
     // 被拖的那个 delegate 本身。不能用 parent —— Handler 的 parent 是
-    // 「声明它的 item 的父项」（固定栏那种是 QuickBar、列表是滚动容器），
+    // 「声明它的 item 的父项」（固定栏那种是 QuickBar、列表是滚动容器），拿不到真正被拖的那块。
     property var dragItem: null
 
     // 每次移动都会发一次；列表用它做「拖到可视区顶端/底端自动滚动」

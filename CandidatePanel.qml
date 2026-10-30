@@ -190,7 +190,7 @@ Item {
                                : "transparent"
                     }
 
-                    Text {
+                    StyledText {
                         id: labelText
 
                         anchors.centerIn: parent
@@ -238,7 +238,7 @@ Item {
     }
 
     // 空状态提示（放在列表外面：ListView 的子项会跟着 contentY 滚）
-    Text {
+    StyledText {
         anchors.centerIn: candView
         visible: candList.rows.length === 0
         text: {
@@ -268,7 +268,7 @@ Item {
     }
 
     // 四个按钮贴列表页的首尾：上两个占前两行、下两个占最后两行。
-    // 不能用主键盘行高（keyH）来排行号——候选行高是 rowH（keyH 的 0.72），
+    // 不能用主键盘行高（keyH）来排行号——候选行高是 rowH（keyH 的 0.72），要按 rowH 算。
     readonly property var sideButtons: [
         { pos: "top0", icon: "keyboard_arrow_up", act: "up" },
         { pos: "top1", icon: "keyboard_arrow_down", act: "down" },

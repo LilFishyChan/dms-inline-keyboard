@@ -309,7 +309,7 @@ PluginSettings {
         root.iconQuery = ""
         if (root.pickerIndex >= 0) {
             root.pickingIcon = true
-            iconPopup.open()
+            root.pickingIcon = true
         }
     }
 
@@ -318,7 +318,7 @@ PluginSettings {
         root.pickForDraft = false
         root.pickerIndex = -1
         root.pickingIcon = true
-        iconPopup.open()
+        root.pickingIcon = true
     }
 
     function openIconPickerForDraft() {
@@ -327,7 +327,7 @@ PluginSettings {
         root.pickerIndex = -1
         root.iconQuery = ""
         root.pickingIcon = true
-        iconPopup.open()
+        root.pickingIcon = true
     }
 
     function applyIcon(name) {
@@ -346,7 +346,7 @@ PluginSettings {
             if (action)
                 root.patchAction(action.id, { icon: value })
         }
-        iconPopup.close()
+        root.pickingIcon = false
     }
 
     // 缺词条时回退英文原串
@@ -365,7 +365,7 @@ PluginSettings {
         radius: Theme.cornerRadius
         color: Theme.withAlpha(Theme.surfaceText, 0.07)
 
-        Text {
+        StyledText {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -378,7 +378,7 @@ PluginSettings {
             font.pixelSize: Theme.fontSizeMedium
         }
 
-        Text {
+        StyledText {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -454,7 +454,7 @@ PluginSettings {
             radius: Theme.cornerRadius
             color: Theme.withAlpha(Theme.surfaceText, 0.06)
 
-            Text {
+            StyledText {
                 id: cmdText
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -928,42 +928,24 @@ PluginSettings {
     }
 
     // 图标选择器浮窗：搜索 + 可滚动网格
-    Popup {
+    // 用 DCommon.DDialog 的 popout 模式承载，尺寸交给 DDialog 限制
+    DCommon.DDialog {
         id: iconPopup
-        parent: Overlay.overlay
-        x: parent ? Math.round((parent.width - width) / 2) : 0
-        y: parent ? Math.round((parent.height - height) / 2) : 0
-        width: Math.min(620, parent ? parent.width - 80 : 620)
-        height: Math.min(580, parent ? parent.height - 90 : 580)
-        modal: true
-        padding: Theme.spacingM
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        // visible 是只读的，只能 open()/close()；关掉时把状态同步回去
-        onClosed: {
+        popout: true
+        opened: root.pickingIcon
+        title: root.tr("Choose an icon")
+        maximumWidth: 620
+        maximumHeight: 580
+        onRejected: {
             root.pickingIcon = false
             root.pickerIndex = -1
             root.pickForDraft = false
             root.pickForWin = false
         }
 
-        background: Rectangle {
-            color: Theme.surfaceContainerHigh
-            radius: Theme.cornerRadius
-            border.width: 1
-            border.color: Theme.withAlpha(Theme.outlineVariant, 0.6)
-        }
-
         Column {
-            anchors.fill: parent
+            width: parent.width
             spacing: Math.round(Theme.spacingS)
-
-            StyledText {
-                width: parent.width
-                text: root.tr("Choose an icon")
-                font.pixelSize: Theme.fontSizeMedium
-                font.weight: Font.Medium
-                color: Theme.surfaceText
-            }
 
             // 搜索框：回车直接采用输入的名字（自定义图标名）
             DCommon.DTextField {
@@ -978,7 +960,7 @@ PluginSettings {
                 id: iconGrid
                 width: parent.width
                 // 给标题 / 搜索框 / 底部说明（可能两行）都留足空间
-                height: parent.height - 120
+                height: 420
                 cellWidth: 48
                 cellHeight: 48
                 clip: true
@@ -1097,68 +1079,44 @@ PluginSettings {
         }
     }
 
-    // 确认框：用不参与布局流的 Popup（设置页的子项是按顺序排版的，
-    // 把 DDialog 直接放进来会占掉一整屏、把其它选项挤出去）。
-    // 文案和按钮仍然用 DMS 的 StyledText / DButton。
-    Popup {
+    // 确认框：DCommon.DDialog 的 popout 模式，不参与设置页的流式排版
+    // （embedded 模式会占掉一整屏，必须走 popout）
+    DCommon.DDialog {
         id: debugConfirm
-        // 挂到窗口覆盖层上居中：设置页本身是长列表，直接 centerIn parent 会跑到内容顶部
-        parent: Overlay.overlay
-        anchors.centerIn: Overlay.overlay
-        visible: root.debugConfirmOpen
-        modal: true
-        width: Math.min(420, Overlay.overlay.width - Theme.spacingL * 4)
-        padding: Theme.spacingL
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        popout: true
+        opened: root.debugConfirmOpen
+        title: root.tr("Turn on debug mode?")
+        supportingText: root.tr("Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
+        maximumWidth: 420
 
-        onClosed: root.debugConfirmOpen = false
-
-        background: StyledRect {
-            color: Theme.surfaceContainerHigh
-            radius: Theme.cornerRadius
-        }
-
-        contentItem: Column {
-            width: debugConfirm.availableWidth
-            spacing: Theme.spacingM
-
-            StyledText {
-                width: parent.width
-                text: root.tr("Turn on debug mode?")
-                font.pixelSize: Theme.fontSizeLarge
-                color: Theme.surfaceText
-                wrapMode: Text.Wrap
-            }
-
-            StyledText {
-                width: parent.width
-                text: root.tr("Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
-                font.pixelSize: Theme.fontSizeSmall
-                color: Theme.surfaceVariantText
-                wrapMode: Text.Wrap
-            }
-
-            Row {
-                spacing: Theme.spacingS
-                anchors.right: parent.right
-
-                DCommon.DButton {
-                    text: root.tr("Cancel")
-                    backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
-                    textColor: Theme.surfaceText
-                    onClicked: root.debugConfirmOpen = false
-                }
-
-                DCommon.DButton {
-                    text: root.tr("Enable")
-                    backgroundColor: Theme.primary
-                    textColor: Theme.onPrimary
-                    onClicked: {
-                        root.writeDebugMode(true);
-                        root.debugConfirmOpen = false;
-                    }
+        actions: [
+            DCommon.DButton {
+                text: root.tr("Cancel")
+                backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                textColor: Theme.surfaceText
+                onClicked: root.debugConfirmOpen = false
+            },
+            DCommon.DButton {
+                text: root.tr("Enable")
+                backgroundColor: Theme.primary
+                textColor: Theme.onPrimary
+                onClicked: {
+                    root.writeDebugMode(true);
+                    root.debugConfirmOpen = false;
                 }
             }
-        }
+        ]
+
+        onRejected: root.debugConfirmOpen = false
     }
+
+    StyledText {
+        width: parent.width
+        text: root.tr("Debugging")
+        font.pixelSize: Theme.fontSizeLarge
+        font.weight: Font.Bold
+        color: Theme.surfaceText
+        topPadding: Theme.spacingL
+    }
+
 }

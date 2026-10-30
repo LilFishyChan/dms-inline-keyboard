@@ -1,4 +1,4 @@
-// Inline Keyboard 的键盘卡片本体：顶部快捷栏 + 右上角动作槽、按键区（page1/page2）、
+// Inline Keyboard 的键盘卡片本体：顶部快捷栏 + 右上角动作槽、按键区（page1/page2）、表情页、透明度面板和功能列表。
 
 import QtQuick
 import "data.js" as Data
@@ -35,6 +35,8 @@ Rectangle {
     property real gap: 6
     property real pad: 8
     property real candH: 44
+    // 写死像素值的缩放系数（窗口传 metrics.uiScale，840 宽时为 1）
+    property real designScale: 1
     // 和顶部动作固定栏同高（quickH），图标也按它的比例
     property real handleH: Math.round(root.quickH)
     property bool showHandle: true
@@ -42,7 +44,7 @@ Rectangle {
     // 长按自动重复的间隔（毫秒），由设置页配置
     property int repeatInterval: 60
     // 候选栏整行的开关：显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，
-    // 必须写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成
+    // 必须写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成半句。
     property bool showCandBar: false
 
     // 状态
@@ -56,7 +58,7 @@ Rectangle {
     // 放在卡片上是因为顶部分类条和中间的网格要读同一份状态。
     property string emojiSegment: "emoji"
     property string emojiCategory: "all"
-    // 点候选上屏：把索引写进 $XDG_RUNTIME_DIR/inline-keyboard-select，
+    // 切页：交给按键路由，page 状态由 daemon 统一管。
     function goPage(target) {
         root.keyPressed({k: "page", to: target})
     }
@@ -175,7 +177,7 @@ Rectangle {
         root.dragFromIndex = source === "cell" ? -1 : index
         root.dragIndex = source === "cell" ? index : -1
         root.dragTarget = source === "cell" ? index : -1
-        // 先算坐标再设 ghostAction：ghostAction 一变 DragGhost 就 visible，
+        // 先算坐标再设 ghostAction：ghostAction 一变 DragGhost 就 visible，所以坐标要在它变之前算好。
         const origin = item.mapToItem(root, centroidPos.x, centroidPos.y)
         root.pressCardX = origin.x
         root.pressCardY = origin.y
@@ -198,7 +200,7 @@ Rectangle {
     }
 
     // 松开：取快照 → 清状态 → 按落点分发。
-    // 顺序不能反：落点写入会触发 Repeater 重建、销毁当前 delegate，
+    // 顺序不能反：落点写入会触发 Repeater 重建、销毁当前 delegate，后面的代码就拿不到 owner 了。
     function endDrag() {
         const owner = root.dragOwner
         if (!owner) {
@@ -391,7 +393,6 @@ Rectangle {
     // ── 落点动作（由 endDrag 分发）────────────────────────────────
 
 
-
     // 右上角槽 → 回到列表；槽留空
 
 
@@ -435,10 +436,10 @@ Rectangle {
             && root.ghostY <= barOrigin.y + quickBar.height
             && root.ghostX >= midLeft
             && root.ghostX <= midLeft + quickBar.midW
-        // 插入索引必须按「眼睛看到的布局」算：slotGap 是按 previewCount 摊开的，
+        // 插入索引必须按「眼睛看到的布局」算：slotGap 是按 previewCount 摊开的，不能按槽宽直接除。
         const previewCount = (root.quickBarResolved || []).length
         // 要跳过的格 = 幽灵块**实际显示**的那一格，也就是上一帧 plan 的 insertedAt。
-        // 不能传 dragBarIndex（那是原始数组里的下标，和预览布局差一位），
+        // 不能传 dragBarIndex（那是原始数组里的下标，和预览布局差一位），要传幽灵块当前显示的那一格。
         const ghostCell = root.barDropPlan ? root.barDropPlan.insertedAt : -1
         let rawIndex = inBand
             ? Actions.quickBarInsertIndex(root.ghostX - midLeft, previewCount,
@@ -471,9 +472,6 @@ Rectangle {
         return pos.x >= 0 && pos.x <= view.width
             && pos.y >= 0 && pos.y <= view.height
     }
-
-
-
 
 
     // 拖动状态已由 clearDragState() 清过，这里只负责幽灵块的淡出
@@ -681,7 +679,7 @@ Rectangle {
     }
 
     // 候选栏能装下 candListModel 的前几项。
-    // 剩下的进列表页，两边不重复。所以容量必须按同一份数据算，
+    // 剩下的进列表页，两边不重复。所以容量必须按同一份数据算，否则会同时显示或同时漏掉一个。
     property int candBarCount: 0
 
     // 顶栏词区的可用宽度：卡片宽减去两侧内边距，再减右侧那一列
@@ -851,7 +849,7 @@ Rectangle {
     property bool fcitxVisible: false
 
     // 已放进固定位置的动作用户不应在列表里再看到一次
-    // 第三个参数必须用「冻结后」的固定栏：松手后到数据回来之前，固定栏已经显示新顺序了，
+    // 第三个参数必须用「冻结后」的固定栏：松手后到数据回来之前，固定栏已经显示新顺序了，用旧列表算会和眼睛看到的不一致。
     readonly property var availableActions:
         Actions.visibleActions(root.frozenList || actionList, slotActionId,
                                root.frozenBar || quickBarActions)
@@ -929,7 +927,7 @@ Rectangle {
     readonly property var listEjected: root.barDropPlan ? root.barDropPlan.ejected : null
 
     // 功能列表的列数（列表布局与落点计算共用）。
-    readonly property real actionMinCellW: 240
+    readonly property real actionMinCellW: Math.round(240 * root.designScale)
     readonly property int actionListColumns: Math.max(2,
         Math.floor((root.width - root.pad * 2 + root.gap)
                    / (root.actionMinCellW + root.gap)))
@@ -1011,7 +1009,7 @@ Rectangle {
     width: unit * Layout.rowUnits + gap * (Layout.rowUnits - 1) + pad * 2
 
     // 卡片高度**固定**：一律按主键区的行数算。
-    // 不能用 rows.length —— 那是「当前页」的行数，切到表情页（0 行）、
+    // 不能用 rows.length —— 那是「当前页」的行数，切到表情页（0 行）、功能列表页都会算错高度。
     readonly property int layoutRowCount: Layout.pageRows("page1").length
     // 和 Column 的结构逐项对齐，一项都不能少：
     // 这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
@@ -1281,7 +1279,7 @@ Rectangle {
         controller: root
     }
 
-    // 半透明遮罩压暗整个键盘（底下仍是键盘主页面），上面按当前尺寸画一个框，
+    // 半透明遮罩压暗整个键盘（底下仍是键盘主页面），上面按当前尺寸画一个框，四角各一个拖拽手柄。
     Item {
         id: resizeArea
         anchors.fill: parent
@@ -1290,7 +1288,7 @@ Rectangle {
         z: 300
 
         // 把手的**命中区**厚度固定，不跟键盘尺寸走。
-        readonly property real grip: 46
+        readonly property real grip: Math.round(46 * root.designScale)
 
         // 停靠且铺满时宽度没得调 → 只剩顶边；否则按模式给对应把手
         readonly property var handles: {
@@ -1422,12 +1420,12 @@ Rectangle {
                             start: { w: startW, h: startH },
                             dx: translation.x,
                             dy: translation.y,
-                            minW: root.baseKbWidth * 0.8,
-                            minH: root.baseKbHeight * 0.8,
+                            minW: root.baseKbWidth * Resize.MIN_FACTOR,
+                            minH: root.baseKbHeight * Resize.MIN_FACTOR,
                             maxW: root.screenW,
                             // 最高只到屏幕 2/3，再高就把应用内容压没了
                             maxH: Math.round(root.screenH * 2 / 3),
-                            // 只有**停靠**模式拖左右时是对称的（键盘水平居中、
+                            // 只有**停靠**模式拖左右时是对称的（键盘水平居中、拉一边两边一起动），浮动模式只动被拖的那条边。
                             symmetric: !root.isFloating
                                 && (handleItem.h === "e" || handleItem.h === "w"),
                             // 角落始终按当前宽高比缩放
@@ -1441,7 +1439,7 @@ Rectangle {
         }
 
         // 调整大小面板的中心按钮组：圆形底 + 图标。
-        // 必须在 Repeater 之外（Repeater 只渲染 delegate，
+        // 必须在 Repeater 之外（Repeater 只渲染 delegate，放进去会被复制成 N 份）。
         Row {
             anchors.centerIn: parent
             spacing: root.gap * 2

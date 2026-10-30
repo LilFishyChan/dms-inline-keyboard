@@ -46,11 +46,11 @@ Item {
     })
 
     // 组合键（Ctrl/Alt/Super）要优先于输入法：
-    // 预编辑挂着时 fcitx5 会先把组合键交给输入法引擎判断，
+    // 预编辑挂着时 fcitx5 会先把组合键交给输入法引擎判断，结果不可控，所以组合键一律走 ydotool。
     readonly property bool hasComboModifier: ctrlState !== 0 || altState !== 0 || superState !== 0
 
     // ---- ydotool ----
-    // 唯一后端。它通过 uinput 造真实键盘设备，事件走 libinput → 合成器第一环，
+    // 唯一后端。它通过 uinput 造真实键盘设备，事件走 libinput → 合成器第一环，比注入按键事件更底层。
     property bool ydotooldUp: false
 
     // 测试用：只记录「会发什么」，不真的注入（不调 ydotool、不发 socket）。

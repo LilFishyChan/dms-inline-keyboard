@@ -1,5 +1,6 @@
 // Inline Keyboard 的守护插件：唯一持有持久状态的地方。
-// 职责：读写插件设置与运行状态、提供 IPC 命令、按需创建/销毁两个键盘窗口、
+// 职责：读写插件设置与运行状态、提供 IPC 命令、按需创建/销毁两个键盘窗口，
+// 并把按键路由到 fcitx5 或 ydotool。
 
 import QtQuick
 import "data.js" as Data
@@ -109,7 +110,7 @@ PluginComponent {
 
         function onImLabelChanged() {
             // 只关「乐观显示」，**不清 optimisticImIdx**：
-            // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从
+            // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从第一行开始数。
             if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
                 root.optimisticImActive = false
         }
@@ -302,7 +303,7 @@ PluginComponent {
     }
 
     // 内置动作的处理函数表：id → 要执行的插件内部逻辑。
-    // 新增内置动作只需要在 actions.js 里加一条（带 kind: "builtin"）再加上这里的函数，
+    // 新增内置动作只需要在 actions.js 里加一条（带 kind: "builtin"）再加上这里的函数，两边名字对上就行。
     readonly property var builtinHandlers: ({
         "close": function() { root.hideKeyboard() },
         "float": function() { root.toggleFloating() },
@@ -503,7 +504,7 @@ PluginComponent {
     property bool voiceMinimal: false
 
     // VoiceBar 的两个按钮统一调 controller.voiceMicRequested() /
-    // controller.voiceMinimalRequested()。主键盘里 controller 是卡片（信号），
+    // controller.voiceMinimalRequested()。主键盘里 controller 是卡片（信号），胶囊窗口里是 daemon，所以这里也要实现一份。
     function voiceMicRequested() {
         root.voiceMicPressed()
     }
@@ -654,7 +655,7 @@ PluginComponent {
     readonly property real baseKbHeight: 444
 
     // 键盘实际尺寸：由「调整大小」拖出来并保存，默认就是名义尺寸。
-    // 原来的 scale 设置项已移除 —— 整体缩放和拖拽调大小是同一件事，
+    // 原来的 scale 设置项已移除 —— 整体缩放和拖拽调大小是同一件事，留两个入口只会互相打架。
     property real savedW: PluginService.loadPluginData(
         root.pluginId, "keyboardWidth", baseKbWidth)
     property real savedH: PluginService.loadPluginData(
@@ -673,7 +674,7 @@ PluginComponent {
     readonly property real kbHeight: root.savedH
 
     // ---- 调整大小：拖拽中的预览值，确认后写进 savedW/savedH ----
-    // 初值必须是**已保存的尺寸**，不能是名义尺寸：键盘可能已被拖成 840×355，
+    // 初值必须是**已保存的尺寸**，不能是名义尺寸：键盘可能已被拖成 840×355，用名义值会让预览先跳一下。
     property real resizeW: root.savedW
     property real resizeH: root.savedH
     // 进入调整态时的尺寸，取消要用它还原
@@ -705,7 +706,8 @@ PluginComponent {
     // 重置 = 回到名义尺寸，并且立刻落盘（和拖拽松手同一套语义）
     function resetResize() {
         const r = Resize.resetSize(root.baseKbWidth, root.baseKbHeight,
-                                   root.baseKbWidth * 0.8, root.baseKbHeight * 0.8)
+                                   root.baseKbWidth * Resize.MIN_FACTOR,
+                                   root.baseKbHeight * Resize.MIN_FACTOR)
         if (root.resizeCard) {
             root.resizeCard.resizeW = r.w
             root.resizeCard.resizeH = r.h
@@ -814,7 +816,7 @@ PluginComponent {
 
     readonly property bool keyboardVisible:
         // 语音模式下主键盘窗口被销毁（item 为 null），但键盘在用户眼里是开着的。
-        // 不算进来的话，状态栏小部件 / ipc toggle 会以为键盘没开、
+        // 不算进来的话，状态栏小部件 / ipc toggle 会以为键盘没开，于是又 open 一次。
         root.voiceMinimal || root.minimized
         || (dockedLoader.item && dockedLoader.item.keyboardVisible)
         || (floatingLoader.item && floatingLoader.item.keyboardVisible)
@@ -881,7 +883,7 @@ PluginComponent {
     readonly property var floatingLoaderItem: floatingLoader.item
 
     // 当前活动的键盘卡片（dock / float 两个 LazyLoader 之一）
-    // 这里必须读 floating —— 写成 isFloating 会读到 undefined，
+    // 这里必须读 floating —— 写成 isFloating 会读到 undefined，卡片上才叫 isFloating。
     readonly property var activeCard: {
         const win = root.floating ? floatingLoader.item : dockedLoader.item
         return win ? win.cardRef : null
@@ -931,7 +933,6 @@ PluginComponent {
 
     // 输入法清单由 addon 在键盘打开时主动推（imlist: 消息），这里不需要主动拉。
     function requestImList() {}
-
 
 // 切中英走 rime 的 D-Bus：键盘窗口持焦点时 ydotool 发的 Shift 落不到输入框
     function setImAscii(want) {
@@ -1244,11 +1245,9 @@ PluginComponent {
             return root.floating ? "INLINE_KEYBOARD_FLOATING" : "INLINE_KEYBOARD_DOCKED"
         }
 
-
         function setPage(p: string): string {
             return "INLINE_KEYBOARD_PAGE:" + root.setPage(p)
         }
-
 
         // 调试用：走和点表情一模一样的上屏通路（addon commit / 剪贴板兜底）
         function typeText(text: string): string {
@@ -1298,11 +1297,6 @@ PluginComponent {
             return "INLINE_KEYBOARD_MODIFIER:" + name + "=" + root.modifierStateOf(name)
         }
 
-
-
-
-
-
         function modifierStates(): string {
             if (!root.devMode) return "dev mode off"
             return root.stateSummary()
@@ -1315,10 +1309,6 @@ PluginComponent {
             root.clearModifierStates()
             return "INLINE_KEYBOARD_MODIFIER_MODE:" + root.modifierMode
         }
-
-
-
-
 
         function setMode(m: string): string {
             if (!root.devMode) return "dev mode off"
@@ -1341,7 +1331,6 @@ PluginComponent {
             root.editing = v
             return "INLINE_KEYBOARD_EDITING:" + v
         }
-
 
         // 调试用：一次导出卡片 / daemon 的关键数组长度，定位「该显示的不显示」类问题
         // 注意不能用可选链 ?. —— QML 的 JS 引擎不支持，整个文件会语法错误。
@@ -1370,14 +1359,8 @@ PluginComponent {
         parts.push("min=" + (root.minimized ? 1 : 0))
         parts.push("cardW=" + Math.round(root.activeCard ? root.activeCard.width : -1))
         parts.push("mode=" + (root.activeCard ? root.activeCard.mode : "-"))
-        parts.push("handles=" + (root.activeCard && root.activeCard.candListPanel
-            ? "-" : "-"))
         parts.push("isFloat=" + (root.activeCard && root.activeCard.isFloating ? 1 : 0))
-            parts.push("candListOpen="
-                       + (root.activeCard ? root.activeCard.candListOpen : "-")
-                       + " loaderActive="
-                       + (root.activeCard
-                          ? (root.activeCard.children.length > 0 ? "?" : "?") : "-"))
+            parts.push("candListOpen=" + (root.activeCard ? root.activeCard.candListOpen : "-"))
             parts.push("cand=" + root.fcitxCandidates.length
                        + " dbg=" + root.debugCandItems.length
                        + " all=" + root.allCandidates.length
@@ -1401,36 +1384,6 @@ PluginComponent {
             parts.push("lastError=" + (root.lastError || "-"))
             return parts.join(" | ")
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         // 调试用：直接设置固定栏动作（逗号分隔的动作 id），验证编辑态视觉用
         function setQuickBar(ids: string): string {
@@ -1528,14 +1481,6 @@ PluginComponent {
             return root.debugIpc("debugClearInjected", [])
         }
 
-
-
-
-
-
-
-
-
         function debugGeometry(): string {
             return root.debugIpc("debugGeometry", [])
         }
@@ -1551,7 +1496,6 @@ PluginComponent {
         function debugSetPosition(x: int, y: int): string {
             return root.debugIpc("debugSetPosition", [x, y])
         }
-
 
         function debugType(code: string): string {
             return root.debugIpc("debugType", [code])
@@ -1578,7 +1522,6 @@ PluginComponent {
             return root.debugIpc("debugSetSetting", [key, value])
         }
     }
-
 
     // 调试实现的入口：DebugIpc.qml 只在调试模式打开时实例化，关着的时候这些转发无实体可调。
     function debugIpc(method, args) {

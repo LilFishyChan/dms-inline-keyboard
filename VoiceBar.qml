@@ -84,7 +84,7 @@ Item {
     }
 
     // ---- 中：识别文字 ----
-    // 用 Item 夹在两端按钮之间，文字在里面左对齐；超长时从**前面**省略，
+    // 用 Item 夹在两端按钮之间，文字在里面左对齐；超长时从**前面**省略，让最近说的几个字留在视野里。
     Item {
         id: textArea
         anchors.left: collapseBtn.right
@@ -116,7 +116,7 @@ Item {
             }
         }
 
-        Text {
+        StyledText {
             id: label
             anchors.verticalCenter: parent.verticalCenter
             // 和左边那个圆形按钮之间留一点空隙（textArea 的左 margin 在主键盘里是 0，
@@ -140,7 +140,7 @@ Item {
         }
 
         // 只在没激活时提示，录音中不占位
-        Text {
+        StyledText {
             anchors.verticalCenter: parent.verticalCenter
             x: label.x
             visible: voiceBar.text === "" && !voiceBar.controller.voiceActive
@@ -167,7 +167,7 @@ Item {
             name: "mic"
             size: voiceBar.icon
             // 激活态图标转 onPrimary；未激活用正文色
-            //（不能写 controller.fg —— 胶囊窗口里 controller 是 daemon，
+            //（不能写 controller.fg —— 胶囊窗口里 controller 是 daemon，没有 fg），所以直接用 Theme。
             color: voiceBar.controller.voiceActive
                    ? Theme.onPrimary
                    : Theme.withAlpha(Theme.surfaceText, 0.8)

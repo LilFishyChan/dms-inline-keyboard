@@ -284,13 +284,6 @@ Item {
     }
 
 
-
-
-
-
-
-
-
     // 调试：当前页键表（下标|标签|键码|类型|Fn标签|有上档）。
     // 验收脚本按下标逐键点击，期望值另从 layouts/phone.js 算。
     function debugKeyList(): string {

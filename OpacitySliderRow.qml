@@ -2,6 +2,7 @@
 // 由 TransparencyPanel 实例化两次（背景 / 按键），改值通过 moved 信号交给调用方。
 import QtQuick
 import qs.Common
+import qs.Widgets
 import qs.DCommon.Widgets as DCommon
 
 Item {
@@ -31,7 +32,7 @@ Item {
             width: parent.width
             height: labelText.implicitHeight
 
-            Text {
+            StyledText {
                 id: labelText
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter

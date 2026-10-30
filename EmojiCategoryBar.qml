@@ -2,6 +2,7 @@
 // 高度和快捷栏相同（quickH），由 KeyboardCard 放在 topArea 里，替换掉快捷栏。
 import QtQuick
 import qs.Common
+import qs.Widgets
 import "layouts/emoji.js" as Emoji
 import "Motion.js" as Motion
 import qs.DCommon.Widgets
@@ -63,7 +64,7 @@ Item {
                         ColorAnimation { duration: Motion.micro }
                     }
 
-                    Text {
+                    StyledText {
                         id: chipLabel
                         anchors.centerIn: parent
                         text: modelData.label

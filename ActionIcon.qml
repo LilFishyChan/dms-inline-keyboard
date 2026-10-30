@@ -1,7 +1,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
-import Qt5Compat.GraphicalEffects
+import QtQuick.Effects
 import qs.DCommon.Widgets
 
 // 统一的动作图标：同一个动作在任何位置（列表 / 快捷栏 / 右上角槽 / 拖动块）都长一样。
@@ -60,8 +60,9 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         layer.enabled: visible
-        layer.effect: ColorOverlay {
-            color: root.color
+        layer.effect: MultiEffect {
+            colorization: 1.0
+            colorizationColor: root.color
         }
     }
 

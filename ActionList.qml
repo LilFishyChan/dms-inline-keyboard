@@ -99,7 +99,7 @@ Item {
         anchors.top: parent.top
         height: controller.keyH
 
-        Text {
+        StyledText {
             anchors.centerIn: parent
             text: controller.tr("Hold and drag to customise")
             color: Theme.withAlpha(controller.fg, 0.6)

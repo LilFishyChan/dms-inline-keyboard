@@ -122,7 +122,7 @@ Item {
         smooth: true
     }
 
-    Text {
+    StyledText {
         visible: grid.c.spaceEntry !== null && grid.c.fcitxImLabel !== ""
         text: grid.c.fcitxImLabel
         font.pixelSize: Math.max(10, Math.round(grid.c.keyH * 0.42))

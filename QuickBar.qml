@@ -1,5 +1,5 @@
 // Inline Keyboard 顶部快捷栏：左侧导航按钮、中间固定栏动作、右侧圆形动作槽。
-// 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，
+// 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，所以「松手后的样子」要靠 plan 单独算。
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -195,7 +195,7 @@ Item {
             // 当前不可用（比如浮动模式下「避让窗口」没意义）→ 和列表一样降透明度
             readonly property bool isDisabled: actState === "disabled"
             // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，
-            // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，
+            // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，看着像抖一下。
             property real lastValidX: 0
             readonly property real cellX: slotIndex >= 0
                 ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2

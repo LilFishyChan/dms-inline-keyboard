@@ -82,7 +82,7 @@ Item {
                                        : "transparent"
                 }
 
-                Text {
+                StyledText {
                     anchors.centerIn: parent
                     text: cell.modelData
                     // 表情字形本身有留白，乘 0.62 之后视觉大小才和键帽文字接近；
@@ -121,7 +121,7 @@ Item {
         }
 
         // 空分类兜底（数据表不该为空，但别让界面变成一片空白没人知道为什么）
-        Text {
+        StyledText {
             anchors.centerIn: parent
             visible: panel.items.length === 0
             text: panel.controller.tr("Empty")
@@ -160,7 +160,7 @@ Item {
                 color: Theme.withAlpha(panel.controller.fg, 0.85)
             }
 
-            Text {
+            StyledText {
                 id: backLabel
                 anchors.left: backIcon.right
                 anchors.leftMargin: Math.round(parent.height * 0.16)
@@ -225,7 +225,7 @@ Item {
                             ColorAnimation { duration: Motion.micro }
                         }
 
-                        Text {
+                        StyledText {
                             id: segLabel
                             anchors.centerIn: parent
                             text: modelData.label

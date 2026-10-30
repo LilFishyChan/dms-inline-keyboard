@@ -2,6 +2,7 @@
 // 键盘内部的下拉框：从右下角弹出、内容可滚动。
 import QtQuick
 import qs.Common
+import qs.Widgets
 import qs.DCommon.Widgets
 
 Item {
@@ -83,7 +84,7 @@ Item {
                            ? Theme.primary
                            : Theme.withAlpha(root.controller.fg, 0.09)
 
-                    Text {
+                    StyledText {
                         anchors.centerIn: parent
                         text: modelData.label
                         color: modelData.current ? Theme.onPrimary : root.controller.fg
@@ -108,7 +109,7 @@ Item {
                 }
 
                 // 「输入法 - 子模式名称」
-                Text {
+                StyledText {
                     anchors.left: rowIcon.visible ? rowIcon.right : labelChip.right
                     anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
                     anchors.right: parent.right
