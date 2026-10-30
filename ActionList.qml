@@ -69,16 +69,11 @@ Item {
 
     // 幽灵块该画在第几格 —— 松手后这一项实际会落到的格子（见 listGhostIndex）。
     // 无效落点（拖到键盘外）时松手不调整顺序，幽灵回它自己那一格。
-    // 拖到右上角槽时：源项去槽、槽里原来的动作回到列表。
-    // 它在列表里的落点 = 把被拖动作当作已进槽后重新算可见列表里的位置。
-    readonly property int slotInsertIndex: {
-        if (!controller || !controller.dragOverSlot || controller.dragIndex < 0)
-            return -1
-        if (!controller.rightSlot)
-            return -1
-        // 交换：被抓项进槽，槽里那个动作回到**被抓项的初始位置**
-        return controller.dragIndex
-    }
+    // 拖到槽时原槽动作要插入的格子（= 被抓项腾出的那一格）
+    readonly property int slotInsertIndex: (controller && controller.dragOverSlot
+                                            && controller.dragIndex >= 0
+                                            && controller.rightSlot)
+        ? controller.dragIndex : -1
 
     readonly property int ghostPlaceIndex: {
         if (!controller || !controller.ghostAction)
@@ -168,24 +163,20 @@ Item {
             // 目标位置：松开后动作会落到这里（幽灵块样式，和固定栏一致）
             GhostBlock {
                 id: dropShadow
-                // 拖到槽且源在列表：原槽动作会落到它腾出的那一格
-                // （固定栏源不画：那边落盘是摘掉源项，固定栏那格最终是空的）
+                // 拖到槽且源在列表：源格将换成槽里那个动作
                 readonly property var swapAction: (controller.dragOverSlot
                                                    && controller.dragIndex >= 0)
                     ? controller.rightSlot : null
-                // 交换时幽灵块站在「原槽动作会落到的那一格」，由 ghostPlaceIndex 给出
                 readonly property bool normalDrop: controller.ghostAction !== null
                     && (controller.dragTarget >= 0 || functionsArea.dropNoop)
                     && !controller.dragOverSlot && !controller.dragOverBar
-                readonly property int shownIndex: swapAction !== null
-                    ? functionsArea.ghostPlaceIndex : functionsArea.ghostPlaceIndex
 
                 active: swapAction !== null || normalDrop
                 action: swapAction !== null ? swapAction : controller.ghostAction
                 label: action ? controller.tr(action.label) : ""
-                x: (shownIndex % functionsArea.columns)
+                x: (functionsArea.ghostPlaceIndex % functionsArea.columns)
                    * (functionsArea.cellW + controller.gap)
-                y: Math.floor(shownIndex / functionsArea.columns)
+                y: Math.floor(functionsArea.ghostPlaceIndex / functionsArea.columns)
                    * (controller.keyH + controller.gap)
                 width: functionsArea.cellW
                 height: controller.keyH

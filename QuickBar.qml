@@ -114,9 +114,13 @@ Item {
     GhostBlock {
         id: insertGhost
         readonly property var plan: controller.barDropPlan
+        // 固定栏 → 槽的交换预览：源格将换成槽里那个动作
+        readonly property var swapAction: (controller.dragOverSlot
+                                           && controller.dragFrom === "bar")
+            ? controller.rightSlot : null
 
-        active: plan !== null
-        action: controller.ghostAction
+        active: plan !== null || swapAction !== null
+        action: swapAction !== null ? swapAction : controller.ghostAction
         iconRatio: 0.6
         z: 2
         y: (quickBar.height - quickBar.cellH) / 2
@@ -127,6 +131,7 @@ Item {
         // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
         property bool allowAnim: false
         property bool settling: false
+        // 交换时 barDropPlan 也会给出 insertedAt（= 被抓项腾出的那一格）
         readonly property real targetX: plan !== null
             ? quickBar.slotX(plan.insertedAt) + (quickBar.slotW - quickBar.cellW) / 2
             : x
@@ -148,7 +153,9 @@ Item {
             settleTimer.restart()
             insertGhost.syncX(false)
         }
-        onTargetXChanged: if (active) insertGhost.syncX(!insertGhost.settling)
+        // 不看 active：它和 targetX 都是绑定，同一帧里可能是旧值，
+        // 那样 syncX 会被跳过，幽灵块停在上一格
+        onTargetXChanged: insertGhost.syncX(!insertGhost.settling)
 
         // 手指在固定栏里持续移动时会给足时间；这段窗口只用来吸收
         // 「刚出现那一帧」的绑定求值顺序问题

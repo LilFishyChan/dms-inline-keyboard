@@ -263,11 +263,24 @@ Rectangle {
             // 只换 slotActionId 的话，那个动作会回到它在 actionList 里的旧位
             // 置，而不是被抓项腾出来的那一格。
             const slotAction = root.rightSlot
-            if (drop.source === "bar")
-                root.removeFromQuickBar(drop.sourceIndex)
+            if (drop.source === "bar") {
+                // 固定栏 ↔ 槽 真交换：槽里那个动作回到被拖项腾出的固定栏位置
+                const bar = Actions.toArray(root.quickBarActions).slice()
+                if (slotAction) {
+                    const at = Math.min(drop.sourceIndex, bar.length - 1)
+                    if (at >= 0)
+                        bar[at] = slotAction
+                    else
+                        bar.push(slotAction)
+                } else if (drop.sourceIndex >= 0 && drop.sourceIndex < bar.length) {
+                    bar.splice(drop.sourceIndex, 1)
+                }
+                root.freezeBarTo(bar)
+                root.quickBarChanged(bar)
+            }
             root.slotChanged(drop.action.id)
             if (drop.fromIndex >= 0 && slotAction) {
-                // 两个都排除：被拖项进槽，原槽动作搬到它腾出的那一格
+                // 列表源：原槽动作搬到被抓项腾出的那一格
                 const visible = (root.availableActions || [])
                     .filter(a => a && a.id !== drop.action.id && a.id !== slotAction.id)
                 root.commitListOrder(
@@ -903,7 +916,15 @@ Rectangle {
 
     // 落在固定栏时的最终结果（预览和落盘共用 actions.js 的 planQuickBarDrop）
     readonly property var barDropPlan: {
-        if (!(root.editing && root.dragActive && root.dragBarIndex >= 0 && root.ghostAction))
+        if (!(root.editing && root.dragActive && root.ghostAction))
+            return null
+        // 拖到槽（交换）：原槽动作插到被抓项腾出的那一格。走同一套 plan，
+        // 固定栏布局才是「源项已移除 + X 已插入」的最终样子，其他块才会让位。
+        if (root.dragOverSlot && root.dragFrom === "bar" && root.rightSlot)
+            return Actions.planQuickBarDrop(
+                root.quickBarDropArgs(root.rightSlot, root.dragFromIndex,
+                                      root.dragFrom, root.dragFromIndex))
+        if (root.dragBarIndex < 0)
             return null
         return Actions.planQuickBarDrop(
             root.quickBarDropArgs(root.ghostAction, root.dragBarIndex,
