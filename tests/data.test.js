@@ -22,7 +22,6 @@ const fixture = name =>
 const STATUS_CN = () => fixture("status-rime-cn.json");
 const IMLIST = () => fixture("imlist.json");
 
-// ---------------- parseStatus ----------------
 
 test("parseStatus: 真实 rime 中文样本", () => {
     const s = parseStatus(STATUS_CN(), null);
@@ -82,7 +81,6 @@ test("parseStatus: 纯键盘布局没有候选", () => {
     assert.deepEqual(s.items, []);
 });
 
-// ---------------- parseImList ----------------
 
 test("parseImList: 真实样本两个输入法", () => {
     const list = parseImList(IMLIST(), []);
@@ -109,7 +107,6 @@ test("parseImList: 丢掉没有 name 的条目", () => {
     assert.equal(got[0].name, "rime");
 });
 
-// ---------------- isAsciiMode ----------------
 
 test("isAsciiMode: 英文字模式标签", () => {
     assert.equal(isAsciiMode("abc"), true);
@@ -127,7 +124,6 @@ test("isAsciiMode: 空标签按中文处理（宁可不切）", () => {
     assert.equal(isAsciiMode(null), false);
 });
 
-// ---------------- buildImRows ----------------
 
 test("buildImRows: 纯键盘布局只占一行", () => {
     const rows = buildImRows(parseImList(IMLIST(), []), "keyboard-us", "en");
@@ -187,7 +183,6 @@ test("buildImRows: 空清单返回空数组", () => {
     assert.deepEqual(buildImRows(null, "rime", "万"), []);
 });
 
-// ---------------- nextImRow ----------------
 
 test("nextImRow: 从键盘布局切到拼音中文", () => {
     const rows = buildImRows(parseImList(IMLIST(), []), "keyboard-us", "en");
@@ -235,7 +230,6 @@ test("nextImRow: 连续点一圈能回到起点", () => {
     assert.deepEqual(seen, ["rime:false", "rime:true", "keyboard-us:false"]);
 });
 
-// ---------------- 候选切分 ----------------
 
 test("barCandidates: 固定从头取，不跟随翻页", () => {
     const all = ["甲", "乙", "丙", "丁"];
@@ -271,7 +265,6 @@ test("全量候选：顶栏 + 展开列表正好覆盖全集且不重复", () =>
     assert.equal(new Set([...bar, ...rest]).size, all.length);
 });
 
-// ---------------- swapEscTilde ----------------
 
 test("swapEscTilde: 把反引号那格换成 Esc", () => {
     const rows = [[{ k: "char", l: "`", s: "~", c: 41, w: 1 }]];
@@ -315,7 +308,6 @@ test("swapEscTilde: 空输入不崩", () => {
     assert.deepEqual(swapEscTilde([[]]), [[]]);
 });
 
-// ---------------- actionExists ----------------
 
 test("actionExists: 命中与未命中", () => {
     const list = [{ id: "undo" }, { id: "redo" }];
@@ -333,7 +325,6 @@ test("actionExists: 跳过 null 条目", () => {
     assert.equal(actionExists([null, undefined], "undo"), false);
 });
 
-// ---------------- quickBarIndexFor ----------------
 
 test("quickBarIndexFor: 返回正确索引", () => {
     const bar = [{ id: "a" }, { id: "b" }, { id: "c" }];
@@ -355,7 +346,6 @@ test("quickBarIndexFor: 重复 id 返回第一个", () => {
     assert.equal(quickBarIndexFor(bar, "a"), 0);
 });
 
-// ---------------- hasMore（还有没显示的候选）----------------
 
 test("parseStatus: 读出 hasMore", () => {
     const st = parseStatus(JSON.stringify({

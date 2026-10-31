@@ -11,29 +11,28 @@ QtObject {
     // 插件翻译表刷新（见 KeyboardCard 里的同款注释）
     function tr(term) {
         if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
-            return term
-        const table = I18n.pluginTranslations
-        return table ? I18n.trFor("inlineKeyboard", term) : term
+            return term;
+
+        const table = I18n.pluginTranslations;
+        return table ? I18n.trFor("inlineKeyboard", term) : term;
     }
 
     // 一次 sh -c 把缺失的必需项打出来（只输出缺的）
     function probeCommand() {
-        const commands = requiredCommands.join(" ")
-        let cmd = "for c in " + commands + "; do command -v \"$c\" >/dev/null 2>&1"
-                + " || printf '%s ' \"$c\"; done"
-        return cmd
+        const commands = requiredCommands.join(" ");
+        let cmd = "for c in " + commands + "; do command -v \"$c\" >/dev/null 2>&1" + " || printf '%s ' \"$c\"; done";
+        return cmd;
     }
 
     function check(done) {
-        Proc.runCommand("inlineKeyboard.depCheck", ["sh", "-c", probeCommand()],
-            (stdout, exitCode) => {
-                const missing = String(stdout || "").trim()
-                if (missing === "") {
-                    done(null)
-                    return
-                }
-                done(tr("Inline Keyboard requires: %1").arg(missing))
-            })
+        Proc.runCommand("inlineKeyboard.depCheck", ["sh", "-c", probeCommand()], (stdout, exitCode) => {
+            const missing = String(stdout || "").trim();
+            if (missing === "") {
+                done(null);
+                return ;
+            }
+            done(tr("Inline Keyboard requires: %1").arg(missing));
+        });
     }
 
 }

@@ -20,20 +20,17 @@ DragHandler {
     target: null
     // 滚动惯性还在跑时拖动会被 Flickable 抢走（「刚滚完拖一下没反应」）
     grabPermissions: PointerHandler.CanTakeOverFromAnything
-
-// 用 pressPosition（按下那一刻）：快速拖动时 handler 激活已移了一段
-    onActiveChanged: active
-        ? root.controller.beginDrag(root.owner, root.ownerIndex, centroid.pressPosition,
-                                    root.dragItem, root.payload)
-        : root.controller.endDrag()
-
+    // 用 pressPosition（按下那一刻）：快速拖动时 handler 激活已移了一段
+    onActiveChanged: active ? root.controller.beginDrag(root.owner, root.ownerIndex, centroid.pressPosition, root.dragItem, root.payload) : root.controller.endDrag()
     onTranslationChanged: {
         if (!active)
-            return
+            return ;
+
         // 没抢到拖动权（上一次残留 / 重复起手）就别动状态
         if (root.controller.dragOwner !== root.owner + ":" + root.ownerIndex)
-            return
-        root.controller.updateDrag(translation)
-        root.dragged(translation)
+            return ;
+
+        root.controller.updateDrag(translation);
+        root.dragged(translation);
     }
 }

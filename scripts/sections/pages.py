@@ -27,9 +27,27 @@ def emoji():
 
     # 符号段：切过去内容要变（分类条只在 emoji 段有）
     r = c.ipc("setEmojiFilter", "symbols", "all")
-    c.check("切到符号段", "symbols" in r, r)
+    c.check("切到符号段", "symbol" in r, r)
+
+    # 分段按钮的 currentIndex 和 controller 状态必须一致：
+    # 点过之后 currentIndex 的绑定会被 QML 打断，靠 Connections 兜底同步
+    seg = c.ipc("debugEmojiSegment")
+    c.check("符号段按钮索引 = 1", "segment=symbol" in seg and "index=1" in seg, seg)
     c.ipc("setEmojiFilter", "emoji", "all")
     time.sleep(0.4)
+    seg = c.ipc("debugEmojiSegment")
+    c.check("表情段按钮索引 = 0", "segment=emoji" in seg and "index=0" in seg, seg)
+
+    # 真实点击分段按钮：DButtonGroup 单选只发 selectionChanged，
+    # 选中态要自己维护，这里锁住「点得动」这一点
+    r = c.ipc("debugTapEmojiSegment", "1")
+    c.check("点符号段按钮", "emojiSeg:1" in r, r)
+    time.sleep(0.5)
+    seg = c.ipc("debugEmojiSegment")
+    c.check("点完切到符号段", "segment=symbol" in seg and "index=1" in seg, seg)
+    r = c.ipc("debugTapEmojiSegment", "0")
+    c.check("点回表情段按钮", "emojiSeg:0" in r, r)
+    time.sleep(0.5)
 
     # 分类 chip 走真实点击
     r = c.ipc("debugTap", "emojiCat", "smileys", 0)

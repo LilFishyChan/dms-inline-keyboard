@@ -112,7 +112,6 @@ test("insertAtVisibleIndex: 已在列表里的动作先摘掉再插", () => {
     );
 });
 
-// ---------------- 列表让位 ----------------
 const LSI = (o) => ({ editing: true, dragActive: true, dropNoop: false, dragIndex: -1, dragTarget: -1, ...o });
 
 test("listShift: 没在拖动时不偏移", () => {
@@ -226,7 +225,6 @@ test("dropIndexAt: 数量为 0 时返回 -1", () => {
     assert.equal(dropIndexAt(10, 10, 400, 0, 60, 6, 4), -1);
 });
 
-// ---------------- 固定栏插入位置 ----------------
 test("quickBarInsertIndex: 空栏 → 0", () => {
     assert.equal(quickBarInsertIndex(100, 0, 80, 10), 0);
 });
@@ -265,7 +263,6 @@ test("quickBarInsertIndex: 越过最后一个 → count", () => {
     assert.equal(quickBarInsertIndex(500, 3, 80, 10), 3);
 });
 
-// ---------------- 落到固定栏的结果 ----------------
 const L = (...ids) => ids.map(id => ({ id, label: id, icon: "" }));
 
 test("planQuickBarDrop: 从列表拖进空栏", () => {
@@ -368,7 +365,6 @@ test("planQuickBarDrop: 重复动作 + 满栏，也不会挤出多余的项", ()
 });
 
 
-// ---------- QML 会把数组包成类数组对象，Array.isArray 为 false ----------
 // 这里用 {length, 0:.., 1:..} 模拟那种对象；不处理的话整个列表会变空
 const pseudo = (...items) => {
     const o = { length: items.length };
@@ -415,7 +411,6 @@ test("planQuickBarDrop: 动作表和固定栏是类数组时也能工作", () =>
 });
 
 
-// ---------- 固定栏在拖动中的渲染数组 ----------
 test("quickBarViewActions: 没在拖动时就是真实数组", () => {
     const view = quickBarViewActions({ bar: L("a", "b"), plan: null, frozen: null, dragActive: false });
     assert.deepEqual(view.map(x => x.id), ["a", "b"]);
@@ -487,7 +482,6 @@ test("quickBarViewActions: 类数组也能处理", () => {
 });
 
 
-// ---------- 动作的隐藏 / 删除 / 编辑 ----------
 test("markBuiltin: 默认动作都打上 builtin:true", () => {
     const list = markBuiltin([{ id: "a", label: "A", icon: "star" }, { id: "b" }]);
     assert.equal(list.length, 2);
@@ -567,7 +561,6 @@ test("appendAction 之前补默认表：自定义动作全部丢失内置时不�
     assert.deepEqual(r.actions.map(x => x.id), ["undo", "redo", "u1", "u7"]);
 });
 
-// ---------- 拖到列表末尾 ----------
 test("dropIndexAt: 落在最后一项之后 → count（追加到末尾）", () => {
     // 4 列，cellW=100 gap=0 cellH=60，count=2 → 最后一格是 row0/col1（x 100..200，中心 150）
     assert.equal(dropIndexAt(10, 10, 400, 2, 60, 0, 4), 0);
@@ -599,12 +592,15 @@ test("sanitizeActions: kind 按 cmd 有无推断（老配置没有 kind 字段�
     assert.equal(byId.explicitCmd.kind, "cmd", "显式 kind 优先");
 });
 
-test("defaultActions: 全部内置动作都标了 kind=builtin", () => {
+test("defaultActions: 内置动作的 kind 是 builtin 或 cmd，cmd 类必须有命令", () => {
     const { defaultActions } = require("../actions.js");
     const list = defaultActions();
     assert.ok(list.length > 0);
-    for (const a of list)
-        assert.equal(a.kind, "builtin", a.id + " 应该标成 builtin");
+    for (const a of list) {
+        assert.ok(a.kind === "builtin" || a.kind === "cmd", a.id + " 的 kind 不合法：" + a.kind);
+        if (a.kind === "cmd")
+            assert.ok(typeof a.cmd === "string" && a.cmd.trim() !== "", a.id + " 是 cmd 类，必须带命令");
+    }
 });
 
 test("mergeNewBuiltins: 补上老配置缺失的内置动作，已有项顺序不变", () => {
@@ -628,7 +624,7 @@ test("mergeNewBuiltins: 新补的动作默认 hidden，不进功能页", () => {
     for (const a of added) {
         assert.equal(a.hidden, true, a.id + " 应该默认隐藏");
         assert.equal(a.builtin, true);
-        assert.equal(a.kind, "builtin");
+        assert.ok(a.kind === "builtin" || a.kind === "cmd", a.id + " 的 kind 不合法：" + a.kind);
     }
 });
 

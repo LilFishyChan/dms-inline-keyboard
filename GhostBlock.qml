@@ -14,10 +14,8 @@ Rectangle {
     property bool active: true
     // 只有图标时，图标占块高的比例（固定栏的块比图标行窄，用 0.6 才对得上真实块）
     property real iconRatio: 0.5
-
     readonly property bool hasLabel: label !== ""
-    readonly property int iconSize: hasLabel
-        ? Math.round(height * 0.42) : Math.round(height * iconRatio)
+    readonly property int iconSize: hasLabel ? Math.round(height * 0.42) : Math.round(height * iconRatio)
 
     visible: active && action !== null
     opacity: action !== null ? 0.55 : 0
@@ -39,9 +37,7 @@ Rectangle {
         pixelSize: Math.max(12, Math.round(root.height * 0.29))
         // 不给上限时 ActionLabel 用 implicitWidth，elide 又是 ElideNone，
         // 名字一长就直接冲出幽灵块右边界。给宽后它自动切 HorizontalFit。
-        maxLabelWidth: Math.max(24, root.width
-                                - Math.round(root.height * 0.34) * 2
-                                - root.iconSize * 2 - 1)
+        maxLabelWidth: Math.max(24, root.width - Math.round(root.height * 0.34) * 2 - root.iconSize * 2 - 1)
         dividerOpacity: 0.45
     }
 
@@ -52,4 +48,5 @@ Rectangle {
         size: root.iconSize
         color: Theme.primary
     }
+
 }

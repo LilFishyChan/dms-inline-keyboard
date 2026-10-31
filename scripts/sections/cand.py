@@ -19,8 +19,7 @@ WORD_COUNT = 30
 
 def candidates():
     print("== cand 候选条 / 列表 ==")
-    # 注意：check 的 detail 参数每次都会求值，别在里面放有副作用的调用
-    # （曾经把 debugCand("") 写进 detail，结果刚注入的候选被自己清掉了）
+    # check 的 detail 参数每次都会求值，里面不能放有副作用的调用
     r = c.ipc("debugCand", WORDS)
     c.check("注入假候选", r.startswith(str(WORD_COUNT)), r)
     c.ipc("open")

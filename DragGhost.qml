@@ -1,8 +1,8 @@
+import "Motion.js" as Motion
 // 拖动中的跟手块：圆形主题色底 + 动作图标。
 // 必须是卡片的直接子项（不能放进列表里）：列表的 clip 会把它正好在最需要时裁掉。
 import QtQuick
 import qs.Common
-import "Motion.js" as Motion
 
 Rectangle {
     id: root
@@ -11,10 +11,6 @@ Rectangle {
 
     visible: root.controller.editing && root.controller.ghostAction !== null
     opacity: root.controller.ghostFading ? 0 : 1
-    Behavior on opacity {
-        enabled: controller ? controller.animateCells : true
-        NumberAnimation { duration: Motion.ghost; easing.type: Easing.OutCubic }
-    }
     z: 300
     width: root.controller.keyH
     height: root.controller.keyH
@@ -29,4 +25,15 @@ Rectangle {
         size: Math.round(parent.width * 0.45)
         color: Theme.onPrimary
     }
+
+    Behavior on opacity {
+        enabled: controller ? controller.animateCells : true
+
+        NumberAnimation {
+            duration: Motion.ghost
+            easing.type: Easing.OutCubic
+        }
+
+    }
+
 }

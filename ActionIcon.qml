@@ -1,40 +1,42 @@
 import QtQuick
-import qs.Common
-import qs.Widgets
 import QtQuick.Effects
+import qs.Common
 import qs.DCommon.Widgets
+import qs.Widgets
 
 // 统一的动作图标：同一个动作在任何位置（列表 / 快捷栏 / 右上角槽 / 拖动块）都长一样。
-// icon 有两种写法：
 Item {
     id: root
 
     property var action: null
     property real size: 26
     property color color: Theme.surfaceText
-
     readonly property string iconName: action ? (action.icon || "") : ""
-
     // 图片图标：带图片扩展名、file:// 前缀或绝对路径
     readonly property bool isImageIcon: {
-        const name = root.iconName
+        const name = root.iconName;
         if (name === "")
-            return false
+            return false;
+
         if (name.indexOf("file://") === 0 || name.indexOf("/") === 0)
-            return true
-        return /\.(svg|png|jpe?g|webp)$/i.test(name)
+            return true;
+
+        return /\.(svg|png|jpe?g|webp)$/i.test(name);
     }
     // Image.source 需要 URL 或绝对路径
     readonly property string imageSource: {
         if (!root.isImageIcon)
-            return ""
-        const name = root.iconName
+            return "";
+
+        const name = root.iconName;
         if (name.indexOf("://") > 0 || name.indexOf("file:") === 0)
-            return name
+            return name;
+
         if (name.indexOf("/") === 0)
-            return "file://" + name
+            return "file://" + name;
+
         // 相对路径按插件目录解析（icons/keyboard-float.svg）
-        return Qt.resolvedUrl(name)
+        return Qt.resolvedUrl(name);
     }
 
     width: size
@@ -60,10 +62,12 @@ Item {
         fillMode: Image.PreserveAspectFit
         smooth: true
         layer.enabled: visible
+
         layer.effect: MultiEffect {
-            colorization: 1.0
+            colorization: 1
             colorizationColor: root.color
         }
+
     }
 
 }

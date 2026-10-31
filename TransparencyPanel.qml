@@ -13,13 +13,17 @@ Item {
         spacing: Math.round(root.controller.keyH * 0.75)
         width: parent.width * 0.7
 
-        // ---- 预览：A / Shift（激活态）/ Win（锁定态） ----
+        // 预览：A / Shift 激活态 / Win 锁定态
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: root.controller.gap
 
             Key {
-                keyData: ({ k: "char", l: "A", w: 1.2 })
+                keyData: ({
+                    "k": "char",
+                    "l": "A",
+                    "w": 1.2
+                })
                 unit: root.controller.unit
                 keyH: root.controller.keyH
                 gap: root.controller.gap
@@ -27,7 +31,11 @@ Item {
             }
 
             Key {
-                keyData: ({ k: "shift", l: "Shift", w: 1.8 })
+                keyData: ({
+                    "k": "shift",
+                    "l": "Shift",
+                    "w": 1.8
+                })
                 unit: root.controller.unit
                 keyH: root.controller.keyH
                 gap: root.controller.gap
@@ -36,13 +44,18 @@ Item {
             }
 
             Key {
-                keyData: ({ k: "key", l: "Win", w: 1.5 })
+                keyData: ({
+                    "k": "key",
+                    "l": "Win",
+                    "w": 1.5
+                })
                 unit: root.controller.unit
                 keyH: root.controller.keyH
                 gap: root.controller.gap
                 keyOpacity: root.controller.keyOpacity
                 modifierState: 2
             }
+
         }
 
         OpacitySliderRow {
@@ -51,7 +64,7 @@ Item {
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
             label: root.controller.tr("Background opacity")
             value: root.controller.bgOpacity
-            onMoved: v => {
+            onMoved: (v) => {
                 root.controller.bgOpacity = v;
                 root.controller.opacityAdjusted(root.controller.bgOpacity, root.controller.keyOpacity);
             }
@@ -63,10 +76,12 @@ Item {
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
             label: root.controller.tr("Key opacity")
             value: root.controller.keyOpacity
-            onMoved: v => {
+            onMoved: (v) => {
                 root.controller.keyOpacity = v;
                 root.controller.opacityAdjusted(root.controller.bgOpacity, root.controller.keyOpacity);
             }
         }
+
     }
+
 }

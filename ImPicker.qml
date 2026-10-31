@@ -2,10 +2,13 @@
 // 键盘内部的下拉框：从右下角弹出、内容可滚动。
 import QtQuick
 import qs.Common
-import qs.Widgets
+import qs.DCommon.Common
 import qs.DCommon.Widgets
+import qs.Widgets
 
 Item {
+    // 地球键循环和这个列表必须同一份数据（KeyboardCard.imRows，带 text / current）
+
     id: root
 
     property var controller: null
@@ -15,18 +18,17 @@ Item {
     // 没有输入法列表时不该露出空面板（一片白色方块）
     visible: root.controller.imPickerOpen && root.controller.imRows.length > 0
 
-// 地球键循环和这个列表必须同一份数据（controller.imRows）
-
-
     // 点面板外关闭
     MouseArea {
         anchors.fill: parent
         onClicked: root.controller.imPickerOpen = false
     }
 
-    // ---- 下拉面板：贴着右下角（地球键上方）----
+    // 下拉面板贴着右下角，在地球键上方
     Rectangle {
         id: panel
+
+        readonly property real padding: Math.round(root.controller.keyH * 0.14)
 
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -34,15 +36,11 @@ Item {
         anchors.bottomMargin: Math.round(root.controller.keyH * 0.6)
         width: Math.min(parent.width * 0.52, 400)
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
-        height: Math.max(Math.round(root.controller.keyH * 0.9),
-                         Math.min(listView.contentHeight + padding * 2,
-                                  parent.height * 0.75))
-        radius: Theme.cornerRadius
+        height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
+        radius: Style.cornerRadiusL
         color: Theme.withAlpha(Theme.surface, 0.99)
         border.width: 1
-        border.color: Theme.withAlpha(Theme.outlineVariant, 0.8)
-
-        readonly property real padding: Math.round(root.controller.keyH * 0.14)
+        border.color: Style.outlineVariant
 
         // 吃掉面板内的点击，避免穿透到下面的关闭区域
         MouseArea {
@@ -60,29 +58,25 @@ Item {
 
             delegate: Rectangle {
                 id: rowItem
+
                 required property var modelData
 
                 width: listView.width
                 height: Math.round(root.controller.keyH * 0.68)
                 radius: Math.round(Theme.cornerRadius * 0.7)
-                color: modelData.current
-                       ? Theme.withAlpha(Theme.primary, 0.14)
-                       : (rowMouse.containsMouse
-                          ? Theme.withAlpha(root.controller.fg, 0.06)
-                          : "transparent")
+                color: modelData.current ? Theme.withAlpha(Theme.primary, 0.14) : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, 0.06) : "transparent")
 
                 // label 块：托盘上看到的那个字（万 / abc / en）
                 Rectangle {
                     id: labelChip
+
                     width: Math.round(parent.height * 0.82)
                     height: width
                     anchors.left: parent.left
                     anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
                     anchors.verticalCenter: parent.verticalCenter
                     radius: Math.round(width * 0.28)
-                    color: modelData.current
-                           ? Theme.primary
-                           : Theme.withAlpha(root.controller.fg, 0.09)
+                    color: modelData.current ? Theme.primary : Theme.withAlpha(root.controller.fg, 0.09)
 
                     StyledText {
                         anchors.centerIn: parent
@@ -91,13 +85,14 @@ Item {
                         font.pixelSize: Math.round(labelChip.height * 0.46)
                         font.weight: Font.DemiBold
                     }
+
                 }
 
                 // 图标：已经有 label 块就不重复画图标
                 Image {
                     id: rowIcon
-                    source: modelData.icon !== "" && modelData.label === ""
-                            ? "file://" + modelData.icon : ""
+
+                    source: modelData.icon !== "" && modelData.label === "" ? "file://" + modelData.icon : ""
                     visible: source !== ""
                     width: Math.round(parent.height * 0.56)
                     height: width
@@ -125,6 +120,7 @@ Item {
                 // 涟漪：输入法行没有底色，扩散范围留一点内边距
                 DRipple {
                     id: rowRipple
+
                     anchors.fill: parent
                     anchors.margins: Math.round(root.controller.gap * 0.4)
                     cornerRadius: Theme.cornerRadius
@@ -133,20 +129,27 @@ Item {
 
                 MouseArea {
                     id: rowMouse
+
                     anchors.fill: parent
                     hoverEnabled: true
-                    onPressed: mouse => rowRipple.trigger(mouse.x, mouse.y)
+                    onPressed: (mouse) => {
+                        return rowRipple.trigger(mouse.x, mouse.y);
+                    }
                     onClicked: {
                         // 纯键盘布局直接切；拼音类输入法走 selectImMode，
                         // 它会在切换生效后再校正中英文状态
                         if (modelData.keyboard)
-                            root.controller.selectIm(modelData.name)
+                            root.controller.selectIm(modelData.name);
                         else
-                            root.controller.selectImMode(modelData.name, modelData.ascii)
-                        root.controller.imPickerOpen = false
+                            root.controller.selectImMode(modelData.name, modelData.ascii);
+                        root.controller.imPickerOpen = false;
                     }
                 }
+
             }
+
         }
+
     }
+
 }

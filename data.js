@@ -76,7 +76,7 @@ function emptyStatus() {
 }
 
 // 解析输入法清单。
-// 空数组 / 非法内容都保留上一次：清单只在键盘打开时刷新，
+// 空数组 / 非法内容都保留上一次的值
 function cloneIm(x) {
     return {
         name: x.name, title: x.title, label: x.label,
@@ -192,7 +192,7 @@ function barCandidates(all, max) {
 }
 
 // Esc 与 `` ` ``/`~` 对调：把布局里 keycode 41（反引号）那格换成 Esc。
-// 想按习惯把 Esc 放左上角的人用（设置项 escSwap）。只换显示和键码，
+// 想按习惯把 Esc 放左上角的人用（设置项 escSwap）。只换显示和键码，不动布局顺序
 function swapEscTilde(layoutRows) {
     const rows = Array.isArray(layoutRows) ? layoutRows : []
     const out = []

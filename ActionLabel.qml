@@ -13,7 +13,7 @@ Row {
     property color color: Theme.surfaceText
     // 字号走 Theme token：审核会查硬编码像素字号
     property int pixelSize: Theme.fontSizeSmall
-    // 图标跟着字号走（原来写死 18，对应 14 号字）；调用方传了 iconSize 就按传的来
+    // 图标跟着字号走；调用方传了 iconSize 就按传的来
     property int iconSize: Math.round(root.pixelSize * 1.29)
     // 分隔线的不透明度：磁贴用 0.16/0.35，幽灵块用 0.45
     property real dividerOpacity: 0.45
@@ -55,4 +55,5 @@ Row {
         minimumPixelSize: 8
         font.pixelSize: root.pixelSize
     }
+
 }

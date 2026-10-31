@@ -25,7 +25,7 @@ def geometry():
     c.check("读得到实际尺寸", w0 > 0 and h0 > 0, g0)
     c.check("读得到落盘尺寸", saved_w > 0 and saved_h > 0, g0)
 
-    # 临时尺寸：和目标值不同才有意义
+    # 目标尺寸要和当前值不同，才能验证真的生效
     tw = 900 if w0 != 900 else 880
     c.ipc("debugSetSize", tw, 400)
     time.sleep(0.7)

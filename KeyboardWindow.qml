@@ -17,13 +17,11 @@ PanelWindow {
     property bool voiceActive: false
     // 语音模式：只留顶部语音行
     property bool voiceMinimal: false
-    signal voiceMicRequested()
-    signal opacityAdjusted(real bg, real key)
     // vinput 是否可用（可选扩展，没装就禁用语音动作）
     property bool voiceAvailable: false
-    property real bgOpacity: 1.0
+    property real bgOpacity: 1
     property int repeatInterval: 60
-    property real keyOpacity: 1.0
+    property real keyOpacity: 1
     // 特殊键形态设置（见 layouts/special-keys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
@@ -33,12 +31,6 @@ PanelWindow {
     property real resizeH: 444
     property real baseKbWidth: 1050
     property real baseKbHeight: 444
-    signal resizeCommitRequested()
-    signal resizeCloseRequested()
-    signal resizeCancelRequested()
-    signal resizeResetRequested()
-    signal resizeFillToggleRequested()
-    signal modeChangeRequested(string mode)
     // 停靠时是否横向铺满屏幕
     property bool dockFill: true
     property var actionList: []
@@ -51,7 +43,6 @@ PanelWindow {
     // 全量候选（daemon 从 FcitxBridge 转发）
     property var allCandidates: []
     property int candRevision: 0
-    signal allCandidatesRequested()
     property bool fcitxHasMore: false
     property string fcitxImIcon: ""
     property string fcitxImLabel: ""
@@ -60,26 +51,41 @@ PanelWindow {
     property bool fcitxVisible: false
     property string slotActionId: "float"
     property var quickBarActions: []
-    signal quickBarChanged(var list)
     // 用户设置的键盘名义宽高（逻辑像素），按键尺寸由它们推导
     property real kbWidth: 1050
     property real kbHeight: 444
-    // 有候选才占位显示候选栏（数据来自 fcitx5 addon）
-    // 判据对齐 fcitx5 自身行为：这个输入法子项会不会弹候选窗。
-    property bool showCandBar:
-        root.fcitxCandidates.length > 0 || root.debugCandItems.length > 0
-
+    // 有候选才占位显示候选栏（数据来自 fcitx5 addon，调试注入也算）
+    property bool showCandBar: root.fcitxCandidates.length > 0 || root.debugCandItems.length > 0
     // 由 daemon 托管的键盘状态
     property bool fnActive: false
     property bool escSwap: false
     // 修饰键状态快照（0 未激活 / 1 一次性 / 2 锁定），由 daemon 整体替换
-    property var modifierStates: ({})
+    property var modifierStates: ({
+    })
     property string page: "page1"
     property string mode: "keys"
     property bool editing: false
+    property var imList: []
+    property var imRows: []
+    // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
+    // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），不会把键盘顶上去。
+    readonly property real preeditReserve: Math.round(metrics.candH * 0.95)
+    // 供外部（daemon 的调试 IPC）访问卡片状态
+    // 用 onCompleted 赋值而不是 `property var cardRef: card`：
+    property var cardRef: null
+
+    signal voiceMicRequested()
+    signal opacityAdjusted(real bg, real key)
+    signal resizeCommitRequested()
+    signal resizeCloseRequested()
+    signal resizeCancelRequested()
+    signal resizeResetRequested()
+    signal resizeFillToggleRequested()
+    signal modeChangeRequested(string mode)
+    signal allCandidatesRequested()
+    signal quickBarChanged(var list)
     signal quickAction(string action)
     signal voiceMinimalRequested()
-    property var imList: []
     signal imSwitchRequested()
     signal imListRequested()
     signal imCycleRequested()
@@ -87,15 +93,43 @@ PanelWindow {
     signal imSelected(string name)
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
-    signal keyboardClosed
+    signal keyboardClosed()
     signal keyPressed(var keyData)
     signal modifierPressed(var keyData)
     signal modifierReleased(var keyData)
     // 表情 / 符号页点上屏（转给 daemon）
     signal textCommitRequested(string text)
 
+    function show() {
+        keyboardVisible = true;
+    }
+
+    function hide() {
+        if (!keyboardVisible)
+            return ;
+
+        keyboardVisible = false;
+        keyboardClosed();
+    }
+
+    visible: keyboardVisible && !root.voiceMinimal
+    color: "transparent"
+    // 避让：reserve 面板实际高度（cardHeight，已扣掉上下留白与把手前的间隙）。
+    // 用 saveH 的原始 kbHeight 会多留 pad+gap，下面的窗口被无谓地推远一截。
+    exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(metrics.cardHeight) : 0
+    // 只包住键盘本体：铺满整屏会让 exclusiveZone 失效（避让和全屏不可兼得）
+    implicitWidth: metrics.screenW
+    implicitHeight: metrics.cardHeight + preeditReserve
+    WlrLayershell.namespace: "dms:plugins:inlineKeyboard"
+    // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字
+    WlrLayershell.layer: WlrLayer.Overlay
+    // 键盘自己不发按键（由 ydotool 注入），绝不能抢焦点
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    Component.onCompleted: cardRef = card
+
     KeyboardMetrics {
         id: metrics
+
         kbWidth: root.kbWidth
         kbHeight: root.kbHeight
         showCandBar: root.showCandBar
@@ -105,68 +139,17 @@ PanelWindow {
         fillWidth: root.dockFill
     }
 
-    function show() {
-        keyboardVisible = true
-    }
-
-    function hide() {
-        if (!keyboardVisible)
-            return
-        keyboardVisible = false
-        keyboardClosed()
-    }
-
-    visible: keyboardVisible && !root.voiceMinimal
-
-    color: "transparent"
-
     anchors {
         bottom: true
         left: true
         right: true
     }
 
-    // 避让：reserve 面板实际高度（cardHeight，已扣掉上下留白与把手前的间隙）。
-    // 用 saveH 的原始 kbHeight 会多留 pad+gap，下面的窗口被无谓地推远一截。
-    exclusiveZone: (keyboardVisible && avoidWindows) ? Math.ceil(metrics.cardHeight) : 0
-
-// 只包住键盘本体：铺满整屏会让 exclusiveZone 失效（避让和全屏不可兼得）
-    implicitWidth: metrics.screenW
-    // 候选出现且有拼音原文时，顶部要额外留出一块给浮动的原文标签。
-    // card 是底部对齐的，所以多出来的高度只影响窗口（键盘整体位置不变），不会把键盘顶上去。
-    readonly property real preeditReserve: Math.round(metrics.candH * 0.95)
-    implicitHeight: metrics.cardHeight + preeditReserve
-
-    WlrLayershell.namespace: "dms:plugins:inlineKeyboard"
-    // Overlay：要盖住 DMS 的 Top 层面板（launcher / 设置页）才能在里面打字。
-    // 实测 niri 对 Overlay 层的 exclusiveZone 一样计入（1030 → 586，正好 444），它占的高度是实打实的。
-    WlrLayershell.layer: WlrLayer.Overlay
-    // 键盘自己不发按键（由 ydotool 注入），绝不能抢焦点
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-
-    // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。
-    // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，下面所有应用都点不到。
-    mask: Region {
-        x: Math.round(card.x)
-        y: Math.max(0, Math.round(card.y - root.preeditReserve))
-        // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，
-        // layer surface 的 mask 还留在屏幕上继续吃点击
-        width: root.visible ? Math.round(card.width) : 0
-        height: root.visible ? Math.max(0, Math.round(root.height - Math.max(0,
-                Math.round(card.y - root.preeditReserve)))) : 0
-    }
-
-    // 供外部（daemon 的调试 IPC）访问卡片状态
-    // 用 onCompleted 赋值而不是 `property var cardRef: card`：
-    property var cardRef: null
-    Component.onCompleted: cardRef = card
-
     KeyboardCard {
         id: card
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-
         unit: metrics.unit
         keyH: metrics.keyH
         gap: metrics.gap
@@ -210,8 +193,12 @@ PanelWindow {
         onResizeFillToggleRequested: root.resizeFillToggleRequested()
         onVoiceMinimalRequested: root.voiceMinimalRequested()
         onVoiceMicRequested: root.voiceMicRequested()
-        onModeChangeRequested: mode => root.modeChangeRequested(mode)
-        onOpacityAdjusted: (bg, key) => root.opacityAdjusted(bg, key)
+        onModeChangeRequested: (mode) => {
+            return root.modeChangeRequested(mode);
+        }
+        onOpacityAdjusted: (bg, key) => {
+            return root.opacityAdjusted(bg, key);
+        }
         dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
@@ -226,21 +213,53 @@ PanelWindow {
         quickBarActions: root.quickBarActions
         isFloating: false
         imList: root.imList
-
-        onQuickBarChanged: list => root.quickBarChanged(list)
+        imRows: root.imRows
+        onQuickBarChanged: (list) => {
+            return root.quickBarChanged(list);
+        }
         onEditingChanged: root.editing = editing
-        onQuickAction: action => root.quickAction(action)
+        onQuickAction: (action) => {
+            return root.quickAction(action);
+        }
         onImSwitchRequested: root.imSwitchRequested()
         onImListRequested: root.imListRequested()
         onImCycleRequested: root.imCycleRequested()
-        onSelectCandidateRequested: index => root.selectCandidateRequested(index)
-        onImSelected: name => root.imSelected(name)
-        onOrderChanged: list => root.orderChanged(list)
-        onSlotChanged: id => root.slotChanged(id)
-        onKeyPressed: keyData => root.keyPressed(keyData)
-        onModifierPressed: keyData => root.modifierPressed(keyData)
-        onModifierReleased: keyData => root.modifierReleased(keyData)
-        onTextCommitRequested: text => root.textCommitRequested(text)
+        onSelectCandidateRequested: (index) => {
+            return root.selectCandidateRequested(index);
+        }
+        onImSelected: (name) => {
+            return root.imSelected(name);
+        }
+        onOrderChanged: (list) => {
+            return root.orderChanged(list);
+        }
+        onSlotChanged: (id) => {
+            return root.slotChanged(id);
+        }
+        onKeyPressed: (keyData) => {
+            return root.keyPressed(keyData);
+        }
+        onModifierPressed: (keyData) => {
+            return root.modifierPressed(keyData);
+        }
+        onModifierReleased: (keyData) => {
+            return root.modifierReleased(keyData);
+        }
+        onTextCommitRequested: (text) => {
+            return root.textCommitRequested(text);
+        }
         onAllCandidatesRequested: root.allCandidatesRequested()
     }
+
+    // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。
+    // 窗口本身铺满屏幕宽（left/right 锚定），如果 mask 也跟着铺满，下面所有应用都点不到。
+    mask: Region {
+        x: Math.round(card.x)
+        y: Math.max(0, Math.round(card.y - root.preeditReserve))
+        // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，
+        // layer surface 的 mask 还留在屏幕上继续吃点击
+        width: root.visible ? Math.round(card.width) : 0
+        height: root.visible ? Math.max(0, Math.round(root.height - Math.max(0, Math.round(card.y - root.preeditReserve)))) : 0
+    }
+
 }

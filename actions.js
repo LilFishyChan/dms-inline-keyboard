@@ -215,12 +215,11 @@ function dropIndexAt(ghostX, ghostY, contentWidth, count, cellHeight, gap, colum
         return -1
     const cellWidth = (contentWidth - (columns - 1) * gap) / columns
     // 列表按**格子左边界**取整：指针落在哪一格，就插到那一格前面。
-    // 固定栏用的是「指针过块中心线」，两套判据各自独立 —— 不要互相借，
+    // 固定栏用「指针过块中心线」，两套判据各自独立，不共用
     const col = Math.max(0, Math.min(columns - 1, Math.floor(ghostX / (cellWidth + gap))))
     const row = Math.max(0, Math.floor(ghostY / (cellHeight + gap)))
     const index = row * columns + col
-    // 落在最后一项之后 → count（追加到末尾）。
-    // 之前一律夹到 count-1，拖到末尾只能插到倒数第一个前面
+    // 落在最后一项之后 → count（追加到末尾）
     if (index >= count)
         return count
     const lastCol = (count - 1) % columns
@@ -375,6 +374,15 @@ function defaultActions() {
         { id: "size", label: "Size", icon: "aspect_ratio", kind: "builtin" },
         { id: "opacity", label: "Opacity", icon: "opacity", kind: "builtin" },
         { id: "nextIm", label: "Next input method", icon: "language", kind: "builtin" },
+        // rime 中英切换：fcitx5 只在 /rime 上开了 ascii 模式的 D-Bus，
+        // 其余开关（全角/表情/预测）没有对外接口，所以这里只做中英
+        {
+            id: "rimeAscii",
+            label: "Rime ASCII",
+            icon: "translate",
+            kind: "cmd",
+            cmd: "b=$(busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 IsAsciiMode | cut -d' ' -f2); if [ \"$b\" = true ]; then busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 SetAsciiMode b false; else busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 SetAsciiMode b true; fi"
+        },
         { id: "clipboard", label: "Clipboard", icon: "content_paste", kind: "builtin" },
         { id: "avoid", label: "Avoid windows", icon: "unfold_more", kind: "builtin" },
         { id: "mic", label: "Voice input", icon: "mic", kind: "builtin" },

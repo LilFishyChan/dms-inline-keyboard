@@ -1,43 +1,33 @@
+import "Motion.js" as Motion
 // Inline Keyboard 顶部快捷栏：左侧导航按钮、中间固定栏动作、右侧圆形动作槽。
 // 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，所以「松手后的样子」要靠 plan 单独算。
 import QtQuick
 import qs.Common
-import qs.Widgets
-import "Motion.js" as Motion
 import qs.DCommon.Widgets
+import qs.Widgets
 
 Item {
     id: quickBar
 
     // KeyboardCard 根：状态、函数与信号的唯一来源
     property var controller: null
-
-    width: parent.width
-    height: controller.quickH
-
     // 两端固定按钮是圆形，直径 = 行高
     readonly property real btnW: controller.quickH
     // 中间组：从左边固定按钮右沿到右边固定按钮左沿
     readonly property real midX: btnW + controller.gap
     readonly property real midW: Math.max(0, width - 2 * (btnW + controller.gap))
-
-// 必须是稳定的真实数组：它同时是 Repeater 的 model
+    // 必须是稳定的真实数组：它同时是 Repeater 的 model
     readonly property var items: controller.quickBarActions || []
     // 松手后的样子，只用来算位置（多一个或少一个时让位）
     readonly property var resolved: controller.quickBarResolved || []
     readonly property int slotCount: resolved.length
     readonly property real slotW: controller.quickH * 2
-    readonly property real slotGap: slotCount > 0
-        ? (midW - slotCount * slotW) / (slotCount + 1) : 0
+    readonly property real slotGap: slotCount > 0 ? (midW - slotCount * slotW) / (slotCount + 1) : 0
     readonly property real capRadius: height / 2
-
     // 动作范围（两端各多留一个键间距）→ 编辑态边框按它画，有动作才有长度
-    readonly property real contentRight: slotCount > 0
-        ? slotGap + (slotCount - 1) * (slotW + slotGap) + slotW : 0
+    readonly property real contentRight: slotCount > 0 ? slotGap + (slotCount - 1) * (slotW + slotGap) + slotW : 0
     readonly property real frameX: Math.max(0, slotGap - controller.gap)
-    readonly property real frameW: slotCount > 0
-        ? Math.min(midW, contentRight - slotGap + 2 * controller.gap) : 0
-
+    readonly property real frameW: slotCount > 0 ? Math.min(midW, contentRight - slotGap + 2 * controller.gap) : 0
     // 动作块比槽位小一圈：上下左右各留几像素，免得贴住编辑态的边框
     readonly property real cellH: Math.round(height * 0.84)
     // 图标容器做成正圆：宽 = 高。slotW 是布局步长（间距），保持不变，
@@ -46,8 +36,44 @@ Item {
 
     // 第 index 个槽位的左沿
     function slotX(index) {
-        return quickBar.midX + quickBar.slotGap * (index + 1) + quickBar.slotW * index
+        return quickBar.midX + quickBar.slotGap * (index + 1) + quickBar.slotW * index;
     }
+
+    // 模拟使用流程：点顶部左侧导航（keys ↔ functions）/ 固定栏里的动作
+    function pointerTapNav() {
+        const item = slotRepeater.count > 0 ? slotRepeater.itemAt(0) : null;
+        if (!item || !item.slotMouse)
+            return false;
+
+        item.slotMouse.tapAt();
+        return true;
+    }
+
+    function pointerTapAction(actionId) {
+        for (let i = 0; i < barRepeater.count; i++) {
+            const item = barRepeater.itemAt(i);
+            if (item && item.modelData && item.modelData.id === actionId && item.barMouse) {
+                item.barMouse.tapAt();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 右上角动作槽（浮动 / 避让这类常驻动作就在这）
+    function pointerTapSlot() {
+        for (let i = 0; i < slotRepeater.count; i++) {
+            const item = slotRepeater.itemAt(i);
+            if (item && item.modelData && item.modelData.kind === "slot" && item.slotMouse) {
+                item.slotMouse.tapAt();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    width: parent.width
+    height: controller.quickH
 
     // 编辑态底色：胶囊 + surfaceContainerLow。
     // 没有动作时铺满整条（提示这里可以放），有动作时收窄到和描边同宽（成为描边内部的填充）
@@ -57,45 +83,50 @@ Item {
         // 跟随背景透明度：用户把键盘调透后，编辑态的框不该还是一片实心
         opacity: (controller.editing ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
-        }
-        // 和中间的动作块一样受 animateCells 控制：打开键盘 / 切模式时
-        // 布局会重排，不设 enabled 的话两端按钮会当场演一遍位移动画
-        Behavior on x {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
-        }
-        Behavior on width {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
-        }
         x: quickBar.midX + (hasItems ? quickBar.frameX : 0)
         y: 0
         width: hasItems ? quickBar.frameW : quickBar.midW
         height: quickBar.height
         radius: quickBar.capRadius
         color: Theme.surfaceContainerLow
+
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.expand
+                easing.type: Easing.OutCubic
+            }
+
+        }
+        // 和中间的动作块一样受 animateCells 控制：不设 enabled 的话，打开键盘 / 切模式时布局重排会当场演一遍位移动画
+
+        Behavior on x {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.shift
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
+        Behavior on width {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.shift
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
     }
 
     // 编辑态边框：按内部动作的范围画（第一个动作左沿 - gap 到最后一个动作右沿 + gap）
     Rectangle {
-        opacity: (controller.editing && quickBar.slotCount > 0 ? 1 : 0)
-                 * (controller ? controller.bgOpacity : 1)
+        opacity: (controller.editing && quickBar.slotCount > 0 ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.expand; easing.type: Easing.OutCubic }
-        }
-        Behavior on x {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
-        }
-        Behavior on width {
-            enabled: controller ? controller.animateCells : true
-            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
-        }
         x: quickBar.midX + quickBar.frameX
         y: 0
         width: quickBar.frameW
@@ -104,17 +135,70 @@ Item {
         color: "transparent"
         border.width: 2
         border.color: Theme.primary
+
+        Behavior on opacity {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.expand
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
+        Behavior on x {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.shift
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
+        Behavior on width {
+            enabled: controller ? controller.animateCells : true
+
+            NumberAnimation {
+                duration: Motion.shift
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
     }
 
     // 真实动作块：胶囊形。拖动时按「松手后的位置」让位，被挤出的淡出
     // 插入幽灵块：拖动时显示「松手后会出现在这里」的那个动作
     GhostBlock {
         id: insertGhost
+
         readonly property var plan: controller.barDropPlan
         // 固定栏 → 槽的交换预览：源格将换成槽里那个动作
-        readonly property var swapAction: (controller.dragOverSlot
-                                           && controller.dragFrom === "bar")
-            ? controller.rightSlot : null
+        readonly property var swapAction: (controller.dragOverSlot && controller.dragFrom === "bar") ? controller.rightSlot : null
+        // x 手动同步：绑定在 plan 为 null 时会 fallback 到第 0 格，首帧会滑过来。
+        // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
+        // 不能回落到 x：syncX 会写 x，读 x 就成了绑定循环
+        property bool allowAnim: false
+        property bool settling: false
+        // 交换时 barDropPlan 也会给出 insertedAt（= 被抓项腾出的那一格）
+        readonly property real targetX: plan !== null ? quickBar.slotX(plan.insertedAt) + (quickBar.slotW - quickBar.cellW) / 2 : -1
+
+        function syncX(animate) {
+            // 还没有 plan：保持原位，等目标格算出来再同步
+            if (insertGhost.targetX < 0)
+                return ;
+
+            if (!animate)
+                insertGhost.allowAnim = false;
+
+            insertGhost.x = insertGhost.targetX;
+            if (!animate)
+                Qt.callLater(function() {
+                insertGhost.allowAnim = true;
+            });
+
+        }
 
         active: plan !== null || swapAction !== null
         action: swapAction !== null ? swapAction : controller.ghostAction
@@ -123,36 +207,14 @@ Item {
         y: (quickBar.height - quickBar.cellH) / 2
         width: quickBar.cellW
         height: quickBar.cellH
-
-        // x 手动同步：绑定在 plan 为 null 时会 fallback 到第 0 格，首帧会滑过来。
-        // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
-        // 不能回落到 x：syncX 会写 x，读 x 就成了绑定循环
-        property bool allowAnim: false
-        property bool settling: false
-        // 交换时 barDropPlan 也会给出 insertedAt（= 被抓项腾出的那一格）
-        readonly property real targetX: plan !== null
-            ? quickBar.slotX(plan.insertedAt) + (quickBar.slotW - quickBar.cellW) / 2
-            : -1
-
-        function syncX(animate) {
-            // 还没有 plan：保持原位，等目标格算出来再同步
-            if (insertGhost.targetX < 0)
-                return
-            if (!animate)
-                insertGhost.allowAnim = false
-            insertGhost.x = insertGhost.targetX
-            if (!animate)
-                Qt.callLater(function() { insertGhost.allowAnim = true })
-        }
-
         onActiveChanged: {
             if (!active) {
-                insertGhost.settling = false
-                return
+                insertGhost.settling = false;
+                return ;
             }
-            insertGhost.settling = true
-            settleTimer.restart()
-            insertGhost.syncX(false)
+            insertGhost.settling = true;
+            settleTimer.restart();
+            insertGhost.syncX(false);
         }
         // 不看 active：它和 targetX 都是绑定，同一帧里可能是旧值，
         // 那样 syncX 会被跳过，幽灵块停在上一格
@@ -162,28 +224,35 @@ Item {
         // 「刚出现那一帧」的绑定求值顺序问题
         Timer {
             id: settleTimer
+
             interval: 80
             onTriggered: insertGhost.settling = false
         }
 
         Behavior on x {
-            enabled: insertGhost.allowAnim
-                     && (controller ? controller.animateCells : true)
-            NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
+            enabled: insertGhost.allowAnim && (controller ? controller.animateCells : true)
+
+            NumberAnimation {
+                duration: Motion.shift
+                easing.type: Easing.OutCubic
+            }
+
         }
+
     }
 
     Repeater {
         id: barRepeater
+
         model: quickBar.items
 
         delegate: Rectangle {
             id: barCell
+
             required property int index
             required property var modelData
             // 把点击入口暴露给 quickBar（模拟点击用）
             property alias barMouse: barMouse
-
             // 松手后它排第几；-1 表示会被挤出固定栏
             readonly property int slotIndex: controller.quickBarIndexFor(modelData.id)
             readonly property bool leaving: slotIndex < 0
@@ -195,40 +264,28 @@ Item {
             // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，
             // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，看着像抖一下。
             property real lastValidX: 0
-            readonly property real cellX: slotIndex >= 0
-                ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2
-                : lastValidX
+            readonly property real cellX: slotIndex >= 0 ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2 : lastValidX
+
             x: cellX
-            onCellXChanged: if (slotIndex >= 0) lastValidX = cellX
+            onCellXChanged: {
+                if (slotIndex >= 0)
+                    lastValidX = cellX;
+
+            }
             y: (quickBar.height - quickBar.cellH) / 2
             width: quickBar.cellW
             height: quickBar.cellH
             radius: quickBar.cellH / 2
             // 非编辑态普通动作不要底色（只图标）；编辑态给 surfaceContainer 方便拖；
             // 激活态和右侧动作槽统一：surfaceContainerHigh 底 + primary 图标。
-            color: controller.editing
-                   ? Theme.surfaceContainer
-                   : (isActive ? Theme.surfaceContainerHigh : "transparent")
+            color: controller.editing ? Theme.surfaceContainer : (isActive ? Theme.surfaceContainerHigh : "transparent")
             opacity: leaving ? 0 : (isDisabled ? 0.5 : 1)
             z: leaving ? 0 : 1
-            Behavior on x {
-                // slotIndex < 0 = 位置还没定（预览里已被摘掉 / 会被挤出）。
-                // 这时 x 停在最后有效位置（见上面的 cellX），不让它参与动画。
-                enabled: slotIndex >= 0 && !leaving
-                         && (controller ? controller.animateCells : true)
-                NumberAnimation { duration: Motion.shift; easing.type: Easing.OutCubic }
-            }
-            Behavior on opacity {
-                // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，
-                // 直接隐藏更干净。
-                enabled: !leaving && (controller ? controller.animateCells : true)
-                NumberAnimation { duration: Motion.fade; easing.type: Easing.OutCubic }
-            }
 
-            // 和右侧固定按钮一样的涟漪。写在 ActionIcon 之前，
-            // 让涟漪铺在图标下面而不是盖住它。
+            // 和右侧固定按钮一样的涟漪；写在 ActionIcon 之前，让它铺在图标下面而不是盖住图标。
             DRipple {
                 id: barRipple
+
                 anchors.fill: parent
                 // 动作块是胶囊形，涟漪按高度的一半裁圆角
                 cornerRadius: parent.height / 2
@@ -240,25 +297,26 @@ Item {
                 size: Math.round(controller.quickH * 0.5)
                 // 编辑态下所有动作都按默认形态显示：那是在排布动作，
                 // 不是在看状态，染色只会干扰对「拖哪个」的判断。
-                color: (!controller.editing && isActive)
-                       ? Theme.primary
-                       : Theme.withAlpha(controller.fg, 0.85)
+                color: (!controller.editing && isActive) ? Theme.primary : Theme.surfaceText
             }
 
             MouseArea {
                 id: barMouse
+
+                function tapAt() {
+                    controller.quickAction(modelData.id);
+                }
+
                 anchors.fill: parent
                 enabled: !controller.editing && !parent.leaving
                 acceptedButtons: Qt.LeftButton
-                // 点击逻辑抽成函数：模拟点击和手指点走同一份
-                function tapAt() {
-                    controller.quickAction(modelData.id)
+                onPressed: (mouse) => {
+                    return barRipple.trigger(mouse.x, mouse.y);
                 }
-                onPressed: mouse => barRipple.trigger(mouse.x, mouse.y)
                 onClicked: tapAt()
             }
 
-// 编辑态可拖到别处/槽/列表；enabled 不能跟 leaving 变，否则手势会被取消
+            // 编辑态可拖到别处/槽/列表；enabled 不能跟 leaving 变，否则手势会被取消
             DragInitiator {
                 enabled: controller.editing
                 controller: quickBar.controller
@@ -267,94 +325,116 @@ Item {
                 payload: modelData
                 dragItem: barCell
             }
+
+            Behavior on x {
+                // slotIndex < 0 = 位置还没定（预览里已被摘掉 / 会被挤出）。
+                // 这时 x 停在最后有效位置（见上面的 cellX），不让它参与动画。
+                enabled: slotIndex >= 0 && !leaving && (controller ? controller.animateCells : true)
+
+                NumberAnimation {
+                    duration: Motion.shift
+                    easing.type: Easing.OutCubic
+                }
+
+            }
+
+            Behavior on opacity {
+                // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，
+                // 直接隐藏更干净。
+                enabled: !leaving && (controller ? controller.animateCells : true)
+
+                NumberAnimation {
+                    duration: Motion.fade
+                    easing.type: Easing.OutCubic
+                }
+
+            }
+
         }
+
     }
 
     Repeater {
         id: slotRepeater
+
         model: controller.quickBarItems
 
         delegate: Rectangle {
             id: slotCell
+
             required property int index
             required property var modelData
-            // 把点击入口暴露给 quickBar（模拟点击用）
+            // 槽位的模拟点击入口
             property alias slotMouse: slotMouse
-
             readonly property bool isSlot: modelData.kind === "slot"
-            // 空槽在非编辑态不显示（省掉一个空圆）；
-            // 透明度面板例外 —— 那个位置的圆钮是「取消」
-            visible: !isSlot || controller.editing
-                     || controller.mode === "transparency"
-                     || controller.slotActionId !== ""
-
             // 松手后槽里会是什么：拖到槽上 = 被拖的动作；从槽拖出 = 空；其它 = 当前
             readonly property var slotShow: {
                 if (!isSlot)
-                    return null
+                    return null;
+
                 if (controller.dragOverSlot)
-                    return controller.ghostAction
+                    return controller.ghostAction;
+
                 if (controller.dragActive && controller.dragFrom === "slot")
-                    return null
-                return controller.rightSlot
+                    return null;
+
+                return controller.rightSlot;
             }
             // 幽灵预览态：将要进槽、或将从槽出去 —— 和列表/固定栏一样，先显示结果
-            readonly property bool slotGhost: isSlot && controller.dragActive
-                                              && (controller.dragOverSlot
-                                                  || controller.dragFrom === "slot")
+            readonly property bool slotGhost: isSlot && controller.dragActive && (controller.dragOverSlot || controller.dragFrom === "slot")
             // 右侧槽用 rightSlot 的内容（可被拖动替换）
-            readonly property var slotData: isSlot
-                ? controller.rightSlot : ({icon: "", action: ""})
-            // 槽里动作的状态提到外层：底色和图标颜色都要用，之前只在
-            // ActionIcon 内部算了一份
-            readonly property string slotState: isSlot && slotData
-                ? (controller.actionStates[slotData.id] || "default") : "default"
-
+            readonly property var slotData: isSlot ? controller.rightSlot : ({
+                "icon": "",
+                "action": ""
+            })
+            // 槽里动作的状态提到外层：底色和图标颜色都要用
+            readonly property string slotState: isSlot && slotData ? (controller.actionStates[slotData.id] || "default") : "default"
             // 第一个按钮在"确认"场景（编辑态 / 透明度面板）都是主题色底 + 白色对钩
-            readonly property bool isConfirm: index === 0
-                && (controller.editing || controller.mode === "transparency")
+            readonly property bool isConfirm: index === 0 && (controller.editing || controller.mode === "transparency")
             // 非编辑态：键盘页显示四格（打开功能页），功能页显示 X（关闭功能页）
             readonly property string btnIcon: {
-                if (isConfirm) return "check"
+                if (isConfirm)
+                    return "check";
+
                 if (index === 0) {
-                    if (controller.mode === "keys") return "apps"
-                    if (controller.mode === "transparency") return "check"
-                    return "close"
+                    if (controller.mode === "keys")
+                        return "apps";
+
+                    if (controller.mode === "transparency")
+                        return "check";
+
+                    return "close";
                 }
                 // 透明度面板里右上角变成"取消"
-                if (controller.mode === "transparency") return "close"
-                // 右上角是圆形动作槽：有动作显示图标，空着显示加号
-                return controller.slotActionId ? (slotData ? slotData.icon : "add") : "add"
-            }
+                if (controller.mode === "transparency")
+                    return "close";
 
+                // 右上角是圆形动作槽：有动作显示图标，空着显示加号
+                return controller.slotActionId ? (slotData ? slotData.icon : "add") : "add";
+            }
+            // 固定按钮常驻一点底色，编辑态换成拖动提示底色。
+            // 激活态用**主色实心**（图标转 onPrimary）—— 只描边区分不够明显。
+            readonly property bool slotActive: !controller.editing && isSlot && slotState === "active"
+
+            // 空槽在非编辑态不显示（省掉一个空圆）；
+            // 透明度面板例外 —— 那个位置的圆钮是「取消」
+            visible: !isSlot || controller.editing || controller.mode === "transparency" || controller.slotActionId !== ""
             // 固定的两个图标钉在两端，不参与中间的分组分布
             x: index === 0 ? 0 : (quickBar.width - quickBar.btnW)
             y: (quickBar.height - quickBar.btnW) / 2
             width: quickBar.btnW
             height: quickBar.btnW
             radius: width / 2
-            // 固定按钮常驻一点底色，编辑态换成拖动提示底色。
-            // 激活态用**主色实心**（图标转 onPrimary）—— 只描边区分不够明显。
-            readonly property bool slotActive: !controller.editing && isSlot
-                                               && slotState === "active"
-            color: (isConfirm || slotActive)
-                   ? Theme.primary
-                   : (controller.editing && isSlot
-                      ? (slotGhost ? Theme.surfaceContainerLow : Theme.surfaceContainer)
-                      : Theme.surfaceContainerHigh)
+            color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.surfaceContainerLow : Theme.surfaceContainer) : Theme.surfaceContainerHigh)
             // 动作槽在编辑态高亮描边，表示可以拖东西进来替换。
             // 非编辑态的激活态改用主色实心底，不需要描边
-            border.width: controller.editing && isSlot
-                          ? (controller.dragOverSlot ? 3 : 2) : 0
+            border.width: controller.editing && isSlot ? (controller.dragOverSlot ? 3 : 2) : 0
             border.color: Theme.primary
             scale: controller.editing && isSlot && controller.dragOverSlot ? 1.12 : 1
-            Behavior on scale {
-                enabled: controller ? controller.animateCells : true
-                NumberAnimation { duration: Motion.micro; easing.type: Easing.OutCubic }
-            }
 
             DRipple {
                 id: qbRipple
+
                 anchors.fill: parent
                 // 快捷条的按钮是圆形，涟漪也要按圆形裁
                 cornerRadius: parent.height / 2
@@ -366,33 +446,29 @@ Item {
                 visible: index === 0
                 name: btnIcon
                 size: Math.round(controller.quickH * 0.5)
-                color: isConfirm ? Theme.surface : Theme.withAlpha(controller.fg, 0.8)
+                color: (isConfirm || slotActive) ? Theme.onPrimary : Theme.surfaceText
             }
 
             // 槽里的动作：内容永远取「松手后的样子」（进槽 / 被拖走 / 不变）
             ActionIcon {
+                readonly property string slotState: parent.slotState
+
                 anchors.centerIn: parent
                 // 透明度面板下这个位置固定是「取消」，不显示槽里的动作
                 visible: isSlot && controller.mode !== "transparency" && slotShow !== null
                 action: slotShow
                 size: Math.round(controller.quickH * 0.5)
-                readonly property string slotState: parent.slotState
                 // 编辑态下统一显示默认形态（见顶部动作块的同款说明）
-                color: slotGhost ? Theme.primary
-                                 : ((isConfirm || slotActive) ? Theme.onPrimary
-                                    : Theme.withAlpha(controller.fg,
-                                                      slotState === "disabled" ? 0.4 : 0.8))
+                color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : (slotState === "disabled" ? Theme.withAlpha(Theme.surfaceText, 0.4) : Theme.surfaceText))
             }
 
-// 占位图标不能走 btnIcon：从槽往外拖时它还是旧动作，会残留原图标
+            // 占位图标不能走 btnIcon：从槽往外拖时它还是旧动作，会残留原图标
             DIcon {
                 anchors.centerIn: parent
                 visible: isSlot && (controller.mode === "transparency" || slotShow === null)
                 name: controller.mode === "transparency" ? "close" : "add"
                 size: Math.round(controller.quickH * 0.5)
-                color: slotGhost ? Theme.primary
-                                 : (isConfirm ? Theme.surface
-                                              : Theme.withAlpha(controller.fg, 0.8))
+                color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : Theme.surfaceText)
             }
 
             // 编辑态：可以把槽里的动作拖回固定栏 / 列表
@@ -407,69 +483,52 @@ Item {
 
             MouseArea {
                 id: slotMouse
-                anchors.fill: parent
-                // index 0 是对钩/导航，编辑态也要能点；槽在编辑态让位给拖动
-                enabled: !isSlot || !controller.editing
-                acceptedButtons: Qt.LeftButton
-                cursorShape: Qt.PointingHandCursor
-                // 点击逻辑抽成函数：模拟点击和手指点走同一份
+
                 function tapAt() {
                     if (controller.mode === "transparency") {
                         // index 0 = 确定：保留当前透明度，回键盘页
                         // 槽 = 取消：恢复到进来之前的透明度
                         if (isSlot) {
-                            controller.bgOpacity = controller.prevBgOpacity
-                            controller.keyOpacity = controller.prevKeyOpacity
+                            controller.bgOpacity = controller.prevBgOpacity;
+                            controller.keyOpacity = controller.prevKeyOpacity;
                         }
-                        controller.modeChangeRequested("keys")
-                        return
+                        controller.modeChangeRequested("keys");
+                        return ;
                     }
                     // 编辑态只有 index 0（确认）可点，槽让位给拖动手势
                     if (controller.editing) {
-                        controller.editing = false
-                        return
+                        controller.editing = false;
+                        return ;
                     }
                     if (!isSlot)
-                        controller.modeChangeRequested(
-                            controller.mode === "functions" ? "keys" : "functions")
+                        controller.modeChangeRequested(controller.mode === "functions" ? "keys" : "functions");
                     else if (controller.slotActionId !== "")
-                        controller.quickAction(controller.slotActionId)
+                        controller.quickAction(controller.slotActionId);
                 }
-                onPressed: mouse => qbRipple.trigger(mouse.x, mouse.y)
+
+                anchors.fill: parent
+                // index 0 是对钩/导航，编辑态也要能点；槽在编辑态让位给拖动
+                enabled: !isSlot || !controller.editing
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                onPressed: (mouse) => {
+                    return qbRipple.trigger(mouse.x, mouse.y);
+                }
                 onClicked: tapAt()
             }
-        }
-    }
 
-    // 模拟使用流程：点顶部左侧导航（keys ↔ functions）/ 固定栏里的动作
-    function pointerTapNav() {
-        const item = slotRepeater.count > 0 ? slotRepeater.itemAt(0) : null
-        if (!item || !item.slotMouse)
-            return false
-        item.slotMouse.tapAt()
-        return true
-    }
+            Behavior on scale {
+                enabled: controller ? controller.animateCells : true
 
-    function pointerTapAction(actionId) {
-        for (let i = 0; i < barRepeater.count; i++) {
-            const item = barRepeater.itemAt(i)
-            if (item && item.modelData && item.modelData.id === actionId && item.barMouse) {
-                item.barMouse.tapAt()
-                return true
+                NumberAnimation {
+                    duration: Motion.micro
+                    easing.type: Easing.OutCubic
+                }
+
             }
+
         }
-        return false
+
     }
 
-    // 右上角动作槽（浮动 / 避让这类常驻动作就在这）
-    function pointerTapSlot() {
-        for (let i = 0; i < slotRepeater.count; i++) {
-            const item = slotRepeater.itemAt(i)
-            if (item && item.modelData && item.modelData.kind === "slot" && item.slotMouse) {
-                item.slotMouse.tapAt()
-                return true
-            }
-        }
-        return false
-    }
 }
