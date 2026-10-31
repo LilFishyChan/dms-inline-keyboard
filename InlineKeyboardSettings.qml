@@ -486,7 +486,7 @@ PluginSettings {
                 spacing: Theme.spacingS
 
                 StyledText {
-                    width: 48
+                    width: Theme.spacingXL * 2
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.tr("Icon")
                     font.pixelSize: Theme.fontSizeSmall
@@ -602,7 +602,7 @@ PluginSettings {
                         spacing: Math.round(Theme.spacingM)
 
                         StyledText {
-                            width: 48
+                            width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.tr("Name")
                             font.pixelSize: Theme.fontSizeSmall
@@ -624,7 +624,7 @@ PluginSettings {
                         spacing: Math.round(Theme.spacingS)
 
                         StyledText {
-                            width: 48
+                            width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.tr("Icon")
                             font.pixelSize: Theme.fontSizeSmall
@@ -660,7 +660,7 @@ PluginSettings {
                         spacing: Math.round(Theme.spacingM)
 
                         StyledText {
-                            width: 48
+                            width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.tr("Command")
                             font.pixelSize: Theme.fontSizeSmall

@@ -9,15 +9,31 @@ from . import common as c
 
 def actions():
     print("== act 动作槽 / 导航 / 磁贴 ==")
+    # 上一轮可能把键盘留在浮窗，先归位到停靠，否则下面两项的方向会反过来
+    if "floating=true" in c.diag():
+        c.ipc("debugTap", "slot", "", 0)
+        for _ in range(10):
+            if "floating=false" in c.diag():
+                break
+            time.sleep(0.2)
+
     # 右上角动作槽：默认是浮动开关
     r = c.ipc("debugTap", "slot", "", 0)
     c.check("点右上角动作槽", "TAP:slot" in r, r)
     time.sleep(0.6)
-    c.check("浮动开关生效", "isFloat=1" in c.diag(), c.diag()[:150])
+    # 切浮窗要销毁并重建窗口，diag 里的 floating 可能晚一拍才更新，轮询到 2s
+    for _ in range(10):
+        if "floating=true" in c.diag():
+            break
+        time.sleep(0.2)
+    c.check("浮动开关生效", "floating=true" in c.diag(), c.diag()[:150])
     r = c.ipc("debugTap", "slot", "", 0)
     c.check("再点槽", "TAP:slot" in r, r)
-    time.sleep(0.6)
-    c.check("回到停靠", "isFloat=0" in c.diag(), c.diag()[:150])
+    for _ in range(10):
+        if "floating=false" in c.diag():
+            break
+        time.sleep(0.2)
+    c.check("回到停靠", "floating=false" in c.diag(), c.diag()[:150])
 
     # 顶部导航键进功能列表 → 点「透明度」磁贴 → 同一个键确认
     r = c.ipc("debugTap", "nav", "", 0)

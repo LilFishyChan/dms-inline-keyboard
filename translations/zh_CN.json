@@ -92,7 +92,6 @@
         "Add a custom action": "添加自定义动作",
         "Built-in actions can only be hidden; the ones you add can be removed. Tap an icon to change it.": "内置动作只能隐藏，自己添加的可以删除。点图标可以更换。",
         "Choose an icon": "选择图标",
-        "Command, e.g. grim -g \\": "命令，例如 grim -g \\",
         "Delay between repeated keystrokes while a key is held down.": "按住按键时重复输入的间隔",
         "Edit action": "编辑动作",
         "Esc on the top-left key": "左上角按键为 Esc",
@@ -115,7 +114,6 @@
         "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": "只提供 acceptance.py 验收脚本要用的 IPC，普通使用不需要打开。",
         "Turn on debug mode?": "开启调试模式？",
         "Enable": "启用",
-        "Command, e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\"",
         "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": "调试模式会加载插件的调试 IPC，供 scripts/acceptance.py 驱动：只读诊断、几何读取，以及按键 / 候选 / 动作 / 浮动开关的模拟点击。\n\n普通使用不需要它，测完记得关掉。",
         "Save": "保存",
         "Or an image path, e.g. ~/icons/foo.svg": "或图片路径，例如 ~/icons/foo.svg",
@@ -127,6 +125,7 @@
         "Edit": "编辑",
         "Remove": "删除",
         "Win key": "Win 键",
-        "Rime ASCII": "中/英切换"
+        "Rime ASCII": "中/英切换",
+        "e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\""
     }
 }
