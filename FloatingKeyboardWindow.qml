@@ -84,6 +84,7 @@ PanelWindow {
     signal quickBarChanged(var list)
     signal quickAction(string action)
     signal voiceMinimalRequested()
+    signal discardVoiceRequested()
     signal imSwitchRequested()
     signal imCycleRequested()
     signal selectCandidateRequested(int index)
@@ -226,6 +227,7 @@ PanelWindow {
         onResizeResetRequested: root.resizeResetRequested()
         onResizeFillToggleRequested: root.resizeFillToggleRequested()
         onVoiceMinimalRequested: root.voiceMinimalRequested()
+        onDiscardVoiceRequested: root.discardVoiceRequested()
         onVoiceMicRequested: root.voiceMicRequested()
         onModeChangeRequested: (mode) => {
             return root.modeChangeRequested(mode);

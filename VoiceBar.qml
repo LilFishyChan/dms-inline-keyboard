@@ -32,6 +32,22 @@ Item {
     // 拖动请求交给宿主窗口处理（layer-shell 的位置只能由窗口的 margins 改）
     signal dragRequested(real dx, real dy)
 
+    // 删除按钮只在语音小窗用；主键盘那一行没有它的位置
+    readonly property bool voiceMini: !!(controller && controller.voiceMinimal)
+
+    // 主键盘里 controller 是卡片（发 keyPressed 信号），语音小窗里是 daemon（直接走 handleKey）
+    function sendBackspace() {
+        const key = {
+            "k": "key",
+            "l": "Backspace",
+            "c": 14
+        };
+        if (voiceBar.controller.handleKey)
+            voiceBar.controller.handleKey(key);
+        else
+            voiceBar.controller.keyPressed(key);
+    }
+
     // 整行背景：和键盘卡片同色。
     // 不加的话这一行是透明的，在表情页 / 功能页上会透过分类条、列表看到重叠的内容。
     Rectangle {
@@ -65,7 +81,7 @@ Item {
         id: textArea
 
         anchors.left: collapseBtn.right
-        anchors.right: micBtn.left
+        anchors.right: delBtn.visible ? delBtn.left : micBtn.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: voiceBar.sidePad
@@ -129,6 +145,71 @@ Item {
 
     }
 
+    // 右：删除（挨着麦克风左边），按住连删
+    DActionButton {
+        id: delBtn
+
+        anchors.right: micBtn.left
+        anchors.rightMargin: Math.max(voiceBar.sidePad, Theme.spacingXS)
+        anchors.verticalCenter: parent.verticalCenter
+        buttonSize: voiceBar.btn
+        // 录音中只能整段丢弃（vinput 没有删单个字的接口），图标换成垃圾桶示意；
+        // 不在录音时是普通退格
+        readonly property bool discarding: !!(voiceBar.controller && voiceBar.controller.voiceActive)
+        // 录音中两个宿主都显示垃圾桶；没录音时只有小窗需要退格，全键盘那一行没有它的位置
+        visible: discarding || voiceBar.voiceMini
+        iconName: discarding ? "delete" : "backspace"
+        iconSize: voiceBar.icon
+        iconColor: Theme.withAlpha(Theme.surfaceText, Alpha.Strong)
+        backgroundColor: delRepeat.running ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
+        stateColor: Theme.primary
+        tooltipText: discarding ? I18n.trFor("inlineKeyboard", "Discard recording") : I18n.trFor("inlineKeyboard", "Delete")
+
+        property bool didRepeat: false
+
+        onPressed: {
+            didRepeat = false;
+            // 丢弃是整段操作，按住连发没有意义
+            if (!discarding)
+                delDelay.start();
+        }
+        onReleased: {
+            delDelay.stop();
+            delRepeat.stop();
+        }
+        onCanceled: {
+            delDelay.stop();
+            delRepeat.stop();
+        }
+        onClicked: {
+            if (discarding)
+                voiceBar.controller.discardVoiceRecording();
+            else if (!didRepeat)
+                voiceBar.sendBackspace();
+        }
+
+        // 按住 400ms 后开始连发，60ms 一次
+        Timer {
+            id: delDelay
+
+            interval: 400
+            onTriggered: {
+                delBtn.didRepeat = true;
+                voiceBar.sendBackspace();
+                delRepeat.start();
+            }
+        }
+
+        Timer {
+            id: delRepeat
+
+            interval: 60
+            repeat: true
+            onTriggered: voiceBar.sendBackspace()
+        }
+
+    }
+
     // 右：麦克风
     DActionButton {
         id: micBtn
@@ -143,7 +224,7 @@ Item {
         // 激活态用主色实心，和固定框同一套
         backgroundColor: voiceBar.controller.voiceActive ? Theme.primary : Theme.chipSurface
         stateColor: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.surfaceText
-        tooltipText: I18n.trFor("inlineKeyboard", "Pause recording")
+        tooltipText: voiceBar.controller.voiceActive ? I18n.trFor("inlineKeyboard", "Stop recording") : I18n.trFor("inlineKeyboard", "Start recording")
 
         onClicked: voiceBar.controller.voiceMicRequested()
     }

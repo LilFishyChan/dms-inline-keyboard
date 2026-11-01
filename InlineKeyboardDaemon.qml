@@ -321,6 +321,14 @@ PluginComponent {
         return lastTextCommitVia;
     }
 
+    // 丢弃整段录音：vinput 的 CancelOperation 在 recording 阶段停采集并丢掉结果，
+    // CLI 没暴露这个动作，只能走 DBus
+    function discardVoiceRecording() {
+        root.runCommand(["busctl", "--user", "call", "org.fcitx.Vinput", "/org/fcitx/Vinput", "org.fcitx.Vinput.Service", "CancelOperation", "b", "false"]);
+        // CancelOperation 在 recording 阶段停采集并把 daemon 打回 idle，本地状态跟着停
+        root.voiceActive = false;
+    }
+
     function runCommand(cmd) {
         if (quickProc.running) {
             // 长按重复每秒能压十几条，ydotool 卡住时无限堆会把键一次性泄到别的窗口
@@ -396,16 +404,12 @@ PluginComponent {
         return Actions.sanitizeActions(list, root.defaultActions);
     }
 
-    // 动作列表 / 固定槽里的麦克风：开始或结束语音输入。
-    // 这是唯一的「开始」入口 —— 语音行里的按钮只负责结束或暂停。
+    // 动作列表 / 固定槽里的麦克风：只管开始录音。停止统一交给语音行上的麦克风或垃圾桶，
+    // 否则动作栏按钮还要判断自己该做哪一半，跟语音行的状态容易打架
     function toggleVoice() {
-        if (!root.voiceAvailable)
+        if (!root.voiceAvailable || root.voiceActive)
             return ;
 
-        if (root.voiceActive) {
-            root.stopVoice();
-            return ;
-        }
         root.voiceActive = true;
         root.runCommand(["vinput", "recording", "start"]);
     }
@@ -417,9 +421,15 @@ PluginComponent {
             return ;
 
         if (root.voiceMinimal) {
-            // 语音模式下是「暂停 / 继续」：状态要跟着翻，否则麦克风的激活态（图标色 + 描边）不会变
-            root.voiceActive = !root.voiceActive;
-            root.runCommand(["vinput", "recording", "toggle"]);
+            // 语音模式下是「停止 / 继续」：发明确的两个命令而不是 toggle —— 状态是本地维护的，
+            // 一旦跟 vinput 实际阶段错位，toggle 会让错位一直翻下去
+            if (root.voiceActive) {
+                root.voiceActive = false;
+                root.runCommand(["vinput", "recording", "stop"]);
+            } else {
+                root.voiceActive = true;
+                root.runCommand(["vinput", "recording", "start"]);
+            }
             return ;
         }
         root.stopVoice();
@@ -1136,6 +1146,7 @@ PluginComponent {
             onQuickAction: (action) => {
                 return root.handleQuick(action);
             }
+            onDiscardVoiceRequested: root.discardVoiceRecording()
             onImSwitchRequested: root.requestImSwitch()
             onImSelected: (name, ascii) => {
                 if (ascii === null || ascii === undefined)
@@ -1241,6 +1252,7 @@ PluginComponent {
             onQuickAction: (action) => {
                 return root.handleQuick(action);
             }
+            onDiscardVoiceRequested: root.discardVoiceRecording()
             onImSwitchRequested: root.requestImSwitch()
             onImSelected: (name, ascii) => {
                 if (ascii === null || ascii === undefined)

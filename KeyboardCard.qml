@@ -150,6 +150,11 @@ Rectangle {
     property var imRows: []
 
     // 长按选择器点了一行：分派规则和地球键单击一致（纯键盘布局直接切，拼音类要校正中英文）
+    // 语音行里的垃圾桶：主键盘里 controller 是这张卡片，daemon 那边的实现在窗口转发之后
+    function discardVoiceRecording() {
+        root.discardVoiceRequested();
+    }
+
     function selectIm(name) {
         root.imSelected(name, null);
     }
@@ -359,6 +364,7 @@ Rectangle {
     signal modifierReleased(var keyData)
     signal quickAction(string action)
     signal voiceMinimalRequested()
+    signal discardVoiceRequested()
     // 语音行里两个按钮的点击请求：卡片自己不处理，转发给窗口 → daemon。
     signal voiceMicRequested()
     // 浮动模式拖把手用：开始拖 / 拖了多少（像素）
