@@ -46,7 +46,7 @@ QtObject {
     readonly property real quickH: Math.round(keyH * quickBarRatio)
     // cardHeight = pad + topH + gap + rows*keyH + (rows-1)*gap + handleH
     // topH = max(quickH, candH)；cardHeight 直接解，避免与 keyH / handleH 循环依赖
-    readonly property real cardHeight: kbHeight - pad - gap
+    readonly property real cardHeight: Math.min(kbHeight, root.screenH) - pad - gap
     readonly property real verticalSlack: cardHeight - pad - gap - (keyRowCount - 1) * gap
     // 顶栏按 quickH 参与分配；候选栏比它高时由 topH = max(...) 兜住，不再反解 keyH
     readonly property real keyH: {

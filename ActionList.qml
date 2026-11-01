@@ -366,7 +366,8 @@ Item {
         anchors.right: fnScroll.right
         anchors.top: fnScroll.top
         anchors.bottom: fnScroll.bottom
-        anchors.margins: -7
+        // 描边框比列表大一圈：外扩量跟着描边宽度走，再加一点留白
+        anchors.margins: -(Theme.outlineWidthFocused + Theme.spacingXS)
         radius: Theme.cornerRadius
         color: "transparent"
         border.width: Theme.outlineWidthFocused

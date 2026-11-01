@@ -34,7 +34,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.rightMargin: Math.round(root.controller.gap * 1.5)
         anchors.bottomMargin: Math.round(root.controller.keyH * 0.6)
-        width: Math.min(parent.width * 0.52, 400)
+        width: Math.min(parent.width * 0.52, Theme.dialogMaxWidth * 0.72)
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
         height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
         radius: Theme.cornerRadiusL

@@ -318,7 +318,7 @@ PluginSettings {
             width: parent.width
             visible: !root.bridgeUp
             // height 和 visible 互相引用会成环：高度由 implicitHeight 一次算清
-            implicitHeight: cmdText.implicitHeight + 28
+            implicitHeight: cmdText.implicitHeight + Theme.spacingL * 2
             height: implicitHeight
             radius: Theme.cornerRadius
             color: Theme.withAlpha(Theme.surfaceText, Alpha.Whisper)
@@ -329,7 +329,7 @@ PluginSettings {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: 14
+                anchors.margins: Theme.spacingL
                 text: root.installCommands
                 color: Theme.surfaceText
                 font.family: "monospace"
@@ -548,7 +548,7 @@ PluginSettings {
                 }
 
                 DCommon.DTextField {
-                    width: parent.width - 48 - winIconPicker2.width - parent.spacing * 2
+                    width: parent.width - Theme.spacingXL * 2 - winIconPicker2.width - parent.spacing * 2
                     placeholderText: I18n.trFor("inlineKeyboard", "svg/png path")
                     text: root.winIconValue.indexOf("/") >= 0 ? root.winIconValue : ""
                     onTextEdited: root.setWinIcon(text.trim())
@@ -639,7 +639,7 @@ PluginSettings {
                         DCommon.DTextField {
                             id: labelField
 
-                            width: parent.width - 48 - parent.spacing
+                            width: parent.width - Theme.spacingXL * 2 - parent.spacing
                             anchors.verticalCenter: parent.verticalCenter
                             onTextEdited: root.draftLabel = text
                         }
@@ -670,7 +670,7 @@ PluginSettings {
                         }
 
                         DCommon.DTextField {
-                            width: parent.width - 48 - iconField.width - parent.spacing * 2
+                            width: parent.width - Theme.spacingXL * 2 - iconField.width - parent.spacing * 2
                             anchors.verticalCenter: parent.verticalCenter
                             placeholderText: I18n.trFor("inlineKeyboard", "svg/png path")
                             text: root.draftIcon.indexOf("/") >= 0 ? root.draftIcon : ""
@@ -697,7 +697,7 @@ PluginSettings {
                         DCommon.DTextField {
                             id: cmdField
 
-                            width: parent.width - 48 - parent.spacing
+                            width: parent.width - Theme.spacingXL * 2 - parent.spacing
                             anchors.verticalCenter: parent.verticalCenter
                             placeholderText: I18n.trFor("inlineKeyboard", "e.g. grim -g \"$(slurp)\"")
                             onTextEdited: root.draftCmd = text
@@ -945,7 +945,8 @@ PluginSettings {
             DCommon.DDialog {
                 title: I18n.trFor("inlineKeyboard", "Turn on debug mode?")
                 supportingText: I18n.trFor("inlineKeyboard", "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
-                maximumWidth: Math.min(Theme.dialogMaxWidth, screenWidth - Theme.spacingXL * 2)
+                // inline Component 的作用域是文件根对象，拿不到 DModal 的 screenWidth
+                maximumWidth: Math.min(Theme.dialogMaxWidth, debugConfirm.screenWidth - Theme.spacingXL * 2)
                 onRejected: root.debugConfirmOpen = false
                 actions: [
                     DCommon.DButton {

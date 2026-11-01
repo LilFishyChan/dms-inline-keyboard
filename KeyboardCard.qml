@@ -327,8 +327,6 @@ Rectangle {
     signal opacityAdjusted(real bg, real key)
     // fcitx5 当前输入法
     signal imSwitchRequested()
-    // 长按地球弹出的输入法选择器
-    signal imListRequested()
     signal imCycleRequested()
     signal imSelected(string name)
     signal resizeCommitRequested()
@@ -797,16 +795,74 @@ Rectangle {
         };
     }
 
-    // 某个动作在「松手后的固定栏」里排第几；-1 = 它会被挤出去
-    // 动态词条（动作名、表情分类名）走这个；字面量直接用 I18n.trFor，提取工具才抓得到
+    // 内置动作名与表情分类名来自 actions.js / layouts/emoji.js，是运行时数据；
+    // 提取工具只认字面量 trFor，所以在这里逐个列出来，找不到的（用户自定义动作名）原样返回
     function tr(term) {
-        // 先读一次翻译表：I18n 是异步注册的，构造期拿到的是英文；
-        // 读了 pluginTranslations 才能让调用点的绑定在表就绪后重算
+        // 读一次翻译表建立依赖：表就绪后调用点的绑定会重算
         const table = (typeof I18n !== "undefined" && I18n) ? I18n.pluginTranslations : null;
         if (!table || !I18n.trFor)
             return term;
 
-        return I18n.trFor("inlineKeyboard", term);
+        switch (term) {
+    case "Undo":
+        return I18n.trFor("inlineKeyboard", "Undo");
+    case "Redo":
+        return I18n.trFor("inlineKeyboard", "Redo");
+    case "Settings":
+        return I18n.trFor("inlineKeyboard", "Settings");
+    case "Float":
+        return I18n.trFor("inlineKeyboard", "Float");
+    case "Size":
+        return I18n.trFor("inlineKeyboard", "Size");
+    case "Opacity":
+        return I18n.trFor("inlineKeyboard", "Opacity");
+    case "Next input method":
+        return I18n.trFor("inlineKeyboard", "Next input method");
+    case "Clipboard":
+        return I18n.trFor("inlineKeyboard", "Clipboard");
+    case "Avoid windows":
+        return I18n.trFor("inlineKeyboard", "Avoid windows");
+    case "Voice input":
+        return I18n.trFor("inlineKeyboard", "Voice input");
+    case "Minimize":
+        return I18n.trFor("inlineKeyboard", "Minimize");
+    case "Smileys & Emotion":
+        return I18n.trFor("inlineKeyboard", "Smileys & Emotion");
+    case "People & Body":
+        return I18n.trFor("inlineKeyboard", "People & Body");
+    case "Animals & Nature":
+        return I18n.trFor("inlineKeyboard", "Animals & Nature");
+    case "Food & Drink":
+        return I18n.trFor("inlineKeyboard", "Food & Drink");
+    case "Travel & Places":
+        return I18n.trFor("inlineKeyboard", "Travel & Places");
+    case "Activities":
+        return I18n.trFor("inlineKeyboard", "Activities");
+    case "Objects":
+        return I18n.trFor("inlineKeyboard", "Objects");
+    case "Symbols":
+        return I18n.trFor("inlineKeyboard", "Symbols");
+    case "Flags":
+        return I18n.trFor("inlineKeyboard", "Flags");
+    case "Math":
+        return I18n.trFor("inlineKeyboard", "Math");
+    case "Punctuation":
+        return I18n.trFor("inlineKeyboard", "Punctuation");
+    case "Arrows":
+        return I18n.trFor("inlineKeyboard", "Arrows");
+    case "Currency":
+        return I18n.trFor("inlineKeyboard", "Currency");
+    case "Shapes":
+        return I18n.trFor("inlineKeyboard", "Shapes");
+    case "Box drawing":
+        return I18n.trFor("inlineKeyboard", "Box drawing");
+    case "Numbers":
+        return I18n.trFor("inlineKeyboard", "Numbers");
+    case "Misc":
+        return I18n.trFor("inlineKeyboard", "Misc");
+        default:
+            return I18n.trFor("inlineKeyboard", term);
+        }
     }
 
     // 索引换算在 data.js（有单测）；QuickBar 通过 controller 调这一层

@@ -73,6 +73,8 @@ function emptyStatus() {
     return {
         items: [], preedit: "", visible: false, keyboard: false,
         hasMore: false,
+        // ui/self/embedded 必须在这里出现：cloneStatus 的白名单会照着补，缺了就会在解析失败时清零
+        ui: "", self: "", embedded: false,
         im: "", imLabel: "", imIcon: "", hasPrev: false, hasNext: false,
     };
 }

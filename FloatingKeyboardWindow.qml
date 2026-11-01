@@ -85,7 +85,6 @@ PanelWindow {
     signal quickAction(string action)
     signal voiceMinimalRequested()
     signal imSwitchRequested()
-    signal imListRequested()
     signal imCycleRequested()
     signal selectCandidateRequested(int index)
     signal imSelected(string name)
@@ -254,7 +253,6 @@ PanelWindow {
             return root.quickAction(action);
         }
         onImSwitchRequested: root.imSwitchRequested()
-        onImListRequested: root.imListRequested()
         onImCycleRequested: root.imCycleRequested()
         onSelectCandidateRequested: (index) => {
             return root.selectCandidateRequested(index);

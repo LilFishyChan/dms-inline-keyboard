@@ -202,7 +202,8 @@ Item {
             try {
                 const arr = JSON.parse(line.substring(8));
                 if (Array.isArray(arr))
-                    allCandidates = arr.map((x, n) => {
+                    // 条数封顶：addon 一次 bulk 推几千条会把 shell 顶住
+                    allCandidates = arr.slice(0, 128).map((x, n) => {
                     const item = (x && typeof x === "object") ? x : {};
                     const idx = Number(item.i);
                     // i 必须是整数：addon 那边是 atoi，传对象/NaN 会选错词
@@ -244,6 +245,9 @@ Item {
         socket.write("text:" + String(text).replace(/[\r\n]/g, " ") + "\n");
         return true;
     }
+
+    // 复制是异步的：发起后还不知道成败，结果由 copyFinished 带回
+    signal copyFinished(bool ok)
 
     function copyText(text) {
         if (!text)
@@ -378,6 +382,7 @@ Item {
         // 用真实退出码更新可用性：失败后 typeText 会改报「装 addon」而不是「已复制」
         onExited: (code) => {
             bridge.clipboardAvailable = code === 0;
+            bridge.copyFinished(code === 0);
             if (code !== 0)
                 console.warn("inlineKeyboard: 复制到剪贴板失败，exit " + code);
         }

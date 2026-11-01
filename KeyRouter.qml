@@ -51,6 +51,8 @@ Item {
     // ydotool 一次只能跑一条，连按要排队
     property var pendingCommands: []
     property double lastToastAt: 0
+    // ydotoold 探到 down 后按 3 秒节流重探，避免一次误判把整场按键锁死
+    property double lastProbeAt: 0
     // 测试用：只记录「会发什么」，不真的注入（不调 ydotool、不发 socket）。
     // 由 debugSetDryRun / debugInjected 驱动，见 scripts/acceptance.py。
     property bool dryRun: false
@@ -184,7 +186,7 @@ Item {
 
         const k = keyData.k;
         if (k === "stub") {
-            notifyUnimplemented("This key");
+            notifyUnimplemented();
             return ;
         }
         const modifier = Modifiers.modifierNameFor(keyData);
@@ -240,6 +242,12 @@ Item {
             }
         }
         if (ydotooldUp === false) {
+            // 不锁死：ydotoold 可能刚起来，节流重探，探到 up 立刻恢复
+            const now = Date.now();
+            if (now - router.lastProbeAt > 3000) {
+                router.lastProbeAt = now;
+                router.probeYdotoold();
+            }
             notifyUnimplemented("ydotoold is not running");
             return ;
         }
@@ -252,7 +260,7 @@ Item {
         runCommand(cmd);
     }
 
-    function notifyUnimplemented(label) {
+    function notifyUnimplemented() {
         if (typeof ToastService === "undefined" || !ToastService)
             return ;
         // 长按重复时每 60ms 一次，没有节流会刷满屏幕
@@ -262,9 +270,7 @@ Item {
 
         router.lastToastAt = now;
 
-        // label 通常是「X is not implemented yet」的前半句，但 ydotool 那条本身就是整句
-        const term = label === "ydotoold is not running" ? label : label + " is not implemented yet";
-        ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", term) : term);
+        ToastService.showInfo(I18n.trFor("inlineKeyboard", "ydotoold is not running"));
     }
 
     function findAction(key) {

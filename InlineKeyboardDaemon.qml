@@ -237,11 +237,6 @@ PluginComponent {
         return root.page;
     }
 
-    // 转发给 FcitxBridge 的解析入口（statusRead 兜底和 debug 用）
-    function applyImList(raw) {
-        fcitxBridge.applyImList(raw);
-    }
-
     // 按键注入和修饰键全部在 KeyRouter 里，这里只转发
     function injectKey(code, sym, kind) {
         keyRouter.injectKey(code, sym, kind);
@@ -298,10 +293,6 @@ PluginComponent {
         keyRouter.clearTransientModifiers();
     }
 
-    function probeYdotoold() {
-        keyRouter.probeYdotoold();
-    }
-
     function sendFcitx(line) {
         return fcitxBridge.sendFcitx(line);
     }
@@ -321,22 +312,12 @@ PluginComponent {
             const now0 = Date.now();
             if (typeof ToastService !== "undefined" && ToastService && now0 - root.lastTextToastAt > 3000) {
                 root.lastTextToastAt = now0;
-                const busy = "Copy is still finishing, try again";
-                ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", busy) : busy);
+                ToastService.showInfo(I18n.trFor("inlineKeyboard", "Copy is still finishing, try again"));
             }
             return "none";
         }
-        const copied = fcitxBridge.clipboardAvailable;
-        lastTextCommitVia = copied ? "clipboard" : "none";
-        // 连点几个表情时别刷一屏提示：同一条消息 3 秒内只弹一次
-        const now = Date.now();
-        if (typeof ToastService !== "undefined" && ToastService && now - root.lastTextToastAt > 3000) {
-            root.lastTextToastAt = now;
-            // 「什么都没成功」要说清楚缺什么、怎么补 ——
-            // 只说「失败了」，用户完全不知道该装什么（平板上就是这样）
-            const term = copied ? "Copied — long press the text field to paste" : "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)";
-            ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", term) : term);
-        }
+        // dms cl copy 还没退出，成败未知；结论和提示都由 copyFinished 带回
+        lastTextCommitVia = "clipboard";
         return lastTextCommitVia;
     }
 
@@ -355,10 +336,6 @@ PluginComponent {
 
     function notifyUnimplemented(label) {
         keyRouter.notifyUnimplemented(label);
-    }
-
-    function findAction(key) {
-        return keyRouter.findAction(key);
     }
 
     // 按 id 找动作（自定义动作要拿它的 cmd）
@@ -968,6 +945,24 @@ PluginComponent {
 
         }
 
+        function onCopyFinished(ok) {
+            if (!ok)
+                root.lastTextCommitVia = "none";
+
+            // 连点几个表情时别刷一屏提示：同一条消息 3 秒内只弹一次
+            const now = Date.now();
+            if (typeof ToastService === "undefined" || !ToastService || now - root.lastTextToastAt <= 3000)
+                return;
+
+            root.lastTextToastAt = now;
+            // 「什么都没成功」要说清楚缺什么、怎么补 ——
+            // 只说「失败了」，用户完全不知道该装什么（平板上就是这样）
+            if (ok)
+                ToastService.showInfo(I18n.trFor("inlineKeyboard", "Copied — long press the text field to paste"));
+            else
+                ToastService.showInfo(I18n.trFor("inlineKeyboard", "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)"));
+        }
+
         target: fcitxBridge
     }
 
@@ -1393,9 +1388,6 @@ PluginComponent {
         }
 
         function setMode(m: string) : string {
-            if (!root.devMode)
-                return "dev mode off";
-
             root.mode = m;
             return "INLINE_KEYBOARD_MODE:" + m;
         }

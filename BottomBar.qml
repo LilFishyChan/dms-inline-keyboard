@@ -4,6 +4,7 @@ import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 import qs.DCommon.Widgets
+import qs.Services
 
 Item {
     id: handleBar
@@ -109,7 +110,6 @@ Item {
 
         // 单击逻辑抽成函数：模拟点击和手指点走同一份
         function tapAt() {
-            controller.imListRequested();
             controller.imCycleRequested();
         }
 
@@ -133,7 +133,11 @@ Item {
             interval: 500
             onTriggered: {
                 langBtn.longFired = true;
-                controller.imListRequested();
+                // 清单是 addon 推来的；空的时候置 imPickerOpen 只会让面板稍后自己弹出来
+                if (controller.imRows.length === 0) {
+                    ToastService.showInfo(I18n.trFor("inlineKeyboard", "Input method list is empty — is the fcitx5 addon running?"));
+                    return;
+                }
                 controller.imPickerOpen = true;
             }
         }
