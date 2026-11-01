@@ -230,7 +230,7 @@ Item {
         }
 
         Behavior on x {
-            enabled: insertGhost.allowAnim && (controller ? controller.animateCells : true)
+            enabled: insertGhost.allowAnim && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
             NumberAnimation {
                 duration: Motion.shift

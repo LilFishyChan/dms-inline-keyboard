@@ -274,6 +274,8 @@ Item {
 
                     MouseArea {
                         id: cellMouse
+                        Accessible.role: Accessible.Button
+                        Accessible.name: controller.tr(modelData.label)
 
                         function tapAt() {
                             controller.quickAction(modelData.id);

@@ -224,7 +224,8 @@ Item {
 
     // 发一行到 addon。没连上返回 false，调用方据此回退 ydotool。
     function sendFcitx(line) {
-        if (!socket.connected)
+        // socketPath 为空 = XDG_RUNTIME_DIR 缺失，别往空路径发也别起进程
+        if (bridge.socketPath === "" || !socket.connected)
             return false;
 
         socket.write(line + "\n");
@@ -268,6 +269,9 @@ Item {
 
     // 文件兜底只在打开键盘时读一次（addon 还没连上那一刻的初始状态），之后全靠 addon 通过 socket 推送，不再定时起 cat 进程。
     function readFallbackFiles() {
+        if (bridge.socketPath === "")
+            return ;
+
         if (!statusRead.running)
             statusRead.running = true;
 
@@ -325,7 +329,7 @@ Item {
         interval: bridge.reconnectDelay
         // 连上了就不跑；只有键盘打开、且该连时才连。
         // 无条件 running: true 会让插件在键盘收起后仍然重连，所以这里把条件写全。
-        running: bridge.keyboardOpen && bridge.connectEnabled && !socket.connected
+        running: bridge.keyboardOpen && bridge.connectEnabled && bridge.socketPath !== "" && !socket.connected
         repeat: true
         triggeredOnStart: true
         onTriggered: {

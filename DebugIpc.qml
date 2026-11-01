@@ -88,8 +88,11 @@ Item {
 
         if (!key)
             return "no-key";
-        // 动作表和运行时位置不是「设置项」，调试口不该能改
-        if (["actions", "floatPosX", "floatPosY", "miniPosRight", "miniPosBottom", "lastMode"].includes(key))
+        // 白名单：只放设置页真实存在的标量项。动作表、队列、运行时位置都不属于「设置项」
+        const writable = ["alwaysShowPreedit", "avoidWindows", "bgOpacity", "debugMode", "defaultFloating",
+                          "dockFillWidth", "escSwap", "keyOpacity", "keyboardHeight", "keyboardWidth",
+                          "modifierMode", "repeatInterval", "specialKeyStyle", "winKeyCustomIcon", "winKeyStyle"];
+        if (!writable.includes(key))
             return "blocked-key";
 
         let parsed = value;

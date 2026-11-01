@@ -217,6 +217,10 @@ Item {
                 "combo": hasComboModifier
             });
             // sym 本身已经是移位后的符号时不能再叠 Shift，否则 / → ? 会变成 ? 再移位
+            // key:<sym>[:<mods>] 里冒号是分隔符：sym 本身是 : 会被 addon 截成空串（最后变成空格）
+            if (route === KeyRoute.ROUTE.fcitx && sym.indexOf(":") >= 0)
+                route = KeyRoute.ROUTE.ydotool;
+
             if (route === KeyRoute.ROUTE.fcitx)
                 mods = (shiftState && !shifted) ? 1 : 0;
 
@@ -267,6 +271,9 @@ Item {
 
     function runCommand(cmd) {
         if (ydotoolProc.running) {
+            if (router.pendingCommands.length >= 32)
+                router.pendingCommands.shift();
+
             // 必须写 router：root 会解析到外层 daemon 的队列，键会排错队甚至注进别的窗口
             router.pendingCommands.push(cmd);
             return ;

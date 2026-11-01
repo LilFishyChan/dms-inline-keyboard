@@ -332,6 +332,10 @@ PluginComponent {
 
     function runCommand(cmd) {
         if (quickProc.running) {
+            // 长按重复每秒能压十几条，ydotool 卡住时无限堆会把键一次性泄到别的窗口
+            if (root.pendingCommands.length >= 32)
+                root.pendingCommands.shift();
+
             root.pendingCommands.push(cmd);
             return ;
         }
@@ -461,7 +465,12 @@ PluginComponent {
     // 老版本把这几项存在 Settings 里，所以 state 没有时回落到 Settings 读一次。
     // 设置文件可能被手改坏或留着旧版本的字符串，读回的数一律夹到合法范围
     function readNum(key, fallback, min, max) {
-        const n = Number(PluginService.loadPluginData(root.pluginId, key, fallback));
+        const raw = PluginService.loadPluginData(root.pluginId, key, fallback);
+        // Number(null) 和 Number("") 都是 0，这里要当「没有值」回落默认，否则透明度会静默变 0
+        if (typeof raw !== "number" && (typeof raw !== "string" || raw.trim() === ""))
+            return fallback;
+
+        const n = Number(raw);
         return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
     }
 
@@ -677,11 +686,11 @@ PluginComponent {
     function reloadSettings() {
         // 透明度面板开着时不回读这两个值：自己刚保存会触发 pluginDataChanged，回读会把还没写盘的另一个值覆盖掉（保存顺序被打乱）。
         if (root.mode !== "transparency") {
-            const nextBgOpacity = PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100;
+            const nextBgOpacity = root.readNum("bgOpacity", 100, 0, 100) / 100;
             if (nextBgOpacity !== root.bgOpacity)
                 root.bgOpacity = nextBgOpacity;
 
-            const nextKeyOpacity = PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100;
+            const nextKeyOpacity = root.readNum("keyOpacity", 100, 0, 100) / 100;
             if (nextKeyOpacity !== root.keyOpacity)
                 root.keyOpacity = nextKeyOpacity;
 

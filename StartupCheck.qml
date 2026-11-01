@@ -21,7 +21,7 @@ QtObject {
                 done(null);
                 return ;
             }
-            done(tr("Inline Keyboard requires: %1").arg(missing));
+            done(I18n.trFor("inlineKeyboard", "Inline Keyboard requires: %1").arg(missing));
         });
     }
 

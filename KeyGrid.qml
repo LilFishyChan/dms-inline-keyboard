@@ -155,6 +155,10 @@ Item {
                     return label === "Backspace" || label === "Del" || label === "End" || label === "Home" || label === "PgUp" || label === "PgDn";
                 }
 
+                Accessible.role: Accessible.Button
+                Accessible.name: keyItem.bottomLabel || keyItem.iconName || keyItem.mainLabel
+                Accessible.onPressAction: clickAt()
+
                 // 按下 / 松开 / 点击各自成一个函数：手势直接调用，模拟点击也调它们，两条路共用同一份逻辑（长按重复、修饰键状态、涟漪都不会漏）
                 function pressAt(px, py) {
                     keyItem.pressRipple(px, py);
