@@ -76,6 +76,15 @@ PluginSettings {
 
     function removeActionById(id) {
         actionList.items = Actions.removeAction(Actions.toArray(actionList.items), id).actions;
+        // 删掉的正是正在编辑的那条时，表单也要跟着收
+        if (root.editingId === id)
+            root.cancelForm();
+    }
+
+    // 收起表单：editingId 决定编辑态那一行是否展开，只清 adding 是不够的
+    function cancelForm() {
+        root.adding = false;
+        root.editingId = "";
     }
 
     function startAdd() {
@@ -724,7 +733,7 @@ PluginSettings {
                             text: I18n.trFor("inlineKeyboard", "Cancel")
                             backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
                             textColor: Theme.surfaceText
-                            onClicked: root.adding = false
+                            onClicked: root.cancelForm()
                         }
 
                     }
