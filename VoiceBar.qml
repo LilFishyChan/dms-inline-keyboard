@@ -1,5 +1,6 @@
 // 语音输入时占据顶部那一行（快捷栏 / 候选栏共用同一块高度）。
 // 布局按「以功能栏为基础」来：两端是圆形按钮，中间是内容区。
+import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 import qs.DCommon.Widgets
@@ -37,7 +38,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Theme.fullRadius(width, height)
-        color: Theme.withAlpha(Theme.surface, voiceBar.controller ? voiceBar.controller.bgOpacity : 1)
+        color: Theme.withAlpha(Theme.hostSurface, voiceBar.controller ? voiceBar.controller.bgOpacity : 1)
     }
 
     // 左：向下箭头 → 小模式
@@ -50,7 +51,7 @@ Item {
         width: voiceBar.btn
         height: voiceBar.btn
         radius: Theme.fullRadius(width, height)
-        color: Theme.surfaceContainer
+        color: Theme.chipSurface
 
         DIcon {
             anchors.centerIn: parent
@@ -69,6 +70,8 @@ Item {
         }
 
         MouseArea {
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Voice input")
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
@@ -144,7 +147,7 @@ Item {
             x: label.x
             visible: voiceBar.text === "" && !voiceBar.controller.voiceActive
             text: I18n.trFor("inlineKeyboard", "Tap the mic on the right to start")
-            color: Theme.withAlpha(Theme.surfaceText, 0.55)
+            color: Theme.withAlpha(Theme.surfaceText, Alpha.Muted)
             font.pixelSize: label.font.pixelSize
         }
 
@@ -161,7 +164,7 @@ Item {
         height: voiceBar.btn
         radius: Theme.fullRadius(width, height)
         // 激活态用主色实心，和固定框同一套：底色 primary、图标 onPrimary
-        color: voiceBar.controller.voiceActive ? Theme.primary : Theme.surfaceContainer
+        color: voiceBar.controller.voiceActive ? Theme.primary : Theme.chipSurface
 
         DIcon {
             anchors.centerIn: parent
@@ -169,7 +172,7 @@ Item {
             size: voiceBar.icon
             // 激活态图标转 onPrimary；未激活用正文色
             //（不能写 controller.fg —— 胶囊窗口里 controller 是 daemon，没有 fg），所以直接用 Theme。
-            color: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, 0.8)
+            color: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, Alpha.Strong)
         }
 
         DRipple {
@@ -180,6 +183,8 @@ Item {
         }
 
         MouseArea {
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Pause recording")
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor

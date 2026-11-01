@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Effects
 import "layouts/special-keys.js" as SpecialKeys
+import "alpha.js" as Alpha
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Widgets
@@ -70,7 +71,7 @@ Item {
     readonly property real topRatio: (hasShiftPair && upperMode) ? mainLabelRatio : upperLabelRatio
     readonly property real bottomRatio: (hasShiftPair && upperMode) ? upperLabelRatio : mainLabelRatio
     // 「非当前状态会输入」的那一行：比正文色再淡一档，层次更清楚
-    readonly property color minorLabelColor: Theme.withAlpha(Theme.onSurfaceVariant, 0.6)
+    readonly property color minorLabelColor: Theme.withAlpha(Theme.onSurfaceVariant, Alpha.Secondary)
     // 键面图标（表情、第二页、菜单…）。可以是 Material 名字，也可以是图片路径
     readonly property string iconName: (root.specialLook !== null && root.specialLook.icon !== "") ? root.specialLook.icon : (keyData.icon || "")
     readonly property bool iconIsImage: {
@@ -129,9 +130,9 @@ Item {
 
         // Fn 和其它修饰键一样：激活靠描边、锁定靠实心，不再单独用淡底
         if (isModifier)
-            return Theme.surfaceContainerHighest;
+            return Theme.chipSurfaceNested;
 
-        return Theme.surfaceContainer;
+        return Theme.chipSurface;
     }
     readonly property color labelColor: {
         if (lockedLook)

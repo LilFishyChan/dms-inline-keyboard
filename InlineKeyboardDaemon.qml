@@ -90,7 +90,8 @@ PluginComponent {
     // QML 里函数抛异常时，IPC 调用方拿到的是空字符串，分不清「没返回」
     property string lastError: ""
     // 所有动作共用一条 Process，忙时排队一条。
-    property var pendingCommand: null
+    // 连按多个动作时排队执行，只留一条会丢掉前面的
+    property var pendingCommands: []
     // 内置动作的处理函数表：id → 要执行的插件内部逻辑。
     // 新增内置动作只需要在 actions.js 里加一条（带 kind: "builtin"）再加上这里的函数，两边名字对上就行。
     readonly property var builtinHandlers: ({
@@ -344,7 +345,7 @@ PluginComponent {
 
     function runCommand(cmd) {
         if (quickProc.running) {
-            root.pendingCommand = cmd;
+            root.pendingCommands.push(cmd);
             return ;
         }
         quickProc.command = cmd;
@@ -984,12 +985,12 @@ PluginComponent {
 
     Connections {
         function onRunningChanged() {
-            if (quickProc.running || !root.pendingCommand)
+            if (quickProc.running || root.pendingCommands.length === 0)
                 return ;
 
-            const next = root.pendingCommand;
-            root.pendingCommand = null;
-            root.runCommand(next);
+            // 这里不能走 runCommand：它会把下一条又塞回队列
+            quickProc.command = root.pendingCommands.shift();
+            quickProc.running = true;
         }
 
         target: quickProc

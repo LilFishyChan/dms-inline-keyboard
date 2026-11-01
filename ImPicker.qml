@@ -1,5 +1,6 @@
 // 输入法选择器（长按底部地球打开）。
 // 键盘内部的下拉框：从右下角弹出、内容可滚动。
+import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 import qs.DCommon.Common
@@ -38,7 +39,7 @@ Item {
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
         height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
         radius: Theme.cornerRadiusL
-        color: Theme.withAlpha(Theme.surface, 0.99)
+        color: Theme.withAlpha(Theme.floatingWindowSurface, 0.99)
         border.width: Theme.outlineWidth
         border.color: Theme.outlineVariant
 
@@ -64,7 +65,7 @@ Item {
                 width: listView.width
                 height: Math.round(root.controller.keyH * 0.68)
                 radius: Math.round(Theme.cornerRadius * 0.7)
-                color: modelData.current ? Theme.withAlpha(Theme.primary, 0.14) : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, 0.06) : "transparent")
+                color: modelData.current ? Theme.withAlpha(Theme.primary, 0.14) : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, Alpha.Whisper) : "transparent")
 
                 // label 块：托盘上看到的那个字（万 / abc / en）
                 Rectangle {

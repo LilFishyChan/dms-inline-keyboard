@@ -44,7 +44,10 @@ Item {
     // 组合键（Ctrl/Alt/Super）要优先于输入法：预编辑挂着时 fcitx5 会先把组合键交给输入法引擎判断，结果不可控，所以组合键一律走 ydotool。
     readonly property bool hasComboModifier: ctrlState !== 0 || altState !== 0 || superState !== 0
     // 唯一后端。它通过 uinput 造真实键盘设备，事件走 libinput → 合成器第一环，比注入按键事件更底层。
-    property bool ydotooldUp: false
+    // 未探测过时先试着注入，探到不通才拒；否则刚开键盘那一下会全被吞掉
+    property var ydotooldUp: undefined
+    // ydotool 一次只能跑一条，连按要排队
+    property var pendingCommands: []
     // 测试用：只记录「会发什么」，不真的注入（不调 ydotool、不发 socket）。
     // 由 debugSetDryRun / debugInjected 驱动，见 scripts/acceptance.py。
     property bool dryRun: false
@@ -228,7 +231,7 @@ Item {
                 return ;
             }
         }
-        if (!ydotooldUp) {
+        if (ydotooldUp === false) {
             notifyUnimplemented("ydotoold is not running");
             return ;
         }
@@ -261,6 +264,10 @@ Item {
     }
 
     function runCommand(cmd) {
+        if (ydotoolProc.running) {
+            root.pendingCommands.push(cmd);
+            return ;
+        }
         ydotoolProc.command = cmd;
         ydotoolProc.running = true;
     }
@@ -289,6 +296,14 @@ Item {
         onExited: (exitCode) => {
             if (exitCode !== 0)
                 router.probeYdotoold();
+            else
+                router.ydotooldUp = true;
+
+            // 队列里还有就接着跑
+            if (router.pendingCommands.length > 0) {
+                ydotoolProc.command = router.pendingCommands.shift();
+                ydotoolProc.running = true;
+            }
 
         }
     }

@@ -316,5 +316,20 @@
     },
     "e.g. grim -g \"$(slurp)\"": {
         "e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\""
+    },
+    "Collapse keyboard": {
+        "Collapse keyboard": "收起键盘"
+    },
+    "Expand keyboard": {
+        "Expand keyboard": "展开键盘"
+    },
+    "Restore keyboard": {
+        "Restore keyboard": "恢复键盘"
+    },
+    "Pause recording": {
+        "Pause recording": "暂停录音"
+    },
+    "Backspace": {
+        "Backspace": "退格"
     }
 }

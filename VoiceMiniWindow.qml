@@ -1,5 +1,6 @@
 // 语音模式窗口：一条浮动胶囊，只放 VoiceBar 一行。
 // 和 FloatingKeyboardWindow 是两种布局（宽度包内容、高度一行、圆角取一半）。
+import "alpha.js" as Alpha
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -64,7 +65,7 @@ PanelWindow {
         radius: Theme.fullRadius(width, height)
         color: "transparent"
         border.width: Theme.outlineWidthFocused
-        border.color: Theme.withAlpha(Theme.primary, 0.5)
+        border.color: Theme.withAlpha(Theme.primary, Alpha.Half)
     }
 
     Rectangle {
@@ -73,7 +74,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: 2
         radius: Theme.fullRadius(width, height)
-        color: Theme.withAlpha(Theme.surface, controller ? controller.bgOpacity : 1)
+        color: Theme.withAlpha(Theme.hostSurface, controller ? controller.bgOpacity : 1)
 
         // 一行内容：左缩小 / 中文字 / 右麦克风
         VoiceBar {

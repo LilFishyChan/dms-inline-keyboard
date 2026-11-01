@@ -1,5 +1,6 @@
 // Inline Keyboard 底部把手行：左侧收起键、中间「拼」/输入法状态、右侧 fcitx5 托盘图标。
 // 高度是半个标准键高；图标裸画不加深色底块。由 KeyboardCard 实例化。
+import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 import qs.DCommon.Widgets
@@ -60,6 +61,8 @@ Item {
         }
 
         MouseArea {
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Collapse keyboard")
             id: hideMouse
 
             function tapAt() {
@@ -86,7 +89,7 @@ Item {
         width: handleBar.gripWidth
         height: Math.max(3, controller.handleH * handleBar.gripHeightRatio)
         radius: Theme.fullRadius(width, height)
-        color: Theme.withAlpha(controller.fg, 0.5)
+        color: Theme.withAlpha(controller.fg, Alpha.Half)
     }
 
     // 拖动区：整条把手（两端图标除外）
@@ -138,6 +141,8 @@ Item {
         }
 
         MouseArea {
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Expand keyboard")
             id: langMouse
 
             // 单击逻辑抽成函数：模拟点击和手指点走同一份

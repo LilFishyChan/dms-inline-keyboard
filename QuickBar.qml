@@ -1,4 +1,5 @@
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 // Inline Keyboard 顶部快捷栏：左侧导航按钮、中间固定栏动作、右侧圆形动作槽。
 // 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，所以「松手后的样子」要靠 plan 单独算。
 import QtQuick
@@ -91,7 +92,7 @@ Item {
         color: Theme.surfaceContainerLow
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.expand
@@ -102,7 +103,7 @@ Item {
         // 和中间的动作块一样受 animateCells 控制：不设 enabled 的话，打开键盘 / 切模式时布局重排会当场演一遍位移动画
 
         Behavior on x {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.shift
@@ -112,7 +113,7 @@ Item {
         }
 
         Behavior on width {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.shift
@@ -140,7 +141,7 @@ Item {
         border.color: Theme.primary
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.expand
@@ -150,7 +151,7 @@ Item {
         }
 
         Behavior on x {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.shift
@@ -160,7 +161,7 @@ Item {
         }
 
         Behavior on width {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.shift
@@ -277,7 +278,7 @@ Item {
             radius: Theme.fullRadius(width, quickBar.cellH)
             // 非编辑态普通动作不要底色（只图标）；编辑态给 surfaceContainer 方便拖；
             // 激活态和右侧动作槽统一：surfaceContainerHigh 底 + primary 图标。
-            color: controller.editing ? Theme.surfaceContainer : (isActive ? Theme.surfaceContainerHigh : "transparent")
+            color: controller.editing ? Theme.chipSurface : (isActive ? Theme.chipSurface : "transparent")
             opacity: leaving ? 0 : (isDisabled ? 0.5 : 1)
             z: leaving ? 0 : 1
 
@@ -327,7 +328,7 @@ Item {
             Behavior on x {
                 // slotIndex < 0 = 位置还没定（预览里已被摘掉 / 会被挤出）。
                 // 这时 x 停在最后有效位置（见上面的 cellX），不让它参与动画。
-                enabled: slotIndex >= 0 && !leaving && (controller ? controller.animateCells : true)
+                enabled: slotIndex >= 0 && !leaving && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
                 NumberAnimation {
                     duration: Motion.shift
@@ -338,7 +339,7 @@ Item {
 
             Behavior on opacity {
                 // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，直接隐藏更干净。
-                enabled: !leaving && (controller ? controller.animateCells : true)
+                enabled: !leaving && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
                 NumberAnimation {
                     duration: Motion.fade
@@ -422,7 +423,7 @@ Item {
             width: quickBar.btnW
             height: quickBar.btnW
             radius: Theme.fullRadius(width, height)
-            color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.surfaceContainerLow : Theme.surfaceContainer) : Theme.surfaceContainerHigh)
+            color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.surfaceContainerLow : Theme.chipSurface) : Theme.chipSurface)
             // 动作槽在编辑态高亮描边，表示可以拖东西进来替换。
             // 非编辑态的激活态改用主色实心底，不需要描边
             border.width: controller.editing && isSlot ? (controller.dragOverSlot ? 3 : 2) : 0
@@ -456,7 +457,7 @@ Item {
                 action: slotShow
                 size: Math.round(quickBar.btnW * 0.5)
                 // 编辑态下统一显示默认形态（见顶部动作块的同款说明）
-                color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : (slotState === "disabled" ? Theme.withAlpha(Theme.surfaceText, 0.4) : Theme.surfaceText))
+                color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : (slotState === "disabled" ? Theme.withAlpha(Theme.surfaceText, Alpha.Hint) : Theme.surfaceText))
             }
 
             // 占位图标不能走 btnIcon：从槽往外拖时它还是旧动作，会残留原图标
@@ -515,7 +516,7 @@ Item {
             }
 
             Behavior on scale {
-                enabled: controller ? controller.animateCells : true
+                enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                 NumberAnimation {
                     duration: Motion.micro

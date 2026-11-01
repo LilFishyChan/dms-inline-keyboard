@@ -1,4 +1,5 @@
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 // Inline Keyboard 的功能动作列表：4 行滚动网格 + 底部编辑按钮；
 // 编辑态下可拖动排序、拖到顶部快捷栏/右上角槽。
 import QtQuick
@@ -102,12 +103,12 @@ Item {
         StyledText {
             anchors.centerIn: parent
             text: I18n.trFor("inlineKeyboard", "Hold and drag to customise")
-            color: Theme.withAlpha(controller.fg, 0.6)
+            color: Theme.withAlpha(controller.fg, Alpha.Secondary)
             font.pixelSize: Math.max(Theme.fontSizeSmall, Math.round(controller.keyH * 0.26))
         }
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.expand
@@ -130,7 +131,7 @@ Item {
         color: Theme.surfaceContainerLow
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.expand
@@ -245,7 +246,7 @@ Item {
                     height: controller.keyH
                     radius: Theme.fullRadius(width, height)
                     // 激活态用和键帽「锁定」同一档：primary 实心 + onPrimary
-                    color: actState === "active" ? Theme.primary : Theme.surfaceContainer
+                    color: actState === "active" ? Theme.primary : Theme.chipSurface
 
                     DRipple {
                         id: fnRipple
@@ -318,7 +319,7 @@ Item {
                     }
 
                     Behavior on x {
-                        enabled: controller ? controller.animateCells : true
+                        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                         NumberAnimation {
                             duration: Motion.listShift
@@ -328,7 +329,7 @@ Item {
                     }
 
                     Behavior on y {
-                        enabled: controller ? controller.animateCells : true
+                        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                         NumberAnimation {
                             duration: Motion.listShift
@@ -344,7 +345,7 @@ Item {
         }
 
         Behavior on y {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.panel
@@ -371,7 +372,7 @@ Item {
         z: 6
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.expand
@@ -392,7 +393,7 @@ Item {
         opacity: (fnScroll.contentHeight > fnScroll.height + 1 && fnScroll.contentY < fnScroll.contentHeight - fnScroll.height - 1) ? 1 : 0
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.panel
@@ -404,12 +405,12 @@ Item {
         gradient: Gradient {
             GradientStop {
                 position: 0
-                color: Theme.withAlpha(Theme.surfaceContainer, 0)
+                color: Theme.withAlpha(Theme.chipSurface, 0)
             }
 
             GradientStop {
                 position: 1
-                color: Theme.withAlpha(Theme.surfaceContainer, 0.94)
+                color: Theme.withAlpha(Theme.chipSurface, 0.94)
             }
 
         }
@@ -425,7 +426,7 @@ Item {
         opacity: fnScroll.contentY > 1 ? 1 : 0
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.panel
@@ -437,12 +438,12 @@ Item {
         gradient: Gradient {
             GradientStop {
                 position: 0
-                color: Theme.withAlpha(Theme.surfaceContainer, 0.94)
+                color: Theme.withAlpha(Theme.chipSurface, 0.94)
             }
 
             GradientStop {
                 position: 1
-                color: Theme.withAlpha(Theme.surfaceContainer, 0)
+                color: Theme.withAlpha(Theme.chipSurface, 0)
             }
 
         }
@@ -472,7 +473,7 @@ Item {
             height: Math.round(controller.keyH * 2 / 3)
             radius: Theme.fullRadius(width, height)
             // 和磁贴同一套填充（比磁贴深一档，读起来像「次级按钮」而不是另一个动作）
-            color: Theme.surfaceContainerHigh
+            color: Theme.chipSurface
 
             DRipple {
                 id: editRipple
@@ -501,7 +502,7 @@ Item {
         }
 
         Behavior on opacity {
-            enabled: controller ? controller.animateCells : true
+            enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
                 duration: Motion.ghost

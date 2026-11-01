@@ -12,7 +12,7 @@ StyledRect {
     width: parent.width
     height: contentColumn.implicitHeight + Theme.spacingL * 2
     radius: Theme.cornerRadius
-    color: Theme.surfaceContainer
+    color: Theme.chipSurface
     border.width: Theme.layerOutlineWidth
     border.color: Theme.outlineMedium
     // 内容超出卡片时裁掉，避免滑块之类按自己的最小宽度顶出去

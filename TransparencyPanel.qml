@@ -1,5 +1,6 @@
 // 透明度调整面板：预览 + 背景 / 按键两行滑块，改值直接写回卡片。
 // 进入时记录原值、取消时恢复由 KeyboardCard + QuickBar 负责（面板本身不管撤销）。
+import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 
@@ -61,7 +62,7 @@ Item {
         OpacitySliderRow {
             width: parent.width
             keyH: root.controller.keyH
-            textColor: Theme.withAlpha(root.controller.fg, 0.85)
+            textColor: Theme.withAlpha(root.controller.fg, Alpha.Bright)
             label: I18n.trFor("inlineKeyboard", "Background opacity")
             value: root.controller.bgOpacity
             onMoved: (v) => {
@@ -73,7 +74,7 @@ Item {
         OpacitySliderRow {
             width: parent.width
             keyH: root.controller.keyH
-            textColor: Theme.withAlpha(root.controller.fg, 0.85)
+            textColor: Theme.withAlpha(root.controller.fg, Alpha.Bright)
             label: I18n.trFor("inlineKeyboard", "Key opacity")
             value: root.controller.keyOpacity
             onMoved: (v) => {

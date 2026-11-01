@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "actions.js" as Actions
+import "alpha.js" as Alpha
 import qs.Common
 import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
@@ -50,12 +51,20 @@ PluginSettings {
         root.repeatInterval = root.loadValue("repeatInterval", 60);
     }
 
+    // 自定义图标的当前值，读写都走 root 的 loadValue/saveValue
+    property string winIconValue: root.loadValue("winKeyCustomIcon", "")
+
+    function setWinIcon(v) {
+        root.winIconValue = v;
+        root.saveValue("winKeyCustomIcon", v);
+    }
+
     function refreshDebugMode() {
-        root.debugModeOn = PluginService.loadPluginData(root.pluginId, "debugMode", false);
+        root.debugModeOn = root.loadValue("debugMode", false);
     }
 
     function writeDebugMode(on) {
-        PluginService.savePluginData(root.pluginId, "debugMode", on);
+        root.saveValue("debugMode", on);
         root.debugModeOn = on;
     }
 
@@ -196,6 +205,8 @@ PluginSettings {
         running: false
         command: ["systemctl", "--user", "start", "ydotool"]
         onExited: (code) => {
+            if (code !== 0)
+                ToastService.showError(I18n.trFor("inlineKeyboard", "Could not start ydotoold"));
             daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
             daemonCheck.running = true;
         }
@@ -207,6 +218,8 @@ PluginSettings {
         running: false
         command: ["systemctl", "--user", "enable", "--now", "ydotool"]
         onExited: (code) => {
+            if (code !== 0)
+                ToastService.showError(I18n.trFor("inlineKeyboard", "Could not enable ydotoold"));
             daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
             daemonCheck.running = true;
         }
@@ -235,8 +248,8 @@ PluginSettings {
         width: parent.width
         visible: !root.ydotooldUp
         // DTone 只有 primary/secondary/tertiary，错误色得自己覆盖
-        color: Theme.withAlpha(Theme.error, 0.12)
-        border.color: Theme.withAlpha(Theme.error, 0.5)
+        color: Theme.withAlpha(Theme.error, Alpha.Focus)
+        border.color: Theme.withAlpha(Theme.error, Alpha.Half)
         implicitHeight: warnColumn.implicitHeight + pad * 2
 
         Column {
@@ -271,7 +284,7 @@ PluginSettings {
 
                 DCommon.DButton {
                     text: I18n.trFor("inlineKeyboard", "Enable at login")
-                    backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                    backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
                     textColor: Theme.surfaceText
                     onClicked: daemonEnable.running = true
                 }
@@ -319,7 +332,7 @@ PluginSettings {
             implicitHeight: cmdText.implicitHeight + 28
             height: implicitHeight
             radius: Theme.cornerRadius
-            color: Theme.withAlpha(Theme.surfaceText, 0.06)
+            color: Theme.withAlpha(Theme.surfaceText, Alpha.Whisper)
 
             StyledText {
                 id: cmdText
@@ -340,7 +353,7 @@ PluginSettings {
         DCommon.DButton {
             visible: !root.bridgeUp
             text: I18n.trFor("inlineKeyboard", "Copy install commands")
-            backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+            backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
             textColor: Theme.surfaceText
             onClicked: copyInstall.running = true
         }
@@ -541,39 +554,21 @@ PluginSettings {
                     id: winIconPicker2
 
                     width: Math.min(160, parent.width * 0.3)
-                    currentIcon: String(winIconSetting.value || "")
-                    onIconSelected: (iconName, iconType) => {
-                        winIconSetting.value = iconName;
-                        root.saveValue("winKeyCustomIcon", iconName);
-                    }
+                    currentIcon: root.winIconValue
+                    onIconSelected: (iconName, iconType) => root.setWinIcon(iconName)
                 }
 
                 DCommon.DTextField {
                     width: parent.width - 48 - winIconPicker2.width - parent.spacing * 2
                     placeholderText: I18n.trFor("inlineKeyboard", "svg/png path")
-                    text: String(winIconSetting.value || "").indexOf("/") >= 0 ? winIconSetting.value : ""
-                    onTextEdited: {
-                        const v = text.trim();
-                        winIconSetting.value = v;
-                        root.saveValue("winKeyCustomIcon", v);
-                    }
+                    text: root.winIconValue.indexOf("/") >= 0 ? root.winIconValue : ""
+                    onTextEdited: root.setWinIcon(text.trim())
                 }
 
             }
 
         }
 
-    }
-
-    // 值的持有者（设置项的读写都靠它），界面由上面那块负责
-    StringSetting {
-        id: winIconSetting
-
-        visible: false
-        settingKey: "winKeyCustomIcon"
-        label: I18n.trFor("inlineKeyboard", "Custom icon")
-        description: ""
-        defaultValue: ""
     }
 
     SettingsSection {
@@ -731,7 +726,7 @@ PluginSettings {
 
                         DCommon.DButton {
                             text: I18n.trFor("inlineKeyboard", "Cancel")
-                            backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                            backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
                             textColor: Theme.surfaceText
                             onClicked: root.adding = false
                         }
@@ -794,7 +789,7 @@ PluginSettings {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.label
                                     font.pixelSize: Theme.fontSizeMedium
-                                    color: isHidden ? Theme.withAlpha(Theme.surfaceText, 0.55) : Theme.surfaceText
+                                    color: isHidden ? Theme.withAlpha(Theme.surfaceText, Alpha.Muted) : Theme.surfaceText
                                     elide: Text.ElideRight
                                 }
 
@@ -808,7 +803,7 @@ PluginSettings {
                                     DCommon.DActionButton {
                                         iconName: isHidden ? "visibility_off" : "visibility"
                                         backgroundColor: isHidden ? Theme.primary : "transparent"
-                                        iconColor: isHidden ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, 0.65)
+                                        iconColor: isHidden ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, Alpha.Medium)
                                         tooltipText: isHidden ? I18n.trFor("inlineKeyboard", "Show") : I18n.trFor("inlineKeyboard", "Hide")
                                         onClicked: root.patchAction(modelData.id, {
                                             "hidden": !isHidden
@@ -818,7 +813,7 @@ PluginSettings {
                                     DCommon.DActionButton {
                                         visible: !isBuiltin
                                         iconName: "edit"
-                                        iconColor: Theme.withAlpha(Theme.surfaceText, 0.75)
+                                        iconColor: Theme.withAlpha(Theme.surfaceText, Alpha.High)
                                         tooltipText: I18n.trFor("inlineKeyboard", "Edit")
                                         onClicked: root.startEdit(modelData)
                                     }
@@ -826,7 +821,7 @@ PluginSettings {
                                     DCommon.DActionButton {
                                         visible: !isBuiltin
                                         iconName: "delete"
-                                        iconColor: Theme.withAlpha(Theme.error, 0.85)
+                                        iconColor: Theme.withAlpha(Theme.error, Alpha.Bright)
                                         tooltipText: I18n.trFor("inlineKeyboard", "Remove")
                                         onClicked: root.removeActionById(modelData.id)
                                     }
@@ -849,7 +844,7 @@ PluginSettings {
 
                             // 行底色比整块卡片高一档，两者要能分开
                             background: Rectangle {
-                                color: isHidden ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
+                                color: isHidden ? Theme.chipSurfaceNested : Theme.chipSurface
                                 border.width: Theme.layerOutlineWidth
                                 border.color: Theme.outlineMedium
                                 topLeftRadius: parent.firstInGroup ? Theme.cornerRadiusM : 2
@@ -882,7 +877,7 @@ PluginSettings {
                 visible: !root.adding
                 text: I18n.trFor("inlineKeyboard", "Add a custom action")
                 iconName: "add"
-                backgroundColor: Theme.withAlpha(Theme.primary, 0.08)
+                backgroundColor: Theme.withAlpha(Theme.primary, Alpha.Ghost)
                 textColor: Theme.primary
                 onClicked: root.startAdd()
             }
@@ -961,7 +956,7 @@ PluginSettings {
         actions: [
             DCommon.DButton {
                 text: I18n.trFor("inlineKeyboard", "Cancel")
-                backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
+                backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
                 textColor: Theme.surfaceText
                 onClicked: root.debugConfirmOpen = false
             },

@@ -2,6 +2,7 @@
 // 左侧 DListView 按行虚拟化（右侧一列是翻页/退格键）。
 
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 import QtQuick
 import "candidates.js" as Candidates
 import qs.Common
@@ -236,7 +237,7 @@ Item {
                         anchors.margins: 2
                         // 胶囊：圆角取自身高度的一半（和顶部候选条一致）
                         radius: Theme.fullRadius(width, height)
-                        color: cellMouse.containsMouse ? Theme.withAlpha(Theme.primary, 0.18) : "transparent"
+                        color: cellMouse.containsMouse ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : "transparent"
                     }
 
                     StyledText {
@@ -281,7 +282,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 1
                         height: Math.round(candList.rowH * 0.5)
-                        color: Theme.withAlpha(candList.fgColor, 0.3)
+                        color: Theme.withAlpha(candList.fgColor, Alpha.Disabled)
                     }
 
                 }
@@ -302,7 +303,7 @@ Item {
 
             return candList.controller.candLoading ? I18n.trFor("inlineKeyboard", "Loading…") : I18n.trFor("inlineKeyboard", "No candidates");
         }
-        color: Theme.withAlpha(candList.controller ? candList.fgColor : Theme.surfaceText, 0.4)
+        color: Theme.withAlpha(candList.controller ? candList.fgColor : Theme.surfaceText, Alpha.Hint)
         font.pixelSize: candList.candFontSize
     }
 
@@ -326,7 +327,7 @@ Item {
             height: candList.sideKeyH
             // 圆角、底色、图标色都跟主键盘的特殊键一致（Tab / Enter 那种）：这一列是键区的一部分，不该看起来像另一套控件。
             radius: Math.min(Theme.cornerRadius, candList.sideKeyH * 0.16)
-            color: Theme.surfaceContainerHighest
+            color: Theme.chipSurfaceNested
             opacity: press.pressed ? 0.72 : 1
 
             DIcon {
@@ -371,7 +372,7 @@ Item {
             }
 
             Behavior on opacity {
-                enabled: controller ? controller.animateCells : true
+                enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                 NumberAnimation {
                     duration: Motion.quick

@@ -88,6 +88,9 @@ Item {
 
         if (!key)
             return "no-key";
+        // 动作表和运行时位置不是「设置项」，调试口不该能改
+        if (["actions", "floatPosX", "floatPosY", "miniPosRight", "miniPosBottom", "lastMode"].includes(key))
+            return "blocked-key";
 
         let parsed = value;
         if (value === "true")

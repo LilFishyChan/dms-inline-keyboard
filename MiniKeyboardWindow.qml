@@ -1,5 +1,6 @@
 // 最小化模式：键盘收起，屏幕上只留一个浮动圆按钮，点一下叫回键盘。
 // 和语音模式（一条胶囊）是两种布局。主键盘窗口在最小化期间被销毁
+import "alpha.js" as Alpha
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -62,9 +63,9 @@ PanelWindow {
 
         anchors.fill: parent
         radius: Theme.fullRadius(width, height)
-        color: Theme.withAlpha(Theme.surface, controller ? controller.bgOpacity : 1)
+        color: Theme.withAlpha(Theme.hostSurface, controller ? controller.bgOpacity : 1)
         border.width: Theme.outlineWidthFocused
-        border.color: Theme.withAlpha(Theme.primary, 0.5)
+        border.color: Theme.withAlpha(Theme.primary, Alpha.Half)
 
         DIcon {
             anchors.centerIn: parent
@@ -106,6 +107,8 @@ PanelWindow {
         }
 
         MouseArea {
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Restore keyboard")
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor

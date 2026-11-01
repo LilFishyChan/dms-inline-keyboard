@@ -362,6 +362,11 @@ Item {
     // 剪贴板兜底：dms cl copy 直接吃文本参数，不经过 shell
     Process {
         id: clipboardProc
+        // 复制失败别静默当成功
+        onExited: (code) => {
+            if (code !== 0)
+                console.warn("inlineKeyboard: 复制到剪贴板失败，exit " + code);
+        }
 
         command: ["true"]
     }
@@ -370,7 +375,7 @@ Item {
     Process {
         id: statusRead
 
-        command: ["sh", "-c", "cat \"" + bridge.statusPath + "\" 2>/dev/null"]
+        command: ["cat", bridge.statusPath]
         running: false
 
         stdout: StdioCollector {
@@ -382,7 +387,7 @@ Item {
     Process {
         id: imListRead
 
-        command: ["sh", "-c", "cat \"" + bridge.imListPath + "\" 2>/dev/null"]
+        command: ["cat", bridge.imListPath]
         running: false
 
         stdout: StdioCollector {

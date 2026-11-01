@@ -1,6 +1,7 @@
 // Inline Keyboard 的键盘卡片本体：顶部快捷栏 + 右上角动作槽、按键区（page1/page2）、表情页、透明度面板和功能列表。
 
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 import QtQuick
 import Quickshell.Io
 import "actions.js" as Actions
@@ -109,6 +110,8 @@ Rectangle {
     property string dragOwner: ""
     // 让位动画开关。默认 false：卡片构造期间功能栏的 x/width 会从默认值
     property bool animateCells: false
+    // 本地 animateCells 只管首帧，DMS 关掉动画时这里也要停
+    readonly property bool animationsEnabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
     // 松手后幽灵块淡出，动画结束再真正移除
     property bool ghostFading: false
     // 按下点在"卡片"坐标系里的位置（按下时算一次，之后只加位移）
@@ -888,7 +891,7 @@ Rectangle {
     height: pad + Math.max(quickH, candH) + gap + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap + handleH
     radius: Theme.windowRadius
     // 卡片底跟 DMS 设置页同色（surface），透明度仍由插件设置控制
-    color: Theme.withAlpha(Theme.surface, bgOpacity)
+    color: Theme.withAlpha(Theme.hostSurface, bgOpacity)
     border.width: Theme.outlineWidth
     border.color: Theme.withAlpha(Theme.outlineVariant, 0.7)
 
@@ -982,7 +985,7 @@ Rectangle {
         z: 200
 
         Behavior on opacity {
-            enabled: root.animateCells
+            enabled: root.animateCells && root.animationsEnabled
 
             NumberAnimation {
                 duration: Motion.expand
@@ -1022,6 +1025,7 @@ Rectangle {
 
                 // 和分类栏 / 候选栏交叉淡入淡出，时长必须一致
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1044,6 +1048,7 @@ Rectangle {
                 z: 20
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1074,6 +1079,7 @@ Rectangle {
                 opacity: root.page === "emoji" ? 1 : 0
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1113,6 +1119,7 @@ Rectangle {
                 shownCountOverride: root.candListOpen ? -1 : 0
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1145,6 +1152,7 @@ Rectangle {
                     enabled: shown && opacity > 0.5
 
                     Behavior on opacity {
+                        enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                         NumberAnimation {
                             duration: Motion.panel
                             easing.type: Easing.OutCubic
@@ -1228,6 +1236,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1249,6 +1258,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1270,6 +1280,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
+                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1386,7 +1397,7 @@ Rectangle {
         // 遮罩：整体键盘背景色的 50%
         Rectangle {
             anchors.fill: parent
-            color: Theme.withAlpha(Theme.surface, 0.5)
+            color: Theme.withAlpha(Theme.hostSurface, Alpha.Half)
             radius: Theme.cornerRadius
 
             // 吞掉点击：下面看得见但点不到
@@ -1527,13 +1538,13 @@ Rectangle {
                 width: parent.btn
                 height: parent.btn
                 radius: Theme.fullRadius(width, height)
-                color: root.dockFill ? Theme.primary : Theme.surfaceContainerHigh
+                color: root.dockFill ? Theme.primary : Theme.chipSurface
 
                 DIcon {
                     anchors.centerIn: parent
                     name: root.dockFill ? "collapse_content" : "expand_content"
                     size: Math.round(root.keyH * 0.42)
-                    color: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, 0.85)
+                    color: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
                 }
 
                 DRipple {
@@ -1560,13 +1571,13 @@ Rectangle {
                 width: parent.btn
                 height: parent.btn
                 radius: Theme.fullRadius(width, height)
-                color: Theme.surfaceContainerHigh
+                color: Theme.chipSurface
 
                 DIcon {
                     anchors.centerIn: parent
                     name: "restart_alt"
                     size: Math.round(root.keyH * 0.42)
-                    color: Theme.withAlpha(root.fg, 0.85)
+                    color: Theme.withAlpha(root.fg, Alpha.Bright)
                 }
 
                 DRipple {
@@ -1592,13 +1603,13 @@ Rectangle {
                 width: parent.btn
                 height: parent.btn
                 radius: Theme.fullRadius(width, height)
-                color: Theme.surfaceContainerHigh
+                color: Theme.chipSurface
 
                 DIcon {
                     anchors.centerIn: parent
                     name: "close"
                     size: Math.round(root.keyH * 0.42)
-                    color: Theme.withAlpha(root.fg, 0.85)
+                    color: Theme.withAlpha(root.fg, Alpha.Bright)
                 }
 
                 DRipple {
@@ -1655,6 +1666,7 @@ Rectangle {
         }
 
         Behavior on opacity {
+            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
             NumberAnimation {
                 duration: Motion.panel
                 easing.type: Easing.OutCubic
@@ -1665,6 +1677,7 @@ Rectangle {
     }
 
     Behavior on opacity {
+        enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
         NumberAnimation {
             duration: Motion.fade
             easing.type: Easing.OutCubic

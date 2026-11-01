@@ -1,4 +1,5 @@
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 // 表情 / 符号页的顶部分类条：全部 + 各分组。
 // 高度和快捷栏相同（quickH），由 KeyboardCard 放在 topArea 里，替换掉快捷栏。
 import QtQuick
@@ -70,7 +71,7 @@ Item {
                     y: (bar.height - height) / 2
                     text: modelData.label
                     backgroundColor: active ? Theme.primary : Theme.chipSurface
-                    textColor: active ? Theme.onPrimary : Theme.withAlpha(bar.controller.fg, 0.85)
+                    textColor: active ? Theme.onPrimary : Theme.withAlpha(bar.controller.fg, Alpha.Bright)
                     onClicked: bar.controller.emojiCategory = modelData.id
                 }
 

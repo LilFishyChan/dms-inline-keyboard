@@ -1,4 +1,5 @@
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 // Inline Keyboard 顶部候选条
 // 布局规则（和主键盘共用同一套度量）：
 import QtQuick
@@ -111,7 +112,7 @@ Item {
                         height: animH
                         // 胶囊形：半径取一半高度
                         radius: Theme.fullRadius(width, animH)
-                        color: (isFirst || mouse.containsMouse) ? Theme.surfaceContainerHigh : "transparent"
+                        color: isFirst ? Theme.chipSurface : "transparent"
                         // 布局完成前 target* 是 0，这时候启动动画只会把起点写成 0
                         onTargetWChanged: {
                             if (capsule.snapping || capsule.targetW <= 0)
@@ -153,6 +154,7 @@ Item {
 
                         // 打字时跟着滑
                         Behavior on animW {
+                            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.shift
                                 easing.type: Easing.OutCubic
@@ -161,6 +163,7 @@ Item {
                         }
 
                         Behavior on animH {
+                            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.shift
                                 easing.type: Easing.OutCubic
@@ -193,11 +196,13 @@ Item {
                         font.weight: isFirst ? Font.DemiBold : Font.Normal
                     }
 
-                    MouseArea {
+                    StateLayer {
                         id: mouse
 
+                        // StateLayer 自带 hover/pressed 状态层和涟漪，不用自己判断 containsMouse
                         anchors.fill: parent
-                        hoverEnabled: true
+                        stateColor: Theme.onSurface
+                        cornerRadius: parent.radius
                         onClicked: {
                             // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
                             const item = candArea.pool[index] || {
@@ -213,7 +218,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 1
                         height: Math.round(candArea.areaH * 0.42)
-                        color: Theme.withAlpha(candArea.controller.fg, 0.3)
+                        color: Theme.withAlpha(candArea.controller.fg, Alpha.Disabled)
                     }
 
                 }
@@ -255,12 +260,12 @@ Item {
                     name: "keyboard_arrow_down"
                     size: Math.round(candArea.controller.quickH * 0.5)
                     // 展开时图标跟着变主色，和键盘其它激活态一致
-                    color: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, 0.8)
+                    color: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
                     // 展开状态下转 180°，变成「收起」
                     rotation: candArea.controller.candListOpen ? 180 : 0
 
                     Behavior on rotation {
-                        enabled: controller ? controller.animateCells : true
+                        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                         NumberAnimation {
                             duration: Motion.expand
@@ -301,7 +306,7 @@ Item {
         width: preeditLabel.width + 20
         height: preeditLabel.height + 8
         radius: Theme.cornerRadiusS
-        color: Theme.withAlpha(Theme.surface, controller.bgOpacity)
+        color: Theme.withAlpha(Theme.hostSurface, controller.bgOpacity)
 
         StyledText {
             id: preeditLabel
@@ -318,7 +323,7 @@ Item {
 
     // 和快捷栏 / 分类栏用同一个时长，三者交叉淡入淡出才对得上
     Behavior on opacity {
-        enabled: controller ? controller.animateCells : true
+        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
         NumberAnimation {
             duration: Motion.panel

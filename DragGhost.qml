@@ -27,7 +27,7 @@ Rectangle {
     }
 
     Behavior on opacity {
-        enabled: controller ? controller.animateCells : true
+        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
         NumberAnimation {
             duration: Motion.ghost

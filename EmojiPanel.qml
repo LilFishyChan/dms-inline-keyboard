@@ -1,4 +1,5 @@
 import "motion.js" as Motion
+import "alpha.js" as Alpha
 // 表情 / 符号页的主体：中间滚动网格 + 底部一行（返回 / 表情·符号切换 / 退格）。
 // 顶部那行分类条是 EmojiCategoryBar（在 KeyboardCard 的 topArea 里）。
 import QtQuick
@@ -98,7 +99,7 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 2
                     radius: Theme.cornerRadius
-                    color: tap.pressed ? Theme.withAlpha(Theme.primary, 0.18) : "transparent"
+                    color: tap.pressed ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : "transparent"
                 }
 
                 StyledText {
@@ -145,7 +146,7 @@ Item {
             anchors.centerIn: parent
             visible: panel.items.length === 0
             text: I18n.trFor("inlineKeyboard", "Empty")
-            color: Theme.withAlpha(panel.controller.fg, 0.45)
+            color: Theme.withAlpha(panel.controller.fg, Alpha.Dim)
             font.pixelSize: Math.round(panel.controller.keyH * 0.4)
         }
 
@@ -164,6 +165,8 @@ Item {
         // 左：返回键盘（官方按钮，自带涟漪和焦点）
         DButton {
             id: backBtn
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Back")
 
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -218,19 +221,21 @@ Item {
         // 右：退格（长按连发）
         Rectangle {
             id: backspaceBtn
+            Accessible.role: Accessible.Button
+            Accessible.name: I18n.trFor("inlineKeyboard", "Backspace")
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: Math.round(actionRow.btnH * 1.5)
             height: actionRow.btnH
             radius: Theme.fullRadius(width, height)
-            color: (bsTap.pressed || backRepeat.running) ? Theme.withAlpha(Theme.primary, 0.18) : Theme.surfaceContainer
+            color: (bsTap.pressed || backRepeat.running) ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
 
             DIcon {
                 anchors.centerIn: parent
                 name: "backspace"
                 size: Math.round(parent.height * 0.5)
-                color: Theme.withAlpha(panel.controller.fg, 0.85)
+                color: Theme.withAlpha(panel.controller.fg, Alpha.Bright)
             }
 
             DRipple {
