@@ -39,8 +39,8 @@ keyH   = 反解上式（Math.max(28, …)）
 
 ## 按压反馈
 
-`Ripple.qml` 是「按下驻留」型：`press(x, y)` 从触点扩散并在按住期间保持不透明，
-`release()` 才淡出（180 ms）。MouseArea 必须三个都接：
+按压反馈用 DMS 自带的 `DRipple`（`qs.DCommon.Widgets`），不再自带实现。
+按下/松开的具体契约看组件本身，这里不重复描述，避免文档跟着组件漂移：
 
 ```qml
 onPressed: mouse => r.press(mouse.x, mouse.y)

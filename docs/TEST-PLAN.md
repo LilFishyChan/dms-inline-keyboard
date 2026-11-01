@@ -8,24 +8,24 @@ splits the whole feature set into lines and marks what `node --test` covers vers
 must be verified manually.
 
 ```bash
-node --test tests/          # 243 cases, pure logic only
+node --test tests/          # pure logic only — the count is whatever --test reports
 ```
 
 ---
 
 ## 1. Automated coverage (no manual check needed)
 
-| File | Cases | What it guards |
-|---|---:|---|
-| `tests/actions.test.js` | 80 | Action-table sanitising and merging, drag reorder and drop-index math, quick-bar capacity and ejection, visibility filtering |
-| `tests/data.test.js` | 53 | addon JSON parsing and fallback, input-method rows and globe cycling, candidate slicing, Esc↔\` swap |
-| `tests/modifiers.test.js` | 40 | Four-mode modifier state machine, Caps, Fn / page, combo key sequence |
-| `tests/resize.test.js` | 23 | Drag-to-resize, min/max bounds, symmetric and aspect-locked, persisted value clamping |
-| `tests/special-keys.test.js` | 14 | Special-key label / short / icon forms |
-| `tests/keyroute.test.js` | 13 | Whether a key goes to fcitx5 or ydotool |
-| `tests/candidates.test.js` | 10 | Candidate row packing and width distribution (no truncation, flush right edge) |
-| `tests/emoji.test.js` | 5 | Emoji group completeness, commit protocol (no newlines) |
-| `tests/layout.test.js` | 5 | Layout structure, page-key targets, no overlapping keys |
+| File | What it guards |
+|---|---|
+| `tests/actions.test.js` | Action-table sanitising and merging, drag reorder and drop-index math, quick-bar capacity and ejection, visibility filtering |
+| `tests/data.test.js` | addon JSON parsing and fallback, input-method rows and globe cycling, candidate slicing, Esc↔\` swap |
+| `tests/modifiers.test.js` | Four-mode modifier state machine, Caps, Fn / page, combo key sequence |
+| `tests/resize.test.js` | Drag-to-resize, min/max bounds, symmetric and aspect-locked, persisted value clamping |
+| `tests/special-keys.test.js` | Special-key label / short / icon forms |
+| `tests/keyroute.test.js` | Whether a key goes to fcitx5 or ydotool |
+| `tests/candidates.test.js` | Candidate row packing and width distribution (no truncation, flush right edge) |
+| `tests/emoji.test.js` | Emoji group completeness, commit protocol (no newlines) |
+| `tests/layout.test.js` | Layout structure, page-key targets, no overlapping keys |
 
 Changing only these files? Running the unit tests is enough:
 

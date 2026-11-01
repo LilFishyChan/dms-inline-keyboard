@@ -50,9 +50,8 @@ row Ctrl/Win/Alt/Space/Fn/menu/emoji/page-2). `page2` is the F-key block + navig
 
 ## Press feedback
 
-`Ripple.qml` is a "stays down while held" ripple: `press(x, y)` expands from the touch point and
-stays opaque for as long as the press lasts; `release()` fades it out (180 ms). A `MouseArea` must
-wire up all three:
+Press feedback uses DMS's own `DRipple` from `qs.DCommon.Widgets` rather than a local implementation.
+See that component for the press/release contract — the API is not restated here so it cannot drift:
 
 ```qml
 onPressed: mouse => r.press(mouse.x, mouse.y)

@@ -6,24 +6,24 @@
 这份清单把全部功能按线拆开，标出哪部分由 `node --test` 负责、哪部分必须手工验。
 
 ```bash
-node --test tests/          # 243 条，纯逻辑层
+node --test tests/          # 纯逻辑层，条数以 --test 输出为准
 ```
 
 ---
 
 ## 一、自动化覆盖（不用手测）
 
-| 文件 | 用例 | 守住什么 |
-|---|---:|---|
-| `tests/actions.test.js` | 80 | 动作表清洗与合并、拖放排序与落点换算、固定栏容量与挤出、可见性过滤 |
-| `tests/data.test.js` | 53 | addon JSON 解析与降级、输入法行构造与地球键循环、候选切分、Esc↔\` 对调 |
-| `tests/modifiers.test.js` | 40 | 修饰键四档状态机、Caps、Fn / page、组合键按下序列 |
-| `tests/resize.test.js` | 23 | 拖拽调尺寸、上下限、对称与等比、持久化值归一 |
-| `tests/special-keys.test.js` | 14 | 特殊键的文字 / 缩写 / 图标三种形态 |
-| `tests/keyroute.test.js` | 13 | 按键交给 fcitx5 还是 ydotool |
-| `tests/candidates.test.js` | 10 | 候选分行与宽度分配（不截断、贴右边） |
-| `tests/emoji.test.js` | 5 | 表情分组完整性、上屏协议（不含换行） |
-| `tests/layout.test.js` | 5 | 布局结构、换页键目标、键位不重叠 |
+| 文件 | 守住什么 |
+|---|---|
+| `tests/actions.test.js` | 动作表清洗与合并、拖放排序与落点换算、固定栏容量与挤出、可见性过滤 |
+| `tests/data.test.js` | addon JSON 解析与降级、输入法行构造与地球键循环、候选切分、Esc↔\` 对调 |
+| `tests/modifiers.test.js` | 修饰键四档状态机、Caps、Fn / page、组合键按下序列 |
+| `tests/resize.test.js` | 拖拽调尺寸、上下限、对称与等比、持久化值归一 |
+| `tests/special-keys.test.js` | 特殊键的文字 / 缩写 / 图标三种形态 |
+| `tests/keyroute.test.js` | 按键交给 fcitx5 还是 ydotool |
+| `tests/candidates.test.js` | 候选分行与宽度分配（不截断、贴右边） |
+| `tests/emoji.test.js` | 表情分组完整性、上屏协议（不含换行） |
+| `tests/layout.test.js` | 布局结构、换页键目标、键位不重叠 |
 
 只改下列文件时，跑一遍单测即可：
 

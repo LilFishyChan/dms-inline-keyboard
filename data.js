@@ -1,6 +1,10 @@
 // fcitx5 addon 输出 → 键盘内部数据模型。纯函数，node --test 可测。
 // 解析失败保留上一次的值，避免候选栏和输入法标识闪动
 
+// 与 FcitxBridge 的 allcand 共用同一套边界：单条最多 64 字、最多 64 条
+const MAX_TEXT = 64
+const MAX_ITEMS = 64
+
 // 解析面板状态。
 // 解析失败（文件半写、还没生成、字段缺失）时**保留上一次的值**：
 function parseStatus(raw, prev) {
@@ -17,12 +21,13 @@ function parseStatus(raw, prev) {
     }
 
     const items = Array.isArray(d.items) ? d.items.filter(
-        x => typeof x === "string" && x.length > 0) : [];
+        x => typeof x === "string" && x.length > 0)
+        .slice(0, MAX_ITEMS).map(x => x.slice(0, MAX_TEXT)) : [];
 
     return {
         // 候选词本身
         items: items,
-        preedit: typeof d.preedit === "string" ? d.preedit : "",
+        preedit: typeof d.preedit === "string" ? d.preedit.slice(0, MAX_TEXT) : "",
         visible: !!d.visible,
         // 纯键盘布局（keyboard-us 这类）没有候选能力
         keyboard: !!d.keyboard,

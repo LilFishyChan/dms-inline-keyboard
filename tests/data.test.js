@@ -378,3 +378,16 @@ test("cloneStatus: 保留 hasMore", () => {
     assert.equal(copy.hasMore, true);
     assert.notStrictEqual(copy, st);
 });
+
+test("parseStatus: 超长候选被截断到 64 字，与 allcand 同一套边界", () => {
+    const long = "啊".repeat(200);
+    const st = parseStatus(JSON.stringify({ items: [long] }), null);
+    assert.equal(st.items[0].length, 64);
+});
+
+test("parseStatus: 候选条数封顶 64，预编辑同样截断", () => {
+    const items = Array.from({ length: 200 }, (_, i) => `词${i}`);
+    const st = parseStatus(JSON.stringify({ items: items, preedit: "x".repeat(200) }), null);
+    assert.equal(st.items.length, 64);
+    assert.equal(st.preedit.length, 64);
+});

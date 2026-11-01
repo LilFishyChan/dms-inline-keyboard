@@ -94,25 +94,25 @@ ydotool:         plain keyboard layout (keyboard-us), or any combination carryin
                     │ 7 files (see the table above)
                     ▼
 ┌─ DMS plugin process ─────────────────────────────────────────┐
-│ FcitxBridge.qml (240 lines)                                  │
+│ FcitxBridge.qml                                              │
 │ · socket I/O, state parsing, candidates, IM list             │
 │ · the only fcitx5 communication layer                        │
 ├──────────────────────────────────────────────────────────────┤
-│ KeyRouter.qml (256 lines)                                    │
+│ KeyRouter.qml                                                │
 │ · modifier three-state machine                               │
 │ · key routing: direct to fcitx5 vs ydotool                   │
 ├──────────────────────────────────────────────────────────────┤
-│ InlineKeyboardDaemon.qml (846 lines)                               │
+│ InlineKeyboardDaemon.qml                                     │
 │ · window lifecycle / IPC / settings read-write               │
 │ · aliases the properties of the two components above         │
 ├──────────────────────────────────────────────────────────────┤
-│ data.js (213 lines, pure functions + 131 unit tests)         │
+│ data.js (pure functions, unit-tested)                        │
 │ · JSON → internal keyboard model                             │
 │ · parseStatus / buildImRows / nextImRow                      │
 ├──────────────────────────────────────────────────────────────┤
 │ QML components                                               │
 │ KeyboardCard / CandidateBar / QuickBar                       │
-│ BottomBar / ImPicker / Key / Ripple …                        │
+│ BottomBar / ImPicker / Key …  (press feedback: DMS DRipple)  │
 └──────────────────────────────────────────────────────────────┘
 ```
 

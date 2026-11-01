@@ -901,6 +901,9 @@ PluginComponent {
     }
 
     function selectIm(name) {
+        // 以 - 开头会被 busctl 当成选项；名字来自 addon，不可信
+        if (typeof name !== "string" || name === "" || name.startsWith("-"))
+            return;
         // 乐观显示：中文行（非 ascii）的标签/图标先顶上
         root.optimisticTo(root.imRows.find((r) => {
             return r.name === name && !r.ascii;

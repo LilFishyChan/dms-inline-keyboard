@@ -86,11 +86,12 @@ def check(repo, names, verbose=False):
             missing.append((where, icon))
 
     # 1) 特殊键表（图标形态直接用它）
-    sk = os.path.join(repo, "layouts", "special-keys.js")
-    if os.path.exists(sk):
-        with open(sk, encoding="utf-8") as f:
-            for m in RE_JS_ICON.finditer(f.read()):
-                verify("layouts/special-keys.js", m.group(1))
+    sk = os.path.join(repo, "layouts", "specialKeys.js")
+    if not os.path.exists(sk):
+        sys.exit("layouts/specialKeys.js not found — icon check would silently pass")
+    with open(sk, encoding="utf-8") as f:
+        for m in RE_JS_ICON.finditer(f.read()):
+            verify("layouts/specialKeys.js", m.group(1))
 
     # 2) QML 里 DankIcon / DIcon 的字面量 name
     for path in sorted(glob.glob(os.path.join(repo, "*.qml"))):
