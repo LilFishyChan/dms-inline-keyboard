@@ -603,6 +603,19 @@ test("defaultActions: 内置动作的 kind 是 builtin 或 cmd，cmd 类必须�
     }
 });
 
+test("mergeNewBuiltins: 默认表删掉的内置动作，老配置里也一并移除", () => {
+    const saved = [
+        { id: "undo", builtin: true },
+        { id: "rimeAscii", builtin: true, kind: "cmd", cmd: "" },
+        { id: "mine", builtin: false, label: "My action" }
+    ]
+
+    const merged = mergeNewBuiltins(saved, defaultActions())
+
+    assert.equal(merged.some(a => a.id === "rimeAscii"), false, "已删的内置动作要清掉");
+    assert.equal(merged.some(a => a.id === "mine"), true, "用户自建的动作不能动");
+});
+
 test("mergeNewBuiltins: 补上老配置缺失的内置动作，已有项顺序不变", () => {
     const kept = { id: "float", label: "浮动", icon: "x", hidden: false, builtin: true, kind: "builtin", cmd: "" };
     const saved = [kept];

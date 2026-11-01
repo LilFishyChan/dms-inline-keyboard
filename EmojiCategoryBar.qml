@@ -1,4 +1,4 @@
-import "Motion.js" as Motion
+import "motion.js" as Motion
 // 表情 / 符号页的顶部分类条：全部 + 各分组。
 // 高度和快捷栏相同（quickH），由 KeyboardCard 放在 topArea 里，替换掉快捷栏。
 import QtQuick
@@ -6,7 +6,6 @@ import "layouts/emoji.js" as Emoji
 import qs.Common
 import qs.DCommon.Common
 import qs.DCommon.Widgets
-import qs.Widgets
 
 Item {
     id: bar
@@ -18,6 +17,7 @@ Item {
     readonly property var chips: {
         const out = [{
             "id": "all",
+            // chips 在初始化时就求值，那时 I18n 单例的 trFor 还没就绪，走卡片上的守卫版
             "label": controller.tr("All")
         }];
         for (let i = 0; i < groups.length; i++) out.push({
@@ -27,9 +27,7 @@ Item {
         return out;
     }
 
-    // 模拟使用流程：点分类条上的某个分组（见 scripts/acceptance.py）
-    // delegate 实例不保证能从这里拿到（itemAt 在 Row 里不稳），按 id 直接落到 controller；
-    // 真实点击路径由 DButton 自己负责
+    // 模拟点击分类：itemAt 在 Row 里不稳，按 id 直接落到 controller
     function pointerTapCategory(id) {
         for (let i = 0; i < bar.chips.length; i++) {
             if (bar.chips[i].id === id) {
@@ -63,8 +61,7 @@ Item {
 
                 model: bar.chips
 
-                // MD3 过滤 chip：DButton 底层是 T.Button（TapHandler），
-                // 和 Flickable 共存，横向滑动不会被吞
+                // MD3 过滤 chip：DButton 底层是 T.Button（TapHandler），和 Flickable 共存，横向滑动不会被吞
                 delegate: DButton {
                     required property var modelData
                     readonly property bool active: bar.controller.emojiCategory === modelData.id
@@ -72,7 +69,7 @@ Item {
                     height: Math.round(bar.height * 0.72)
                     y: (bar.height - height) / 2
                     text: modelData.label
-                    backgroundColor: active ? Theme.primary : Style.chipSurface
+                    backgroundColor: active ? Theme.primary : Theme.chipSurface
                     textColor: active ? Theme.onPrimary : Theme.withAlpha(bar.controller.fg, 0.85)
                     onClicked: bar.controller.emojiCategory = modelData.id
                 }

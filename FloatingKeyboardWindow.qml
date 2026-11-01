@@ -5,13 +5,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Common
-import qs.Widgets
 
 // 浮动键盘窗口：不贴边、可拖动。同样不抢键盘焦点。
 PanelWindow {
     // 允许压到 DMS 条栏 / 状态栏上面：Overlay 层 + exclusionMode Ignore，posY 下界就是 0。
-    // resize 拖动中卡片尺寸不变（宽高由 metrics 算，输入是 daemon 的 savedW/H，松手落盘后才更新），
-    // 所以拖动中 mask 也不用重算。
+    // resize 拖动中卡片尺寸不变（宽高由 metrics 算，输入是 daemon 的 savedW/H，松手落盘后才更新），所以拖动中 mask 也不用重算。
 
     id: root
 
@@ -125,8 +123,9 @@ PanelWindow {
         keyboardClosed();
     }
 
-    onPosXChanged: posSaveTimer.restart()
-    onPosYChanged: posSaveTimer.restart()
+    // 首次定位是 show() 摆出来的，不是用户拖的，别写盘
+    onPosXChanged: if (posInitialized) posSaveTimer.restart()
+    onPosYChanged: if (posInitialized) posSaveTimer.restart()
     visible: keyboardVisible && !root.voiceMinimal
     color: "transparent"
     implicitWidth: metrics.screenW
@@ -134,8 +133,7 @@ PanelWindow {
     WlrLayershell.namespace: "dms:plugins:inlineKeyboard:floating"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    // 关键：不参与独占区计算，否则会一直被 DMS 条栏的 exclusive zone 推开，
-    // 永远压不到条栏上面，而且条栏换到底部时同样会被推
+    // 关键：不参与独占区计算，否则会一直被 DMS 条栏的 exclusive zone 推开，永远压不到条栏上面，而且条栏换到底部时同样会被推
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     Component.onCompleted: cardRef = card
 
@@ -161,8 +159,7 @@ PanelWindow {
         screenH: root.screen ? root.screen.height : 800
     }
 
-    // 窗口**必须铺满整屏**。浮在屏幕上的键盘不能用一个「和键盘一样大」的窗口：
-    // 调整尺寸时窗口尺寸跟着变，margins 重算，键盘位置就会漂；
+    // 窗口**必须铺满整屏**。浮在屏幕上的键盘不能用一个「和键盘一样大」的窗口：调整尺寸时窗口尺寸跟着变，margins 重算，键盘位置就会漂；
     anchors {
         top: true
         bottom: true
@@ -284,15 +281,13 @@ PanelWindow {
             return root.textCommitRequested(text);
         }
         onAllCandidatesRequested: root.allCandidatesRequested()
-        // 松手时的落点判断在 onDragMoved 里按「起点 + 累计位移」算，
-        // 起点在 onDragStarted 记一次
+        // 松手时的落点判断在 onDragMoved 里按「起点 + 累计位移」算，起点在 onDragStarted 记一次
         onDragStarted: {
             root.dragStartX = root.posX;
             root.dragStartY = root.posY;
         }
         onDragMoved: (dx, dy) => {
-            // 必须用"名义尺寸"（metrics.cardW / kbHeight）夹紧：
-            // 用 card.width 会踩到"窗口被压窄 → 允许位移更大 → 更溢出"的正反馈
+            // 必须用"名义尺寸"（metrics.cardW / kbHeight）夹紧：用 card.width 会踩到"窗口被压窄 → 允许位移更大 → 更溢出"的正反馈
             const maxX = Math.max(0, metrics.screenW - metrics.cardW);
             const maxY = Math.max(0, metrics.screenH - root.kbHeight);
             root.posX = Math.max(0, Math.min(maxX, root.dragStartX + dx));

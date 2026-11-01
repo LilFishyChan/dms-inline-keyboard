@@ -16,7 +16,7 @@ Item {
     // 文字大小按键高换算，跟键盘缩放一起变
     property real keyH: 64
     property color textColor: Theme.surfaceText
-    readonly property int labelPixelSize: Math.max(12, Math.round(keyH * 0.27))
+    readonly property int labelPixelSize: Math.max(Theme.fontSizeSmall, Math.round(keyH * 0.27))
 
     signal moved(real newValue)
 

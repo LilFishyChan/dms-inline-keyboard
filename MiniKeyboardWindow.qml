@@ -5,7 +5,6 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Common
 import qs.DCommon.Widgets
-import qs.Widgets
 
 PanelWindow {
     id: miniWindow
@@ -62,9 +61,9 @@ PanelWindow {
         id: bubble
 
         anchors.fill: parent
-        radius: width / 2
+        radius: Theme.fullRadius(width, height)
         color: Theme.withAlpha(Theme.surface, controller ? controller.bgOpacity : 1)
-        border.width: 2
+        border.width: Theme.outlineWidthFocused
         border.color: Theme.withAlpha(Theme.primary, 0.5)
 
         DIcon {
@@ -81,8 +80,7 @@ PanelWindow {
             cornerRadius: width / 2
         }
 
-        // 拖动和点击共存：DragHandler 只在超过阈值后接管，
-        // 手指原地抬起仍然是一次正常点击
+        // 拖动和点击共存：DragHandler 只在超过阈值后接管，手指原地抬起仍然是一次正常点击
         DragHandler {
             target: null
             onActiveChanged: {

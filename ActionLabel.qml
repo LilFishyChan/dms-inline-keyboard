@@ -52,7 +52,7 @@ Row {
         elide: Text.ElideNone
         wrapMode: Text.NoWrap
         fontSizeMode: root.maxLabelWidth > 0 ? Text.HorizontalFit : Text.FixedSize
-        minimumPixelSize: 8
+        minimumPixelSize: Theme.fontSizeSmall
         font.pixelSize: root.pixelSize
     }
 

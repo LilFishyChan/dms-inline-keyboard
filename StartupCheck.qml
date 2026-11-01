@@ -7,16 +7,6 @@ QtObject {
     // 必需：缺了插件完全没法用
     readonly property var requiredCommands: ["ydotool"]
 
-    // 缺词条时回退英文原串。读一次 pluginTranslations 让绑定随异步注册的
-    // 插件翻译表刷新（见 KeyboardCard 里的同款注释）
-    function tr(term) {
-        if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
-            return term;
-
-        const table = I18n.pluginTranslations;
-        return table ? I18n.trFor("inlineKeyboard", term) : term;
-    }
-
     // 一次 sh -c 把缺失的必需项打出来（只输出缺的）
     function probeCommand() {
         const commands = requiredCommands.join(" ");

@@ -5,8 +5,7 @@ function num(v) {
     return typeof v === "number" && isFinite(v) ? v : 0
 }
 
-// 分行按「文字宽 + 左右内边距」算，分行之后再分配余量：
-// 等分会把宽词压窄（= 截断文字），按份加宽才能既保住每个词、行尾又铺满。
+// 分行按「文字宽 + 左右内边距」算，分行之后再分配余量：等分会把宽词压窄（= 截断文字），按份加宽才能既保住每个词、行尾又铺满。
 function layoutCandidates(list, measure, opts) {
     const src = list || []
     const o = opts || {}

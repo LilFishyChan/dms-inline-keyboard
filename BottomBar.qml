@@ -33,8 +33,7 @@ Item {
     height: controller.handleH
     visible: controller.showHandle
 
-    // 左端：收起。圆形触控区，背景透明、图标用正文色，
-    // 和底部整行的观感一致（不额外压一个色块）。
+    // 左端：收起。圆形触控区，背景透明、图标用正文色，和底部整行的观感一致（不额外压一个色块）。
     Rectangle {
         id: hideBtn
 
@@ -43,7 +42,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: handleBar.endBtn
         height: handleBar.endBtn
-        radius: width / 2
+        radius: Theme.fullRadius(width, height)
         color: "transparent"
 
         DIcon {
@@ -86,7 +85,7 @@ Item {
         anchors.centerIn: parent
         width: handleBar.gripWidth
         height: Math.max(3, controller.handleH * handleBar.gripHeightRatio)
-        radius: height / 2
+        radius: Theme.fullRadius(width, height)
         color: Theme.withAlpha(controller.fg, 0.5)
     }
 
@@ -121,7 +120,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: handleBar.endBtn
         height: handleBar.endBtn
-        radius: width / 2
+        radius: Theme.fullRadius(width, height)
         color: "transparent"
 
         DIcon {

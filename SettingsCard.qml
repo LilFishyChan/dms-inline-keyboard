@@ -2,7 +2,6 @@
 // 插件不能依赖 DMS 应用内部的 SettingsGroup/SettingsRow，示例插件也是自带一套。
 import QtQuick
 import qs.Common
-import qs.DCommon.Common
 import qs.Widgets
 
 StyledRect {

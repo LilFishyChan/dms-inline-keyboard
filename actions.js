@@ -59,8 +59,7 @@ function sanitizeActions(raw, fallback) {
                   : (typeof action.icon === "string" ? action.icon : ""),
             hidden: action.hidden === true,
             builtin: action.builtin === true || builtinIds[id] === true,
-            // kind 决定点击时怎么执行；老配置没有这个字段，
-            // 有 cmd 的按 cmd 跑，其余当内置动作
+            // kind 决定点击时怎么执行；老配置没有这个字段，有 cmd 的按 cmd 跑，其余当内置动作
             kind: typeof action.kind === "string"
                   ? action.kind
                   : (typeof action.cmd === "string" && action.cmd.trim() !== ""
@@ -260,8 +259,7 @@ function moveActionToEndById(list, id) {
  * @param {number} slotGap 动作块之间的间距（两端也有）
  * @returns {number} 0..count 的插入位置
  */
-// 用**指针位置**判定，不看跟手块自己的尺寸：
-//   指针在某个动作块的**中心线左侧** → 插到这个块的左边
+// 用**指针位置**判定，不看跟手块自己的尺寸：指针在某个动作块的**中心线左侧** → 插到这个块的左边
 function quickBarInsertIndex(pointerX, count, slotW, slotGap, ghostIndex) {
     if (count <= 0)
         return 0
@@ -374,15 +372,6 @@ function defaultActions() {
         { id: "size", label: "Size", icon: "aspect_ratio", kind: "builtin" },
         { id: "opacity", label: "Opacity", icon: "opacity", kind: "builtin" },
         { id: "nextIm", label: "Next input method", icon: "language", kind: "builtin" },
-        // rime 中英切换：fcitx5 只在 /rime 上开了 ascii 模式的 D-Bus，
-        // 其余开关（全角/表情/预测）没有对外接口，所以这里只做中英
-        {
-            id: "rimeAscii",
-            label: "Rime ASCII",
-            icon: "translate",
-            kind: "cmd",
-            cmd: "b=$(busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 IsAsciiMode | cut -d' ' -f2); if [ \"$b\" = true ]; then busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 SetAsciiMode b false; else busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 SetAsciiMode b true; fi"
-        },
         { id: "clipboard", label: "Clipboard", icon: "content_paste", kind: "builtin" },
         { id: "avoid", label: "Avoid windows", icon: "unfold_more", kind: "builtin" },
         { id: "mic", label: "Voice input", icon: "mic", kind: "builtin" },
@@ -528,6 +517,18 @@ function mergeNewBuiltins(saved, defaults) {
             present[list[i].id] = true
     }
     const defs = toArray(defaults)
+    // 默认表里已经没有的内置动作，老配置里的那条也要移除；用户自己加的不动
+    const defIds = {}
+    for (let i = 0; i < defs.length; i++) {
+        if (defs[i] && defs[i].id)
+            defIds[defs[i].id] = true
+    }
+    for (let i = list.length - 1; i >= 0; i--) {
+        const a = list[i]
+        if (a && a.builtin && a.id && !defIds[a.id])
+            list.splice(i, 1)
+    }
+
     for (let i = 0; i < defs.length; i++) {
         const d = defs[i]
         if (d && d.id && !present[d.id]) {

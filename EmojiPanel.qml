@@ -1,4 +1,4 @@
-import "Motion.js" as Motion
+import "motion.js" as Motion
 // 表情 / 符号页的主体：中间滚动网格 + 底部一行（返回 / 表情·符号切换 / 退格）。
 // 顶部那行分类条是 EmojiCategoryBar（在 KeyboardCard 的 topArea 里）。
 import QtQuick
@@ -112,8 +112,7 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                // 涟漪：由 TapHandler 的 pressed 驱动 —— 这里不能挂 MouseArea，
-                // 那会抢走 GridView 的拖动，表情列表就滑不动了
+                // 涟漪：由 TapHandler 的 pressed 驱动 —— 这里不能挂 MouseArea，那会抢走 GridView 的拖动，表情列表就滑不动了
                 DRipple {
                     id: cellRipple
 
@@ -145,7 +144,7 @@ Item {
         StyledText {
             anchors.centerIn: parent
             visible: panel.items.length === 0
-            text: panel.controller.tr("Empty")
+            text: I18n.trFor("inlineKeyboard", "Empty")
             color: Theme.withAlpha(panel.controller.fg, 0.45)
             font.pixelSize: Math.round(panel.controller.keyH * 0.4)
         }
@@ -169,7 +168,7 @@ Item {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             height: actionRow.btnH
-            text: panel.controller.tr("Back")
+            text: I18n.trFor("inlineKeyboard", "Back")
             iconName: "arrow_back"
             onClicked: panel.controller.goPage("page1")
         }
@@ -187,7 +186,7 @@ Item {
             }
 
             anchors.centerIn: parent
-            model: [panel.controller.tr("Emoji"), panel.controller.tr("Symbols")]
+            model: [I18n.trFor("inlineKeyboard", "Emoji"), I18n.trFor("inlineKeyboard", "Symbols")]
             selectionMode: "single"
             // DButtonGroup 单选只发 selectionChanged，不会自己改 currentIndex
             currentIndex: -1
@@ -224,7 +223,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: Math.round(actionRow.btnH * 1.5)
             height: actionRow.btnH
-            radius: height / 2
+            radius: Theme.fullRadius(width, height)
             color: (bsTap.pressed || backRepeat.running) ? Theme.withAlpha(Theme.primary, 0.18) : Theme.surfaceContainer
 
             DIcon {

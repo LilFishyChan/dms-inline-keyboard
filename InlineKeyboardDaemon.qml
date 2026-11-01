@@ -1,6 +1,5 @@
 // Inline Keyboard 的守护插件：唯一持有持久状态的地方。
-// 职责：读写插件设置与运行状态、提供 IPC 命令、按需创建/销毁两个键盘窗口，
-// 并把按键路由到 fcitx5 或 ydotool。
+// 职责：读写插件设置与运行状态、提供 IPC 命令、按需创建/销毁两个键盘窗口，并把按键路由到 fcitx5 或 ydotool。
 
 import QtQuick
 import Quickshell
@@ -22,6 +21,9 @@ PluginComponent {
     // 状态在窗口销毁后仍保留
     property bool open: PluginService.getGlobalVar(root.pluginId, "open", false)
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
+    // 宿主按 "popoutService" in item 判断是否注入，不声明就永远拿不到
+    property var popoutService: null
+
     readonly property bool avoidWindows: root.pluginData && root.pluginData.avoidWindows !== undefined ? root.pluginData.avoidWindows : true
     readonly property bool fnActive: root.fnState > 0
     // 调试 IPC（debug* 系列）的开关：设置页那个「调试模式」，环境变量兜底。
@@ -56,8 +58,7 @@ PluginComponent {
     readonly property alias fcitxVisible: fcitxBridge.panelVisible
     readonly property alias fcitxImKeyboard: fcitxBridge.imKeyboard
     readonly property alias fcitxImName: fcitxBridge.imName
-    // 切换输入法时的乐观显示：点下地球键的那一刻就把图标/标签换成目标值，
-    // 不等 addon 回推。否则从 en 切到万象会先闪一下 abc 再变「万」——
+    // 切换输入法时的乐观显示：点下地球键的那一刻就把图标/标签换成目标值，不等 addon 回推。否则从 en 切到万象会先闪一下 abc 再变「万」——
     property string optimisticImLabel: ""
     property string optimisticImIcon: ""
     property bool optimisticImActive: false
@@ -68,8 +69,7 @@ PluginComponent {
     readonly property alias fcitxSocketUp: fcitxBridge.socketUp
     readonly property alias fcitxLastError: fcitxBridge.lastError
     readonly property alias imList: fcitxBridge.imList
-    // 不能写 alias：imRows 是 property var 存数组，alias 只跟住引用，
-    // bridge 重建数组后这里不会重新求值，nextImRow 就一直读到没有 current 的旧数组。
+    // 不能写 alias：imRows 是 property var 存数组，alias 只跟住引用，bridge 重建数组后这里不会重新求值，nextImRow 就一直读到没有 current 的旧数组。
     readonly property var imRows: fcitxBridge.imRows
     readonly property alias imAsciiMode: fcitxBridge.isAsciiMode
     // 键盘内始终显示预编辑（不因应用自己渲染了 preedit 就隐藏）
@@ -80,8 +80,7 @@ PluginComponent {
     // 全量候选（候选列表页用）
     readonly property var allCandidates: fcitxBridge.allCandidates
     readonly property int candRevision: fcitxBridge.candRevision
-    // 调试候选：终端这类不支持 text-input 的窗口里 fcitx5 不产生候选，
-    // 靠它把候选栏调出来看布局。真实候选非空时仍然以真实值为准。
+    // 调试候选：终端这类不支持 text-input 的窗口里 fcitx5 不产生候选，靠它把候选栏调出来看布局。真实候选非空时仍然以真实值为准。
     property var debugCandItems: []
     // 优先级：addon 进程内 commit（直接进输入框，用户不用再操作）
     property string lastTextCommit: ""
@@ -148,8 +147,7 @@ PluginComponent {
         if (!v || !v.length)
             return root.defaultActions;
 
-        // 插件升级后新增的内置动作不会自动出现在老配置里，
-        // 否则「设置页看不到、动作表也调不到」
+        // 插件升级后新增的内置动作不会自动出现在老配置里，否则「设置页看不到、动作表也调不到」
         return Actions.mergeNewBuiltins(root.sanitizeActions(v), root.defaultActions);
     }
     // 外观：缩放 + 透明度，都从设置读（PluginSettings 存的是百分数）
@@ -167,8 +165,9 @@ PluginComponent {
     property real miniPosRight: root.loadRuntime("miniPosRight", -1)
     property real miniPosBottom: root.loadRuntime("miniPosBottom", -1)
     // 浮动键盘的位置（-1 = 还没拖过，由窗口按默认位置摆）
-    property real floatPosX: PluginService.loadPluginData(root.pluginId, "floatPosX", -1)
-    property real floatPosY: PluginService.loadPluginData(root.pluginId, "floatPosY", -1)
+    // 窗口位置是运行时状态，走 State；老版本存在 Settings 里，没值才回落一次
+    property real floatPosX: PluginService.loadPluginState(root.pluginId, "floatPosX", PluginService.loadPluginData(root.pluginId, "floatPosX", -1))
+    property real floatPosY: PluginService.loadPluginState(root.pluginId, "floatPosY", PluginService.loadPluginData(root.pluginId, "floatPosY", -1))
     // 语音模式：切浮动 + 只显示顶部语音行
     property bool voiceMinimal: false
     property real prevBgOpacity: 1
@@ -439,8 +438,7 @@ PluginComponent {
             return ;
 
         if (root.voiceMinimal) {
-            // 语音模式下是「暂停 / 继续」：状态要跟着翻，
-            // 否则麦克风的激活态（图标色 + 描边）不会变
+            // 语音模式下是「暂停 / 继续」：状态要跟着翻，否则麦克风的激活态（图标色 + 描边）不会变
             root.voiceActive = !root.voiceActive;
             root.runCommand(["vinput", "recording", "toggle"]);
             return ;
@@ -450,15 +448,14 @@ PluginComponent {
 
     //* 浮动键盘拖完落盘：下次浮动打开回到同一位置。
     function saveFloatPosition(x, y) {
-        // 先取局部值再存：第一次 save 会触发 pluginDataChanged → reloadSettings，
-        // 第二次读到的东西可能已经被改过了
+        // 先取局部值再存：第一次 save 会触发 pluginDataChanged → reloadSettings，第二次读到的东西可能已经被改过了
         const px = Math.round(x);
         const py = Math.round(y);
         root.floatPosX = px;
         root.floatPosY = py;
         root.lastSelfSaveAt = Date.now();
-        PluginService.savePluginData(root.pluginId, "floatPosX", px);
-        PluginService.savePluginData(root.pluginId, "floatPosY", py);
+        PluginService.savePluginState(root.pluginId, "floatPosX", px);
+        PluginService.savePluginState(root.pluginId, "floatPosY", py);
     }
 
     //* 小圆按钮拖完落盘：下次最小化回到同一个地方。
@@ -470,8 +467,7 @@ PluginComponent {
         PluginService.savePluginState(root.pluginId, "miniPosBottom", bottom);
     }
 
-    // 运行时状态该走 State 文件（~/.local/state/dms/plugins/<id>_state.json），
-    // 写 plugin_settings.json 会触发全插件 reloadSettings。
+    // 运行时状态该走 State 文件（~/.local/state/dms/plugins/<id>_state.json），写 plugin_settings.json 会触发全插件 reloadSettings。
     // 老版本把这几项存在 Settings 里，所以 state 没有时回落到 Settings 读一次。
     function loadRuntime(key, fallback) {
         const st = PluginService.loadPluginState(root.pluginId, key, null);
@@ -629,8 +625,7 @@ PluginComponent {
             root.activeCard.resizeW = root.savedW;
             root.activeCard.resizeH = root.savedH;
         }
-        // 先回到键盘主页：从功能列表或表情页点「调整大小」时，
-        // 遮罩底下的必须是主键区，否则用户看到的是表情面板。
+        // 先回到键盘主页：从功能列表或表情页点「调整大小」时，遮罩底下的必须是主键区，否则用户看到的是表情面板。
         root.setPage("page1");
         if (root.activeCard)
             root.activeCard.candListOpen = false;
@@ -681,8 +676,7 @@ PluginComponent {
     }
 
     function reloadSettings() {
-        // 透明度面板开着时不回读这两个值：自己刚保存会触发 pluginDataChanged，
-        // 回读会把还没写盘的另一个值覆盖掉（保存顺序被打乱）。
+        // 透明度面板开着时不回读这两个值：自己刚保存会触发 pluginDataChanged，回读会把还没写盘的另一个值覆盖掉（保存顺序被打乱）。
         if (root.mode !== "transparency") {
             const nextBgOpacity = PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100;
             if (nextBgOpacity !== root.bgOpacity)
@@ -722,8 +716,12 @@ PluginComponent {
 
         const rawActions = PluginService.loadPluginData(root.pluginId, "actions", null);
         const nextActions = (rawActions && rawActions.length) ? root.sanitizeActions(rawActions) : root.defaultActions;
-        if (JSON.stringify(nextActions) !== JSON.stringify(root.actions))
-            root.actions = nextActions;
+        // 默认表增删过：补新动作、清掉已删的内置动作，并把结果写回，设置页才不会看到失效项
+        const merged = Actions.mergeNewBuiltins(nextActions, root.defaultActions);
+        if (JSON.stringify(merged) !== JSON.stringify(rawActions))
+            PluginService.savePluginData(root.pluginId, "actions", merged);
+        if (JSON.stringify(merged) !== JSON.stringify(root.actions))
+            root.actions = merged;
 
         const nextQuickBar = PluginService.loadPluginData(root.pluginId, "quickBarActions", []);
         if (JSON.stringify(nextQuickBar) !== JSON.stringify(root.quickBarActions))
@@ -732,8 +730,7 @@ PluginComponent {
     }
 
     function showKeyboard(restoreLastMode) {
-        // 从最小化恢复（或任何途径打开键盘）都要退出最小化，
-        // 否则小圆按钮会和键盘同时在场
+        // 从最小化恢复（或任何途径打开键盘）都要退出最小化，否则小圆按钮会和键盘同时在场
         root.minimized = false;
         const loader = root.floating ? floatingLoader : dockedLoader;
         if (!loader.item)
@@ -845,8 +842,7 @@ PluginComponent {
             return r.name === name && r.ascii;
         }));
 
-        // 等 fcitx5 切完输入法再设子模式：切输入法是异步的，
-        // 立刻设会在旧输入法上生效（rs 切完就是中文，不用再设）。
+        // 等 fcitx5 切完输入法再设子模式：切输入法是异步的，立刻设会在旧输入法上生效（rs 切完就是中文，不用再设）。
         root.pendingAscii = wantAscii;
         root.hasPendingAscii = true;
         asciiFixTimer.restart();
@@ -854,8 +850,7 @@ PluginComponent {
 
     // 地球键单击：循环到列表里的下一项（不只是换输入法，也覆盖 rime 的中英文态）
     function cycleIm() {
-        // 下标计算在 data.js 的 nextImRow：current 标错会让地球键原地打转，
-        // 那条逻辑有单测（连续点一圈必须回到起点）。
+        // 下标计算在 data.js 的 nextImRow：current 标错会让地球键原地打转，那条逻辑有单测（连续点一圈必须回到起点）。
         const next = Data.nextImRow(root.imRows);
         if (next === null) {
             root.requestImList();
@@ -877,8 +872,7 @@ PluginComponent {
 
         root.optimisticImLabel = row.label || "";
         root.optimisticImIcon = row.icon || "";
-        // 同时记住目标在 imRows 里的行号：连续点击时用它算「下一个」，
-        // 否则真实的 imName/imLabel 还没追上，每次点都算出同一项
+        // 同时记住目标在 imRows 里的行号：连续点击时用它算「下一个」，否则真实的 imName/imLabel 还没追上，每次点都算出同一项
         let idx = -1;
         for (let i = 0; i < root.imRows.length; i++) {
             const r = root.imRows[i];
@@ -948,8 +942,7 @@ PluginComponent {
         modifierMode: root.modifierMode
     }
 
-    // 页面键状态 → 当前页。page 键和 Shift / Ctrl 走同一套状态机，
-    // 1 = 一次性（按一个键后自动回第一页）/ 2 = 锁定在第二页。
+    // 页面键状态 → 当前页。page 键和 Shift / Ctrl 走同一套状态机，1 = 一次性（按一个键后自动回第一页）/ 2 = 锁定在第二页。
     Connections {
         function onPageStateChanged() {
             if (root.page === "emoji")
@@ -961,13 +954,11 @@ PluginComponent {
         target: keyRouter
     }
 
-    // addon 推回来的 label 已经是目标值了 → 立刻收起乐观态，
-    // 这样正常情况下切换是「瞬间到位」，不会白压 1 秒。
+    // addon 推回来的 label 已经是目标值了 → 立刻收起乐观态，这样正常情况下切换是「瞬间到位」，不会白压 1 秒。
     // 必须监听数据源：fcitxImLabel 是由乐观态算出来的，在里面写乐观态就是绑定循环。
     Connections {
         function onImLabelChanged() {
-            // 只关「乐观显示」，**不清 optimisticImIdx**：
-            // 那个索引是「上次点到行几」的账本，清掉后下次点击又会从第一行开始数。
+            // 只关「乐观显示」，**不清 optimisticImIdx**：那个索引是「上次点到行几」的账本，清掉后下次点击又会从第一行开始数。
             if (root.optimisticImActive && root.optimisticImLabel === fcitxBridge.imLabel)
                 root.optimisticImActive = false;
 
@@ -976,8 +967,7 @@ PluginComponent {
         target: fcitxBridge
     }
 
-    // 乐观值最多压 1 秒。超时还没等到新状态就回落到真实值，
-    // 免得切换失败时图标永远停在目标输入法上。
+    // 乐观值最多压 1 秒。超时还没等到新状态就回落到真实值，免得切换失败时图标永远停在目标输入法上。
     Timer {
         id: optimisticImTimer
 
@@ -988,12 +978,6 @@ PluginComponent {
 
     Process {
         id: quickProc
-
-        command: ["true"]
-    }
-
-    Process {
-        id: pendingDrain
 
         command: ["true"]
     }
@@ -1039,8 +1023,7 @@ PluginComponent {
     }
 
     Connections {
-        // 最小化状态也要彻底关掉：hideKeyboard 会清掉 minimized，
-        // 浮窗跟着消失，而不是留一个恢复按钮在屏幕上
+        // 最小化状态也要彻底关掉：hideKeyboard 会清掉 minimized，浮窗跟着消失，而不是留一个恢复按钮在屏幕上
 
         function onGlobalVarChanged(pluginId, varName) {
             if (pluginId !== root.pluginId || varName !== "open")
@@ -1334,8 +1317,7 @@ PluginComponent {
             return "INLINE_KEYBOARD_TEXT:" + root.typeText(text) + ":" + root.lastTextCommitVia;
         }
 
-        // 调试用：走和触摸换页键完全相同的入口（卡片 → handleKey），
-        // 验证换页分发而不是绕过它。setPage 是直接赋值，绕过 handleKey。
+        // 调试用：走和触摸换页键完全相同的入口（卡片 → handleKey），验证换页分发而不是绕过它。setPage 是直接赋值，绕过 handleKey。
         function pressPageKey(to: string) : string {
             if (!root.devMode)
                 return "dev mode off";
@@ -1424,17 +1406,25 @@ PluginComponent {
         }
 
         // 调试用：动作列表编辑态
+        // 必须写给卡片：editing 的唯一真源在卡片上，daemon 这份是跟着卡片同步的，只改 daemon 的话界面不会进编辑态。
         function setEditing(v: bool) : string {
             if (!root.devMode)
                 return "dev mode off";
 
-            root.editing = v;
-            return "INLINE_KEYBOARD_EDITING:" + v;
+            const card = root.activeCard;
+            if (!card)
+                return "no-card";
+
+            card.editing = v;
+            return "INLINE_KEYBOARD_EDITING:" + card.editing;
         }
 
         // 调试用：一次导出卡片 / daemon 的关键数组长度，定位「该显示的不显示」类问题
         // 注意不能用可选链 ?. —— QML 的 JS 引擎不支持，整个文件会语法错误。
         function diag() : string {
+            if (!root.devMode)
+                return "dev mode off";
+
             const parts = [];
             parts.push("open=" + root.open);
             parts.push("floating=" + root.floating);

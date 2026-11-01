@@ -5,10 +5,7 @@ import qs.Common
 import qs.Widgets
 
 Item {
-    // 模拟使用流程：把一次点击 / 长按注入到按键里
-    // 调的是上面同一组 pressAt / releaseAt / clickAt，所以长按重复、修饰键状态、
-    // 页面切换、涟漪都会真实发生；不经过系统输入、不动鼠标。
-    // holdMs 就是按住时长：超过 400ms 会触发长按重复（和手指一致）。
+    // 模拟点击：走和手指同一组 pressAt / releaseAt / clickAt，不经过系统输入
 
     id: grid
 
@@ -79,10 +76,7 @@ Item {
         return out;
     }
 
-    // 按下 → 等 holdMs → 松开并点击：pointerTap 按标签找，pointerTapAt 按格子下标找
-    // （同名键、占位格里只有下标能唯一定位）
-    // 收尾上一次没走完的点击：release 丢了 holdTimer 会一直挂着 → 长按重复失控。
-    // 连发（脚本遍历）和定时器到点都走这一条路。
+    // 收尾上一次没走完的点击：release 丢了 holdTimer 会一直挂着，长按重复会失控
     function finishPendingTap() {
         const item = grid.pendingTap;
         grid.pendingTap = null;
@@ -160,8 +154,7 @@ Item {
                     return label === "Backspace" || label === "Del" || label === "End" || label === "Home" || label === "PgUp" || label === "PgDn";
                 }
 
-                // 按下 / 松开 / 点击各自成一个函数：手势直接调用，模拟点击也调它们，
-                // 两条路共用同一份逻辑（长按重复、修饰键状态、涟漪都不会漏）
+                // 按下 / 松开 / 点击各自成一个函数：手势直接调用，模拟点击也调它们，两条路共用同一份逻辑（长按重复、修饰键状态、涟漪都不会漏）
                 function pressAt(px, py) {
                     keyItem.pressRipple(px, py);
                     grid.c.modifierPressed(keyItem.keyData);

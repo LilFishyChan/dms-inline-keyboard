@@ -4,7 +4,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Common
-import qs.Widgets
 
 PanelWindow {
     id: voiceWindow
@@ -13,8 +12,7 @@ PanelWindow {
     // 一行的高度（和主键盘顶部那一行一致）
     readonly property real rowH: Math.max(metrics.quickH, metrics.candH)
     readonly property real capH: rowH + Math.round(metrics.pad * 2)
-    // 宽度跟随主键盘的**名义宽度**（keyboardWidth），不跟全宽模式：
-    // 铺满时 cardW 会等于屏幕宽，那对一条语音条来说太长了。
+    // 宽度跟随主键盘的**名义宽度**（keyboardWidth），不跟全宽模式：铺满时 cardW 会等于屏幕宽，那对一条语音条来说太长了。
     readonly property real capW: Math.min(metrics.kbWidth, metrics.screenW - metrics.pad * 4)
     // 可拖动：锚点和 margins 配合（layer-shell 不能改 x/y，只能调 margins）。
     // 默认水平居中、贴屏幕底部；用户拖过之后用自己记的位置。
@@ -45,8 +43,7 @@ PanelWindow {
 
         kbWidth: controller ? controller.savedW : 1050
         kbHeight: controller ? controller.kbHeight : 444
-        // daemon 上没有 screen 属性（那是窗口才有的），
-        // 直接问 Quickshell 要主屏尺寸
+        // daemon 上没有 screen 属性（那是窗口才有的），直接问 Quickshell 要主屏尺寸
         screenW: Quickshell.screens.length > 0 ? Quickshell.screens[0].width : 1920
         screenH: Quickshell.screens.length > 0 ? Quickshell.screens[0].height : 1080
     }
@@ -64,9 +61,9 @@ PanelWindow {
     // 描边画在背景外面，否则会被 VoiceBar 自己的背景盖住内边缘
     Rectangle {
         anchors.fill: parent
-        radius: height / 2
+        radius: Theme.fullRadius(width, height)
         color: "transparent"
-        border.width: 2
+        border.width: Theme.outlineWidthFocused
         border.color: Theme.withAlpha(Theme.primary, 0.5)
     }
 
@@ -75,7 +72,7 @@ PanelWindow {
 
         anchors.fill: parent
         anchors.margins: 2
-        radius: height / 2
+        radius: Theme.fullRadius(width, height)
         color: Theme.withAlpha(Theme.surface, controller ? controller.bgOpacity : 1)
 
         // 一行内容：左缩小 / 中文字 / 右麦克风

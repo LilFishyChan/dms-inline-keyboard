@@ -1,7 +1,6 @@
 // Inline Keyboard 插件设置页：外观（缩放 / 透明度）、行为（避让 / 默认模式）、动作列表。
 // 文案一律走 tr()，源串保持英文，译文在 translations/<locale>.json。
 import QtQuick
-import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import "actions.js" as Actions
@@ -22,8 +21,8 @@ PluginSettings {
     property bool ydotooldUp: true
     // 设置值：SettingsRow 不自带存取，这里自己 load / save
     property int repeatInterval: 60
-    // 调试 IPC（只读诊断 + 模拟点击 / 长按 / 拖动）给 scripts/acceptance.py 用，
-    // 普通使用用不到，所以打开前必须过一次确认框。
+
+    // 调试 IPC（只读诊断 + 模拟点击 / 长按 / 拖动）给 scripts/acceptance.py 用，普通使用用不到，所以打开前必须过一次确认框。
     property bool debugModeOn: false
     property bool debugConfirmOpen: false
     // 可选扩展：fcitx5 桥接
@@ -32,8 +31,7 @@ PluginSettings {
     // 安装命令直接摆出来，省得用户回 README 找
     readonly property string installCommands: "git clone https://github.com/LilFishyChan/fcitx5-inline-keyboard-status\n" + "cd fcitx5-inline-keyboard-status && cmake -B build -G Ninja && ninja -C build\n" + "cmake --install build --prefix ~/.local\n" + "systemctl --user restart 'app-org.fcitx.Fcitx5@autostart.service'"
     // 正在改图标的动作索引（-1 = 没在选）
-    // 内置动作的 id 集合：ListSetting 直接读文件里的原始数组（不经 sanitize），
-    // 老数据没有 builtin 字段，靠这张表兜底
+    // 内置动作的 id 集合：ListSetting 直接读文件里的原始数组（不经 sanitize），老数据没有 builtin 字段，靠这张表兜底
     readonly property var builtinIds: {
         const map = {
         };
@@ -123,20 +121,47 @@ PluginSettings {
         root.adding = false;
     }
 
-    // 缺词条时回退英文原串
+    pluginId: "inlineKeyboard"
+    // 宿主按 "popoutService" in item 判断是否注入，不声明就永远拿不到
+    property var popoutService: null
+
+    // DMS 注入的 pluginService 上只有 availablePlugins，没有 load/savePluginData，直接走单例
+    function loadValue(key, def) {
+        return PluginService.loadPluginData(root.pluginId, key, def);
+    }
+
+    function saveValue(key, val) {
+        // 各设置组件初始化时都会带着默认值发一次变化，那一次不能写盘
+        if (!root.settingsReady)
+            return ;
+
+        PluginService.savePluginData(root.pluginId, key, val);
+    }
+    // 手写下拉用：DDropdown 只认显示文本，值要自己映射
+    readonly property var specialStyleValues: ["icon", "short", "full"]
+    // 下面的 label 表在初始化时求值，那一刻 I18n 单例可能还没就绪
     function tr(term) {
-        const version = root.localeVersion; // 让调用处的绑定跟随版本重算
-        if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
+        if (typeof I18n === "undefined" || !I18n || typeof I18n.trFor !== "function")
             return term;
 
         return I18n.trFor("inlineKeyboard", term);
     }
 
-    pluginId: "inlineKeyboard"
+    readonly property var specialStyleLabels: [tr("Icon"), tr("Short"), tr("Full name")]
+    readonly property var modifierModeValues: ["noLock", "toggle", "tapLock", "doubleTapLock"]
+    readonly property var modifierModeLabels: [tr("Active while held"), tr("Tap to activate; any key clears it"), tr("Tap to lock (tap again to unlock)"), tr("Tap to toggle, double-tap to lock")]
+    readonly property var winLookValues: ["mod", "super", "system", "custom"]
+    readonly property var winLookLabels: ["Mod", "Super", "⌘", tr("Custom icon")]
+    // DDropdown 初始化时也会发一次 valueChanged（带默认值），这时不能写盘
+    property bool settingsReady: false
     // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
     Component.onCompleted: {
         daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
         daemonCheck.running = true;
+        Qt.callLater(function() {
+            root.settingsReady = true;
+        });
+
         bridgeCheck.running = true;
         root.reloadSettings();
         root.refreshDebugMode();
@@ -222,7 +247,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: root.tr("ydotoold is not running — the keyboard cannot type until it starts.")
+                text: I18n.trFor("inlineKeyboard", "ydotoold is not running — the keyboard cannot type until it starts.")
                 color: Theme.surfaceText
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeMedium
@@ -230,7 +255,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: root.tr("Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool")
+                text: I18n.trFor("inlineKeyboard", "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool")
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeSmall
@@ -240,12 +265,12 @@ PluginSettings {
                 spacing: Theme.spacingS
 
                 DCommon.DButton {
-                    text: root.tr("Start")
+                    text: I18n.trFor("inlineKeyboard", "Start")
                     onClicked: daemonStart.running = true
                 }
 
                 DCommon.DButton {
-                    text: root.tr("Enable at login")
+                    text: I18n.trFor("inlineKeyboard", "Enable at login")
                     backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
                     textColor: Theme.surfaceText
                     onClicked: daemonEnable.running = true
@@ -259,7 +284,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: root.tr("Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.")
+        text: I18n.trFor("inlineKeyboard", "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.")
         font.pixelSize: Theme.fontSizeMedium
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
@@ -272,7 +297,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            text: root.tr("Optional: fcitx5 bridge")
+            text: I18n.trFor("inlineKeyboard", "Optional: fcitx5 bridge")
             font.pixelSize: Theme.fontSizeLarge
             font.weight: Font.Bold
             color: Theme.surfaceText
@@ -281,7 +306,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            text: root.bridgeUp ? root.tr("Connected — candidates, preedit and the globe switcher are live.") : root.tr("Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.")
+            text: root.bridgeUp ? I18n.trFor("inlineKeyboard", "Connected — candidates, preedit and the globe switcher are live.") : I18n.trFor("inlineKeyboard", "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.")
             font.pixelSize: Theme.fontSizeMedium
             color: root.bridgeUp ? Theme.primary : Theme.surfaceVariantText
             wrapMode: Text.WordWrap
@@ -314,7 +339,7 @@ PluginSettings {
 
         DCommon.DButton {
             visible: !root.bridgeUp
-            text: root.tr("Copy install commands")
+            text: I18n.trFor("inlineKeyboard", "Copy install commands")
             backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
             textColor: Theme.surfaceText
             onClicked: copyInstall.running = true
@@ -323,14 +348,14 @@ PluginSettings {
     }
 
     SettingsSection {
-        text: root.tr("Appearance")
+        text: I18n.trFor("inlineKeyboard", "Appearance")
     }
 
     SettingsCardGroup {
         SettingsCard {
             StyledText {
                 width: parent.width
-                text: root.tr("Key repeat interval")
+                text: I18n.trFor("inlineKeyboard", "Key repeat interval")
                 font.pixelSize: Theme.fontSizeMedium
                 font.weight: Theme.fontWeightMedium
                 color: Theme.surfaceText
@@ -338,7 +363,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: root.tr("Delay between repeated keystrokes while a key is held down.")
+                text: I18n.trFor("inlineKeyboard", "Delay between repeated keystrokes while a key is held down.")
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.Wrap
@@ -364,15 +389,15 @@ PluginSettings {
     }
 
     SettingsSection {
-        text: root.tr("Behaviour")
+        text: I18n.trFor("inlineKeyboard", "Behaviour")
     }
 
     SettingsCardGroup {
         SettingsCard {
             ToggleSetting {
                 settingKey: "avoidWindows"
-                label: root.tr("Avoid windows when docked")
-                description: root.tr("Shrink other windows so the keyboard does not cover them.")
+                label: I18n.trFor("inlineKeyboard", "Avoid windows when docked")
+                description: I18n.trFor("inlineKeyboard", "Shrink other windows so the keyboard does not cover them.")
                 defaultValue: true
             }
 
@@ -381,8 +406,8 @@ PluginSettings {
         SettingsCard {
             ToggleSetting {
                 settingKey: "alwaysShowPreedit"
-                label: root.tr("Always show the preedit in the keyboard")
-                description: root.tr("Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.")
+                label: I18n.trFor("inlineKeyboard", "Always show the preedit in the keyboard")
+                description: I18n.trFor("inlineKeyboard", "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.")
                 defaultValue: false
             }
 
@@ -391,8 +416,8 @@ PluginSettings {
         SettingsCard {
             ToggleSetting {
                 settingKey: "defaultFloating"
-                label: root.tr("Use the floating keyboard by default")
-                description: root.tr("Off opens the docked keyboard.")
+                label: I18n.trFor("inlineKeyboard", "Use the floating keyboard by default")
+                description: I18n.trFor("inlineKeyboard", "Off opens the docked keyboard.")
                 defaultValue: false
             }
 
@@ -400,21 +425,23 @@ PluginSettings {
 
         SettingsCard {
             SelectionSetting {
+                id: modifierModeSetting
+
                 settingKey: "modifierMode"
-                label: root.tr("Modifier tap behaviour")
-                description: root.tr("How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.")
+                label: I18n.trFor("inlineKeyboard", "Modifier tap behaviour")
+                description: I18n.trFor("inlineKeyboard", "How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.")
                 defaultValue: "doubleTapLock"
                 options: [{
-                    "label": root.tr("Active while held"),
+                    "label": I18n.trFor("inlineKeyboard", "Active while held"),
                     "value": "noLock"
                 }, {
-                    "label": root.tr("Tap to activate; any key clears it"),
+                    "label": I18n.trFor("inlineKeyboard", "Tap to activate; any key clears it"),
                     "value": "toggle"
                 }, {
-                    "label": root.tr("Tap to lock (tap again to unlock)"),
+                    "label": I18n.trFor("inlineKeyboard", "Tap to lock (tap again to unlock)"),
                     "value": "tapLock"
                 }, {
-                    "label": root.tr("Tap to toggle, double-tap to lock"),
+                    "label": I18n.trFor("inlineKeyboard", "Tap to toggle, double-tap to lock"),
                     "value": "doubleTapLock"
                 }]
             }
@@ -424,29 +451,46 @@ PluginSettings {
         // 特殊键的表现形式。三个选项对应 layouts/special-keys.js 的 STYLES；
         // 「完整」形态下过长的文字由 Key.qml 的 Text.HorizontalFit 自动缩字号。
         SettingsCard {
-            SelectionSetting {
-                settingKey: "specialKeyStyle"
-                label: root.tr("Special key labels")
-                description: root.tr("How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.")
-                defaultValue: "full"
-                options: [{
-                    "label": root.tr("Icon"),
-                    "value": "icon"
-                }, {
-                    "label": root.tr("Short"),
-                    "value": "short"
-                }, {
-                    "label": root.tr("Full name"),
-                    "value": "full"
-                }]
-            }
+            Column {
+                spacing: Theme.spacingS
+                width: parent.width
 
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("inlineKeyboard", "Special key labels")
+                    font.pixelSize: Theme.fontSizeMedium
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: I18n.trFor("inlineKeyboard", "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.Wrap
+                }
+
+                // 不用 SelectionSetting：它初始化时会把 defaultValue 写回文件（DDropdown 的 valueChanged 回环）
+                DCommon.DDropdown {
+                    width: parent.width
+                    options: root.specialStyleLabels
+                    currentValue: root.specialStyleLabels[Math.max(0, root.specialStyleValues.indexOf(root.loadValue("specialKeyStyle", "full")))]
+
+                    onValueChanged: v => {
+                        if (!root.settingsReady)
+                            return ;
+
+                        const i = root.specialStyleLabels.indexOf(v);
+                        if (i >= 0)
+                            root.saveValue("specialKeyStyle", root.specialStyleValues[i]);
+                    }
+                }
+            }
         }
 
     }
 
     SettingsSection {
-        text: root.tr("Win key")
+        text: I18n.trFor("inlineKeyboard", "Win key")
     }
 
     SettingsCardGroup {
@@ -456,8 +500,8 @@ PluginSettings {
                 id: winLookSetting
 
                 settingKey: "winKeyStyle"
-                label: root.tr("Win key label")
-                description: root.tr("This key sends Super. Show it as text or an icon.")
+                label: I18n.trFor("inlineKeyboard", "Win key label")
+                description: I18n.trFor("inlineKeyboard", "This key sends Super. Show it as text or an icon.")
                 defaultValue: "mod"
                 options: [{
                     "label": "Mod",
@@ -469,7 +513,7 @@ PluginSettings {
                     "label": "⌘",
                     "value": "system"
                 }, {
-                    "label": root.tr("Custom icon"),
+                    "label": I18n.trFor("inlineKeyboard", "Custom icon"),
                     "value": "custom"
                 }]
             }
@@ -488,7 +532,7 @@ PluginSettings {
                 StyledText {
                     width: Theme.spacingXL * 2
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.tr("Icon")
+                    text: I18n.trFor("inlineKeyboard", "Icon")
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceText
                 }
@@ -506,7 +550,7 @@ PluginSettings {
 
                 DCommon.DTextField {
                     width: parent.width - 48 - winIconPicker2.width - parent.spacing * 2
-                    placeholderText: root.tr("svg/png path")
+                    placeholderText: I18n.trFor("inlineKeyboard", "svg/png path")
                     text: String(winIconSetting.value || "").indexOf("/") >= 0 ? winIconSetting.value : ""
                     onTextEdited: {
                         const v = text.trim();
@@ -527,23 +571,22 @@ PluginSettings {
 
         visible: false
         settingKey: "winKeyCustomIcon"
-        label: root.tr("Custom icon")
+        label: I18n.trFor("inlineKeyboard", "Custom icon")
         description: ""
         defaultValue: ""
     }
 
     SettingsSection {
-        text: root.tr("Actions")
+        text: I18n.trFor("inlineKeyboard", "Actions")
     }
 
     SettingsCardGroup {
         SettingsCard {
-            // 用 ListSetting 而不是自己读写 pluginData：设置页没有 pluginService 可用，
-            // ListSetting 自带存取，并提供 items / addItem / removeItem。
+            // 用 ListSetting 而不是自己读写 pluginData：设置页没有 pluginService 可用，ListSetting 自带存取，并提供 items / addItem / removeItem。
             ToggleSetting {
                 settingKey: "escSwap"
-                label: root.tr("Esc on the top-left key")
-                description: root.tr("Swap the \`~ key with Esc. Fn layer keeps the other one.")
+                label: I18n.trFor("inlineKeyboard", "Esc on the top-left key")
+                description: I18n.trFor("inlineKeyboard", "Swap the \`~ key with Esc. Fn layer keeps the other one.")
                 defaultValue: false
             }
 
@@ -591,7 +634,7 @@ PluginSettings {
 
                     StyledText {
                         width: parent.width
-                        text: root.editingId !== "" ? root.tr("Edit action") : root.tr("New action")
+                        text: root.editingId !== "" ? I18n.trFor("inlineKeyboard", "Edit action") : I18n.trFor("inlineKeyboard", "New action")
                         font.pixelSize: Theme.fontSizeMedium
                         font.weight: Font.Medium
                         color: Theme.surfaceText
@@ -604,7 +647,7 @@ PluginSettings {
                         StyledText {
                             width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.tr("Name")
+                            text: I18n.trFor("inlineKeyboard", "Name")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceText
                         }
@@ -626,7 +669,7 @@ PluginSettings {
                         StyledText {
                             width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.tr("Icon")
+                            text: I18n.trFor("inlineKeyboard", "Icon")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceText
                         }
@@ -645,7 +688,7 @@ PluginSettings {
                         DCommon.DTextField {
                             width: parent.width - 48 - iconField.width - parent.spacing * 2
                             anchors.verticalCenter: parent.verticalCenter
-                            placeholderText: root.tr("svg/png path")
+                            placeholderText: I18n.trFor("inlineKeyboard", "svg/png path")
                             text: root.draftIcon.indexOf("/") >= 0 ? root.draftIcon : ""
                             onTextEdited: {
                                 const v = text.trim();
@@ -662,7 +705,7 @@ PluginSettings {
                         StyledText {
                             width: Theme.spacingXL * 2
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.tr("Command")
+                            text: I18n.trFor("inlineKeyboard", "Command")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceText
                         }
@@ -672,7 +715,7 @@ PluginSettings {
 
                             width: parent.width - 48 - parent.spacing
                             anchors.verticalCenter: parent.verticalCenter
-                            placeholderText: root.tr("e.g. grim -g \"$(slurp)\"")
+                            placeholderText: I18n.trFor("inlineKeyboard", "e.g. grim -g \"$(slurp)\"")
                             onTextEdited: root.draftCmd = text
                         }
 
@@ -682,12 +725,12 @@ PluginSettings {
                         spacing: Math.round(Theme.spacingS)
 
                         DCommon.DButton {
-                            text: root.editingId !== "" ? root.tr("Save") : root.tr("Add")
+                            text: root.editingId !== "" ? I18n.trFor("inlineKeyboard", "Save") : I18n.trFor("inlineKeyboard", "Add")
                             onClicked: root.confirmAdd()
                         }
 
                         DCommon.DButton {
-                            text: root.tr("Cancel")
+                            text: I18n.trFor("inlineKeyboard", "Cancel")
                             backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
                             textColor: Theme.surfaceText
                             onClicked: root.adding = false
@@ -706,8 +749,8 @@ PluginSettings {
                 id: actionList
 
                 settingKey: "actions"
-                label: root.tr("Actions")
-                description: root.tr("Built-in actions can only be hidden; the ones you add can be removed. Tap an icon to change it.")
+                label: I18n.trFor("inlineKeyboard", "Actions")
+                description: I18n.trFor("inlineKeyboard", "Built-in actions can only be hidden; the ones you add can be removed. Tap an icon to change it.")
                 defaultValue: Actions.defaultActions()
 
                 delegate: Component {
@@ -766,7 +809,7 @@ PluginSettings {
                                         iconName: isHidden ? "visibility_off" : "visibility"
                                         backgroundColor: isHidden ? Theme.primary : "transparent"
                                         iconColor: isHidden ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, 0.65)
-                                        tooltipText: isHidden ? root.tr("Show") : root.tr("Hide")
+                                        tooltipText: isHidden ? I18n.trFor("inlineKeyboard", "Show") : I18n.trFor("inlineKeyboard", "Hide")
                                         onClicked: root.patchAction(modelData.id, {
                                             "hidden": !isHidden
                                         })
@@ -776,7 +819,7 @@ PluginSettings {
                                         visible: !isBuiltin
                                         iconName: "edit"
                                         iconColor: Theme.withAlpha(Theme.surfaceText, 0.75)
-                                        tooltipText: root.tr("Edit")
+                                        tooltipText: I18n.trFor("inlineKeyboard", "Edit")
                                         onClicked: root.startEdit(modelData)
                                     }
 
@@ -784,7 +827,7 @@ PluginSettings {
                                         visible: !isBuiltin
                                         iconName: "delete"
                                         iconColor: Theme.withAlpha(Theme.error, 0.85)
-                                        tooltipText: root.tr("Remove")
+                                        tooltipText: I18n.trFor("inlineKeyboard", "Remove")
                                         onClicked: root.removeActionById(modelData.id)
                                     }
 
@@ -837,7 +880,7 @@ PluginSettings {
             DCommon.DButton {
                 width: parent.width
                 visible: !root.adding
-                text: root.tr("Add a custom action")
+                text: I18n.trFor("inlineKeyboard", "Add a custom action")
                 iconName: "add"
                 backgroundColor: Theme.withAlpha(Theme.primary, 0.08)
                 textColor: Theme.primary
@@ -849,7 +892,7 @@ PluginSettings {
     }
 
     SettingsSection {
-        text: root.tr("Debugging")
+        text: I18n.trFor("inlineKeyboard", "Debugging")
     }
 
     SettingsCardGroup {
@@ -866,14 +909,14 @@ PluginSettings {
 
                     StyledText {
                         width: parent.width
-                        text: root.tr("Debug mode")
+                        text: I18n.trFor("inlineKeyboard", "Debug mode")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceText
                     }
 
                     StyledText {
                         width: parent.width
-                        text: root.tr("Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.")
+                        text: I18n.trFor("inlineKeyboard", "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         wrapMode: Text.Wrap
@@ -886,7 +929,7 @@ PluginSettings {
 
                     anchors.verticalCenter: parent.verticalCenter
                     hideText: true
-                    text: root.tr("Debug mode")
+                    text: I18n.trFor("inlineKeyboard", "Debug mode")
                     checked: root.debugModeOn
                     onToggled: (value) => {
                         if (value)
@@ -911,19 +954,19 @@ PluginSettings {
         popout: true
         visible: root.debugConfirmOpen
         opened: root.debugConfirmOpen
-        title: root.tr("Turn on debug mode?")
-        supportingText: root.tr("Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
+        title: I18n.trFor("inlineKeyboard", "Turn on debug mode?")
+        supportingText: I18n.trFor("inlineKeyboard", "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
         maximumWidth: 420
         onRejected: root.debugConfirmOpen = false
         actions: [
             DCommon.DButton {
-                text: root.tr("Cancel")
+                text: I18n.trFor("inlineKeyboard", "Cancel")
                 backgroundColor: Theme.withAlpha(Theme.surfaceText, 0.12)
                 textColor: Theme.surfaceText
                 onClicked: root.debugConfirmOpen = false
             },
             DCommon.DButton {
-                text: root.tr("Enable")
+                text: I18n.trFor("inlineKeyboard", "Enable")
                 backgroundColor: Theme.primary
                 textColor: Theme.onPrimary
                 onClicked: {

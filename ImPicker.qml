@@ -37,10 +37,10 @@ Item {
         width: Math.min(parent.width * 0.52, 400)
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
         height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
-        radius: Style.cornerRadiusL
+        radius: Theme.cornerRadiusL
         color: Theme.withAlpha(Theme.surface, 0.99)
-        border.width: 1
-        border.color: Style.outlineVariant
+        border.width: Theme.outlineWidth
+        border.color: Theme.outlineVariant
 
         // 吃掉面板内的点击，避免穿透到下面的关闭区域
         MouseArea {
@@ -136,8 +136,7 @@ Item {
                         return rowRipple.trigger(mouse.x, mouse.y);
                     }
                     onClicked: {
-                        // 纯键盘布局直接切；拼音类输入法走 selectImMode，
-                        // 它会在切换生效后再校正中英文状态
+                        // 纯键盘布局直接切；拼音类输入法走 selectImMode，它会在切换生效后再校正中英文状态
                         if (modelData.keyboard)
                             root.controller.selectIm(modelData.name);
                         else

@@ -27,16 +27,14 @@ Item {
     property string imIcon: "" // 绝对路径
     property bool hasPrev: false
     property bool hasNext: false
-    // 还有没显示的候选。rime 的 bulk 列表没有 pageable，hasNext 恒 false，
-    // 这个字段由 addon 另外算（第 19 个候选还取不取得到）。
+    // 还有没显示的候选。rime 的 bulk 列表没有 pageable，hasNext 恒 false，这个字段由 addon 另外算（第 19 个候选还取不取得到）。
     property bool hasMore: false
     // 当前有没有输入框拿着焦点（addon 的 focus:0/1 消息）
     property bool inputFocused: false
     // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
     // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），超时判据就看这个时间戳。
     property double lastSeenAt: 0
-    // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，
-    // 带下标是为了让显示层做去重/剔除时不破坏选词准确性。
+    // 全量候选（候选列表页用）。每项 { i: 原始全局下标, t: 词 }，带下标是为了让显示层做去重/剔除时不破坏选词准确性。
     property var allCandidates: []
     // int 值属性：addon 每 40ms 推新数组，监听数组会无限重启定时器
     property int candRevision: 0
@@ -130,8 +128,7 @@ Item {
     }
 
     function applyStatus(raw) {
-        // data.js 的 parseStatus 解析失败时返回上一次的副本，
-        // 所以文件半写 / 还没生成的情况不会把候选闪空。
+        // data.js 的 parseStatus 解析失败时返回上一次的副本，所以文件半写 / 还没生成的情况不会把候选闪空。
         const st = Data.parseStatus(raw, {
             "items": candidates,
             "preedit": preedit,
@@ -265,8 +262,7 @@ Item {
         return sendFcitx("select:" + index);
     }
 
-    // 文件兜底只在打开键盘时读一次（addon 还没连上那一刻的初始状态），
-    // 之后全靠 addon 通过 socket 推送，不再定时起 cat 进程。
+    // 文件兜底只在打开键盘时读一次（addon 还没连上那一刻的初始状态），之后全靠 addon 通过 socket 推送，不再定时起 cat 进程。
     function readFallbackFiles() {
         if (!statusRead.running)
             statusRead.running = true;
@@ -280,8 +276,7 @@ Item {
     visible: false
     width: 0
     height: 0
-    // 不该连时（最小化）立刻断，不等重连 Timer 的下一拍：
-    // addon 收到 EOF 会马上把 UI 交还 classicui，用户在那儿打字就能看到候选窗
+    // 不该连时（最小化）立刻断，不等重连 Timer 的下一拍：addon 收到 EOF 会马上把 UI 交还 classicui，用户在那儿打字就能看到候选窗
     onConnectEnabledChanged: {
         if (!connectEnabled && socket.connected)
             socket.connected = false;

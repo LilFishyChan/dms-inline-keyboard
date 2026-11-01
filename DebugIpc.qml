@@ -80,8 +80,7 @@ Item {
         return "voice=" + (controller.voiceActive ? "rec" : "idle") + "/" + (controller.voiceMinimal ? "mini" : "full");
     }
 
-    // 调试：写一个设置项。走 PluginService.savePluginData（和设置页同一条路），
-    // 写完 daemon 的 onPluginDataChanged → reloadSettings 立刻生效，不用重启。
+    // 调试：写一个设置项，走 savePluginData（和设置页同一条路），写完立刻 reloadSettings，不用重启
     // value 用字符串传，这里按 true/false/整数解析，其余当字符串。
     function debugSetSetting(key: string, value: string) : string {
         if (!controller.devMode)
@@ -129,8 +128,7 @@ Item {
         return "mode=" + (card ? card.mode : "-") + " page=" + (card ? card.page : "-") + " listOpen=" + (card ? card.candListOpen : "-");
     }
 
-    // 调试用：模拟「把列表第 index 个动作拖到卡片坐标 (x,y)」，
-    // 用来在没有人手的情况下检查拖动预览（幽灵块 / 让位 / 挤出）
+    // 调试用：模拟「把列表第 index 个动作拖到卡片坐标 (x,y)」，用来在没有人手的情况下检查拖动预览（幽灵块 / 让位 / 挤出）
     function debugDrag(index: int, x: int, y: int) : string {
         if (!controller.devMode)
             return "dev mode off";

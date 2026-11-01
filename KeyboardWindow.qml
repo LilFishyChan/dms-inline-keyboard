@@ -5,7 +5,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Common
-import qs.Widgets
 
 // 贴底键盘窗口。layer-shell overlay、不抢键盘焦点（注入的按键落到应用上）。
 PanelWindow {
@@ -256,8 +255,7 @@ PanelWindow {
     mask: Region {
         x: Math.round(card.x)
         y: Math.max(0, Math.round(card.y - root.preeditReserve))
-        // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，
-        // layer surface 的 mask 还留在屏幕上继续吃点击
+        // 窗口隐藏时必须把输入区域也收成 0：visible=false 只是不绘制，layer surface 的 mask 还留在屏幕上继续吃点击
         width: root.visible ? Math.round(card.width) : 0
         height: root.visible ? Math.max(0, Math.round(root.height - Math.max(0, Math.round(card.y - root.preeditReserve)))) : 0
     }

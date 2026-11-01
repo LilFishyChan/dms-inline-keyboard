@@ -1,6 +1,6 @@
 // Inline Keyboard 的键盘卡片本体：顶部快捷栏 + 右上角动作槽、按键区（page1/page2）、表情页、透明度面板和功能列表。
 
-import "Motion.js" as Motion
+import "motion.js" as Motion
 import QtQuick
 import Quickshell.Io
 import "actions.js" as Actions
@@ -31,14 +31,14 @@ Rectangle {
     property real designScale: 1
     // 表情页分段按钮的当前索引，供诊断 IPC 断言（emojiPanel 的 id 只在组件内部可见）
     readonly property int emojiSegmentIndex: emojiPanel ? emojiPanel.segmentIndex : -1
-    // 和顶部动作固定栏同高（quickH），图标也按它的比例
-    property real handleH: Math.round(root.quickH)
+    // 底部把手高度，比例和 KeyboardMetrics.handleRatio 一致；
+    // 窗口总会传 metrics.handleH，这里只是兜底
+    property real handleH: Math.round(root.keyH * 0.75)
     property bool showHandle: true
     property bool dragEnabled: false
     // 长按自动重复的间隔（毫秒），由设置页配置
     property int repeatInterval: 60
-    // 候选栏整行的开关：显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，
-    // 必须写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成半句。
+    // 候选栏整行的开关：显示条件看**这个输入法在 fcitx5 下会不会弹候选窗**，必须写成一行：QML 的 JS 在换行处会插分号，多行表达式会被截断成半句。
     property bool showCandBar: false
     property bool fnActive: false
     // Esc 与 ` 对调（设置项）
@@ -99,8 +99,7 @@ Rectangle {
     property var ghostAction: null
     // 语音输入是否在录音（daemon 传下来，决定顶部是否切到语音行）
     property bool voiceActive: false
-    // 语音模式：只留顶部语音行。由 daemon 传下来（daemon 负责切浮动），
-    // 卡片只负责按它隐藏主区和底栏。
+    // 语音模式：只留顶部语音行。由 daemon 传下来（daemon 负责切浮动），卡片只负责按它隐藏主区和底栏。
     property bool voiceMinimal: false
     // vinput 是否可用：没装时语音动作禁用，键盘其它功能不变
     property bool voiceAvailable: false
@@ -160,7 +159,8 @@ Rectangle {
     readonly property string preedit: root.fcitxPreedit
     readonly property var shortcuts: Layout.demoShortcuts
     readonly property color fg: Theme.surfaceText
-    // 顶部快捷条高度 = 圆形按钮直径（按钮填满这一行）；窗口按 KeyboardMetrics 传入
+    // 顶部快捷条高度 = 圆形按钮直径（按钮填满这一行）。
+    // 窗口总会传 metrics.quickH，这里的默认值只是没接线时的兜底，比例要和 KeyboardMetrics.quickBarRatio 保持一致。
     property real quickH: Math.round(keyH * 0.78)
     // 动作表由插件设置提供（daemon 传进来）
     property var actionList: []
@@ -168,8 +168,7 @@ Rectangle {
     property var fcitxCandidates: []
     // 调试注入的假候选（dms ipc call inlineKeyboard debugCand "一,二,三"）。
     property var debugCandItems: []
-    // 候选列表页是否展开。展开时键区让位（真换页，不是盖一层），
-    // 否则下面的按键还会被点到。
+    // 候选列表页是否展开。展开时键区让位（真换页，不是盖一层），否则下面的按键还会被点到。
     property bool candListOpen: false
     // 候选面板引用（调试用）
     property var candListPanel: null
@@ -179,8 +178,7 @@ Rectangle {
     property var allCandidates: []
     // 正在等 addon 回包
     property bool candLoading: false
-    // 「刚选过词」窗口：选词是明确动作，列表页此时也不会再打字，
-    // 所以这段时间里候选变化要立刻处理，不能走 800ms 的打字 debounce。
+    // 「刚选过词」窗口：选词是明确动作，列表页此时也不会再打字，所以这段时间里候选变化要立刻处理，不能走 800ms 的打字 debounce。
     property bool recentSelect: false
     // 主键区行数，候选列表页的滚动区高度按它算
     readonly property int keyRowCount: Layout.pageRows("page1").length
@@ -201,8 +199,7 @@ Rectangle {
     property bool dockFill: true
     // 候选列表页的数据源：真实全量候选优先；调试注入的 {i,t} 兜底
     property var debugCandModel: []
-    // addon 推的顶部候选也是纯字符串数组，同样要缓存成 {i,t}，
-    // 否则 candListModel 每次求值都要 map 一遍（18 个对象/次）。
+    // addon 推的顶部候选也是纯字符串数组，同样要缓存成 {i,t}，否则 candListModel 每次求值都要 map 一遍（18 个对象/次）。
     property var fcitxModel: []
     // 候选**列表页**的数据源：全量优先。
     // 不能拿来喂候选栏：allCandidates 是懒加载的，只有展开列表时才拉取。
@@ -226,10 +223,14 @@ Rectangle {
     // 候选栏能装下 candListModel 的前几项。
     // 剩下的进列表页，两边不重复。所以容量必须按同一份数据算，否则会同时显示或同时漏掉一个。
     property int candBarCount: 0
-    // 顶栏词区的可用宽度：卡片宽减去两侧内边距，再减右侧那一列
-    readonly property real candBarAvail: Math.max(0, root.width - root.pad * 2 - (root.unit + root.gap))
+    // 顶栏词区的可用宽度：卡片宽减去两侧内边距，再减右侧展开按钮那一列（按钮直径 + 间距）
+    readonly property real candBarAvail: Math.max(0, root.width - root.pad * 2 - (root.quickH + root.gap))
+    // 单个候选词左右的内边距，按候选栏高度算（和 CandidateBar 共用同一个值，否则量容量和画出来的宽度对不上）
+    readonly property real candItemPad: Math.round(root.candH * 0.8)
     // 候选栏显示前一段
     property var candBarItems: []
+    // 顶栏排完后剩下的宽度，按项数分摊给每一项（列表也是这么铺满行尾的）
+    property real candBarSlack: 0
     property var candListItems: []
     readonly property var candBarSlice: candBarItems
     // 候选列表页显示后一段（不含顶栏已有的，避免重复）。
@@ -271,8 +272,7 @@ Rectangle {
         if (!(root.editing && root.dragActive && root.ghostAction))
             return null;
 
-        // 拖到槽（交换）：原槽动作插到被抓项腾出的那一格。走同一套 plan，
-        // 固定栏布局才是「源项已移除 + X 已插入」的最终样子，其他块才会让位。
+        // 拖到槽（交换）：原槽动作插到被抓项腾出的那一格。走同一套 plan，固定栏布局才是「源项已移除 + X 已插入」的最终样子，其他块才会让位。
         if (root.dragOverSlot && root.dragFrom === "bar" && root.rightSlot)
             return Actions.planQuickBarDrop(root.quickBarDropArgs(root.rightSlot, root.dragFromIndex, root.dragFrom, root.dragFromIndex));
 
@@ -281,8 +281,7 @@ Rectangle {
 
         return Actions.planQuickBarDrop(root.quickBarDropArgs(root.ghostAction, root.dragBarIndex, root.dragFrom, root.dragFromIndex));
     }
-    // 松手后短暂保留落盘后的顺序：真实数据要等一个 IPC 往返才回到卡片，
-    // 中间若用旧数组，位置会先跳回去、再动画到新位置（看起来就是"松手后又演了一遍"）
+    // 松手后短暂保留落盘后的顺序：真实数据要等一个 IPC 往返才回到卡片，中间若用旧数组，位置会先跳回去、再动画到新位置（看起来就是"松手后又演了一遍"）
     property var frozenBar: null
     property var frozenList: null
     // 松手后固定栏的样子。注意：这里只用来**算位置**，绝不能拿它当 Repeater 的 model
@@ -337,8 +336,7 @@ Rectangle {
     signal imCycleRequested()
     signal imSelected(string name)
     signal resizeCommitRequested()
-    // 松手落盘时用：键盘尺寸变成新值后，卡片位置要补偿多少，
-    // 才能让「拖的那条边」的对侧保持不动。拖动过程中不移动键盘。
+    // 松手落盘时用：键盘尺寸变成新值后，卡片位置要补偿多少，才能让「拖的那条边」的对侧保持不动。拖动过程中不移动键盘。
     signal resizeOriginShift(real dx, real dy)
     signal resizeCloseRequested()
     signal resizeCancelRequested()
@@ -348,8 +346,7 @@ Rectangle {
     signal modeChangeRequested(string mode)
     signal allCandidatesRequested()
     signal keyPressed(var keyData)
-    // 表情 / 符号上屏：卡片只负责报「点了哪个字符」，
-    // 真正怎么提交（addon commit / 剪贴板）由 daemon 决定。
+    // 表情 / 符号上屏：卡片只负责报「点了哪个字符」，真正怎么提交（addon commit / 剪贴板）由 daemon 决定。
     signal textCommitRequested(string text)
     // 点了第 index 个候选
     signal selectCandidateRequested(int index)
@@ -391,8 +388,7 @@ Rectangle {
             root.candLoading = true;
             root.allCandidatesRequested();
             candLoadGuard.restart();
-            // 先把当前状态立刻刷上去；addon 回包后 candDataSeq 会再 ++ 一次，
-            // 那次走的就是下面的 recentSelect 分支，同样是立即的
+            // 先把当前状态立刻刷上去；addon 回包后 candDataSeq 会再 ++ 一次，那次走的就是下面的 recentSelect 分支，同样是立即的
             if (candListPanel)
                 candListPanel.forceRelayout();
 
@@ -445,8 +441,7 @@ Rectangle {
     function endDrag() {
         const owner = root.dragOwner;
         if (!owner) {
-            // 手势已经断了（delegate 被重建、或 endDrag 被重复调用）：
-            // 至少把状态清干净，别把幽灵块和 dragActive 留在界面上
+            // 手势已经断了（delegate 被重建、或 endDrag 被重复调用）：至少把状态清干净，别把幽灵块和 dragActive 留在界面上
             root.clearDragState();
             return ;
         }
@@ -626,8 +621,7 @@ Rectangle {
     }
 
     function reenableAnim() {
-        // 列表还在冻结中就先别开动画：数据回来时顺序万一差一点点，
-        // 开了会看到松手后补一段位移
+        // 列表还在冻结中就先别开动画：数据回来时顺序万一差一点点，开了会看到松手后补一段位移
         if (root.frozenList)
             return ;
 
@@ -747,6 +741,7 @@ Rectangle {
         const list = root.candBarSource;
         if (!list || list.length === 0 || root.candBarAvail <= 0) {
             root.candBarCount = 0;
+            root.candBarSlack = 0;
             return ;
         }
         const avail = root.candBarAvail;
@@ -757,7 +752,7 @@ Rectangle {
         for (let i = 0; i < list.length; i++) {
             const t = list[i] && list[i].t !== undefined ? String(list[i].t) : String(list[i] || "");
             candMeasure.text = t;
-            let w = candMeasure.advanceWidth + root.unit * 2 / 3 + root.gap;
+            let w = candMeasure.advanceWidth + root.candItemPad + root.gap;
             if (i === 0 && w > firstMax)
                 w = firstMax;
 
@@ -768,6 +763,7 @@ Rectangle {
             n++;
         }
         root.candBarCount = n;
+        root.candBarSlack = Math.max(0, avail - used);
         // 只有这里才切一次数组，下游读的是稳定引用
         root.candBarItems = n <= 0 ? [] : list.slice(0, n);
         // 列表页从候选栏之后开始，避免和顶栏重复。
@@ -806,18 +802,17 @@ Rectangle {
     }
 
     // 某个动作在「松手后的固定栏」里排第几；-1 = 它会被挤出去
-    // 索引换算在 data.js（有单测）；QuickBar 通过 controller 调这一层
-    function quickBarIndexFor(id) {
-        return Data.quickBarIndexFor(root.quickBarResolved, id);
-    }
-
-    // 用户可见文案统一走插件翻译表（translations/<locale>.json），缺词条回退英文原串
+    // 动态词条（动作名、表情分类名）走这个；字面量直接用 I18n.trFor，提取工具才抓得到
     function tr(term) {
-        const version = root.localeVersion; // 让调用处的绑定跟随版本重算
         if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
             return term;
 
         return I18n.trFor("inlineKeyboard", term);
+    }
+
+    // 索引换算在 data.js（有单测）；QuickBar 通过 controller 调这一层
+    function quickBarIndexFor(id) {
+        return Data.quickBarIndexFor(root.quickBarResolved, id);
     }
 
     // 键位 → 修饰键状态：映射规则在 modifiers.js（有单测），这里只查表
@@ -866,8 +861,7 @@ Rectangle {
     onWidthChanged: recomputeCandBar()
     onUnitChanged: recomputeCandBar()
     onGapChanged: recomputeCandBar()
-    // 高度变了 keyH 就变，候选测量的字号跟着变（candMeasure.font 依赖 keyH），
-    // 容量必须重算 —— 否则拖高键盘后候选栏仍按旧字号排版，出现早省略
+    // 高度变了 keyH 就变，候选测量的字号跟着变（candMeasure.font 依赖 keyH），容量必须重算 —— 否则拖高键盘后候选栏仍按旧字号排版，出现早省略
     onKeyHChanged: recomputeCandBar()
     Component.onCompleted: {
         recomputeCandBar();
@@ -890,13 +884,12 @@ Rectangle {
 
     }
     width: unit * Layout.rowUnits + gap * (Layout.rowUnits - 1) + pad * 2
-    // 和 Column 的结构逐项对齐，一项都不能少：
-    // 这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
+    // 和 Column 的结构逐项对齐，一项都不能少：这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
     height: pad + Math.max(quickH, candH) + gap + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap + handleH
-    radius: Theme.cornerRadius
+    radius: Theme.windowRadius
     // 卡片底跟 DMS 设置页同色（surface），透明度仍由插件设置控制
     color: Theme.withAlpha(Theme.surface, bgOpacity)
-    border.width: 1
+    border.width: Theme.outlineWidth
     border.color: Theme.withAlpha(Theme.outlineVariant, 0.7)
 
     // 选词窗口：600ms 后恢复正常（覆盖 addon 回包 + 一次状态推送）
@@ -942,8 +935,7 @@ Rectangle {
     Timer {
         id: candReloadTimer
 
-        // 800ms：rime 的 BulkCandidateList 是懒加载，取一次要跨页生成，
-        // 展开状态下每打几个字就重拉太贵，是主要的 CPU 抖动来源。
+        // 800ms：rime 的 BulkCandidateList 是懒加载，取一次要跨页生成，展开状态下每打几个字就重拉太贵，是主要的 CPU 抖动来源。
         interval: 800
         repeat: false
         onTriggered: {
@@ -983,7 +975,7 @@ Rectangle {
         anchors.fill: parent
         radius: Theme.cornerRadius
         color: "transparent"
-        border.width: 2
+        border.width: Theme.outlineWidthFocused
         border.color: Theme.primary
         opacity: root.mode === "transparency" ? 1 : 0
         visible: opacity > 0.01
@@ -1006,8 +998,7 @@ Rectangle {
         anchors.margins: root.pad
         // 底部不留 pad：把手行要贴到卡片底边
         anchors.bottomMargin: 0
-        // 间距改由显式 spacer 控制 —— Column 的 spacing 对所有子项一律生效，
-        // 没法只去掉「键区 ↔ 把手」那一段。
+        // 间距改由显式 spacer 控制 —— Column 的 spacing 对所有子项一律生效，没法只去掉「键区 ↔ 把手」那一段。
         spacing: 0
 
         // 候选出现时覆盖快捷栏（同一块高度，不是上下共存）。
@@ -1025,10 +1016,19 @@ Rectangle {
 
                 controller: root
                 anchors.fill: parent
-                // 用 opacity 而不是 visible：visible:false 期间内部几何不重算，
-                // 切回主页面时槽会被摆到错误的键位上。
+                // 用 opacity 而不是 visible：visible:false 期间内部几何不重算，切回主页面时槽会被摆到错误的键位上。
                 opacity: (root.page === "emoji" || root.showCandBar || root.voiceActive) ? 0 : 1
                 enabled: root.page !== "emoji" && !root.showCandBar && !root.voiceActive
+
+                // 和分类栏 / 候选栏交叉淡入淡出，时长必须一致
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
             }
 
             // 语音行：录音时占掉这一整行，优先级 语音 > 候选 > 功能
@@ -1039,8 +1039,18 @@ Rectangle {
                 anchors.fill: parent
                 // 语音模式下即使暂停也要留在屏幕上 —— 否则麦克风一进未激活态
                 // 整行就没了，用户看不到「点它可以继续」这个提示
-                visible: root.voiceActive || root.voiceMinimal
+                visible: opacity > 0
+                opacity: (root.voiceActive || root.voiceMinimal) ? 1 : 0
                 z: 20
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
             }
 
             // 候选栏：盖在快捷栏上面。
@@ -1049,7 +1059,8 @@ Rectangle {
 
                 controller: root
                 anchors.fill: parent
-                visible: root.showCandBar && root.page !== "emoji" && !root.voiceActive
+                // 内层还在淡出时不能隐藏，否则过渡被砍断
+                visible: (root.showCandBar || candBar.opacity > 0) && root.page !== "emoji" && !root.voiceActive
                 z: 10
             }
 
@@ -1059,7 +1070,17 @@ Rectangle {
 
                 controller: root
                 anchors.fill: parent
-                visible: root.page === "emoji"
+                visible: opacity > 0
+                opacity: root.page === "emoji" ? 1 : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Motion.panel
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
             }
 
         }
@@ -1075,37 +1096,21 @@ Rectangle {
             id: mainArea
 
             width: parent.width
-            // 展开候选列表时整块键区让位：它是「换页」不是「盖一层」，
-            // 按键必须真正隐藏，否则下面的按键还能被点到。
+            // 展开候选列表时整块键区让位：它是「换页」不是「盖一层」，按键必须真正隐藏，否则下面的按键还能被点到。
             height: root.layoutRowCount * root.keyH + Math.max(0, root.layoutRowCount - 1) * root.gap
 
             CandidatePanel {
                 id: candListPanel
 
                 Component.onCompleted: root.candListPanel = candListPanel
-                // 度量（unit/keyH/gap/rowCount）和候选数据全从卡片拿，
-                // 漏了这一行会导致 unit/gap 取默认兜底值，列表宽度算错
+                // 度量（unit/keyH/gap/rowCount）和候选数据全从卡片拿，漏了这一行会导致 unit/gap 取默认兜底值，列表宽度算错
                 controller: root
                 anchors.fill: parent
                 visible: root.candListOpen
+                // 只做展开淡入：收起会立刻清空渲染量，淡出只剩空白
+                opacity: root.candListOpen ? 1 : 0
                 // 收起时把渲染量归零，避免隐藏状态下仍持有几百个 delegate
                 shownCountOverride: root.candListOpen ? -1 : 0
-            }
-
-            KeyGrid {
-                id: keyArea
-
-                // resize 模式下键区要留着：遮罩半透明盖在上面，
-                // 底下必须是真实的键盘主页面
-                // 面板切换走交叉淡入：visible 跟着 opacity 走，否则动画看不到；
-                // 淡出那一半不接点击，避免和新面板抢输入
-                readonly property bool shown: (root.mode === "keys" || root.mode === "resize") && root.page !== "emoji" && !root.candListOpen
-
-                controller: root
-                anchors.fill: parent
-                visible: opacity > 0.01
-                opacity: shown ? 1 : 0
-                enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
                     NumberAnimation {
@@ -1117,6 +1122,99 @@ Rectangle {
 
             }
 
+            // page1 ↔ page2 是同一个 Repeater 换 model，没有两层可以交叉淡入，所以切页时让键区整体从下方 6px 淡入一次，盖掉重建的突兀感。
+            Item {
+                id: keyWrapper
+
+                property real pageFade: 1
+                property real pageShift: 0
+
+                anchors.fill: parent
+                opacity: pageFade
+
+                KeyGrid {
+                    id: keyArea
+
+                    // resize 时键区要留着（遮罩半透明），切面板走交叉淡入，visible 跟 opacity 走
+                    readonly property bool shown: (root.mode === "keys" || root.mode === "resize") && root.page !== "emoji" && !root.candListOpen
+
+                    controller: root
+                    anchors.fill: parent
+                    visible: opacity > 0.01
+                    opacity: shown ? 1 : 0
+                    enabled: shown && opacity > 0.5
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Motion.panel
+                            easing.type: Easing.OutCubic
+                        }
+
+                    }
+
+                }
+
+                transform: Translate {
+                    y: keyWrapper.pageShift
+                }
+
+            }
+
+            // 切页动画：先瞬时归零（旧页直接消失），再从下方抬起淡入
+            SequentialAnimation {
+                id: pageSwap
+
+                NumberAnimation {
+                    target: keyWrapper
+                    property: "pageFade"
+                    to: 0
+                    duration: 0
+                }
+
+                NumberAnimation {
+                    target: keyWrapper
+                    property: "pageShift"
+                    to: 6
+                    duration: 0
+                }
+
+                PauseAnimation {
+                    duration: 16
+                }
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: keyWrapper
+                        property: "pageFade"
+                        to: 1
+                        duration: Motion.fade
+                        easing.type: Easing.OutCubic
+                    }
+
+                    NumberAnimation {
+                        target: keyWrapper
+                        property: "pageShift"
+                        to: 0
+                        duration: Motion.fade
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
+            }
+
+            Connections {
+                function onPageChanged() {
+                    // 切到表情页走 EmojiPanel 自己的交叉淡入，这里不参与
+                    if (root.page === "emoji")
+                        return ;
+
+                    pageSwap.restart();
+                }
+
+                target: root
+            }
+
             EmojiPanel {
                 id: emojiPanel
 
@@ -1124,7 +1222,8 @@ Rectangle {
 
                 controller: root
                 anchors.fill: parent
-                visible: opacity > 0.01
+                // 淡出要能一路走完，> 0.01 会让尾段直接跳没，子项（列表滚动条）跟着断
+                visible: opacity > 0
                 opacity: shown ? 1 : 0
                 enabled: shown && opacity > 0.5
 
@@ -1182,8 +1281,7 @@ Rectangle {
 
         }
 
-        // 放在 Column 末尾：它高度是 handleH、和卡片高度公式里的同一项，
-        // Column 各子项加起来正好等于 card height，不需要额外让位也不需要贴底。
+        // 放在 Column 末尾：它高度是 handleH、和卡片高度公式里的同一项，Column 各子项加起来正好等于 card height，不需要额外让位也不需要贴底。
         BottomBar {
             id: bottomBar
 
@@ -1280,7 +1378,8 @@ Rectangle {
         }
 
         anchors.fill: parent
-        visible: root.mode === "resize"
+        visible: opacity > 0
+        opacity: root.mode === "resize" ? 1 : 0
         // 盖在把手条（z 200）和所有页之上
         z: 300
 
@@ -1309,8 +1408,7 @@ Rectangle {
             readonly property real outerH: Math.round(root.resizeH) - root.pad - root.gap
             // 描边宽度：按键高取比例，比边框线粗一档才看得出是「可拖区域」
             readonly property real bw: Math.max(4, Math.round(root.keyH * 0.07))
-            // 矩形按半个描边内缩：内层描边骑在自己的边界上，
-            //   停靠模式：键盘本来就水平居中，拖左右必须**两边一起收/放**
+            // 矩形按半个描边内缩：内层描边骑在自己的边界上，停靠模式：键盘本来就水平居中，拖左右必须**两边一起收/放**
             readonly property bool symmetricX: !root.isFloating && (root.resizeHandle === "" || root.resizeHandle === "e" || root.resizeHandle === "w")
 
             x: Math.round(symmetricX ? (resizeArea.width - outerW) / 2 : (root.resizeHandle.indexOf("w") >= 0 ? resizeArea.width - outerW : 0)) + bw / 2
@@ -1428,7 +1526,7 @@ Rectangle {
                 visible: !root.isFloating
                 width: parent.btn
                 height: parent.btn
-                radius: width / 2
+                radius: Theme.fullRadius(width, height)
                 color: root.dockFill ? Theme.primary : Theme.surfaceContainerHigh
 
                 DIcon {
@@ -1461,7 +1559,7 @@ Rectangle {
             Rectangle {
                 width: parent.btn
                 height: parent.btn
-                radius: width / 2
+                radius: Theme.fullRadius(width, height)
                 color: Theme.surfaceContainerHigh
 
                 DIcon {
@@ -1493,7 +1591,7 @@ Rectangle {
             Rectangle {
                 width: parent.btn
                 height: parent.btn
-                radius: width / 2
+                radius: Theme.fullRadius(width, height)
                 color: Theme.surfaceContainerHigh
 
                 DIcon {
@@ -1525,7 +1623,7 @@ Rectangle {
             Rectangle {
                 width: parent.btn
                 height: parent.btn
-                radius: width / 2
+                radius: Theme.fullRadius(width, height)
                 color: Theme.primary
 
                 DIcon {
@@ -1552,6 +1650,14 @@ Rectangle {
                     onClicked: root.resizeCloseRequested()
                 }
 
+            }
+
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Motion.panel
+                easing.type: Easing.OutCubic
             }
 
         }

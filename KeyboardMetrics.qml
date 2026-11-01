@@ -14,10 +14,16 @@ QtObject {
     readonly property real handleRatio: 0.75
     readonly property int keyRowCount: Layout.pageRows("page1").length
     // 840 宽时 uiScale = 1，下面 base 值就是原值；键盘拖小/放大时等比跟着变。
-    // 不缩放的话，candH 44 在 222 高的键盘上要占 20%（正常只有 10%），
-    // gap 6×6 个间隙在 525 宽上也要吃掉 7%。
+    // 不缩放的话，candH 44 在 222 高的键盘上要占 20%（正常只有 10%），gap 6×6 个间隙在 525 宽上也要吃掉 7%。
     readonly property real designW: 840
+    // 名义高度：竖向上限的基准，见 vScale
+    readonly property real designH: 444
+    // 横向缩放：内边距 / 间距 / 单元宽。只跟宽度走。
     readonly property real uiScale: Math.max(0.5, Math.min(1.6, root.cardW / root.designW))
+    // 纵向缩放：只跟高度走的基准
+    readonly property real vScale: Math.max(0.5, Math.min(1.6, root.kbHeight / root.designH))
+    // 顶栏（候选栏）的缩放：宽高两个方向都大才放大，只在一个方向拉大不会把顶栏撑高，上限 1.15 是因为候选栏只要放得下一行字，不需要跟着键盘无限变高
+    readonly property real topScale: Math.max(0.5, Math.min(root.uiScale, root.vScale, 1.15))
     // 输入：窗口绑定，或用户设置换算后的名义值
     property real kbWidth: 1050
     property real kbHeight: 444
@@ -28,28 +34,24 @@ QtObject {
     property real screenH: 800
     readonly property real gap: Math.round(root.gapBase * root.uiScale)
     readonly property real pad: Math.round(root.padBase * root.uiScale)
-    readonly property real candH: Math.round(root.candHBase * root.uiScale)
+    // 顶栏高度：基准值按宽高共同缩放，上限键高的 0.8，下限 22 保证一行字放得下
+    readonly property real candH: Math.max(22, Math.min(Math.round(root.candHBase * root.topScale), Math.round(root.keyH * 0.8)))
     property bool showCandBar: false
     property real screenW: 1280
-    // 停靠模式铺满屏幕两侧；浮动模式保持名义宽度并留出边距，
-    // 否则浮窗会被拉成整屏宽。
+    // 停靠模式铺满屏幕两侧；浮动模式保持名义宽度并留出边距，否则浮窗会被拉成整屏宽。
     property bool fillWidth: false
     readonly property real cardW: root.fillWidth ? root.screenW : Math.min(root.kbWidth, root.screenW - 24)
     // 一行 = rowUnits 个单元 + (rowUnits-1) 个间距 + 两侧内边距
     readonly property real unit: (cardW - pad * 2 - (Layout.rowUnits - 1) * gap) / Layout.rowUnits
     readonly property real quickH: Math.round(keyH * quickBarRatio)
     // cardHeight = pad + topH + gap + rows*keyH + (rows-1)*gap + handleH
-    // topH = max(quickH, candH)，分两种情形解；直接解 keyH 避免与 handleH 循环依赖
+    // topH = max(quickH, candH)；cardHeight 直接解，避免与 keyH / handleH 循环依赖
     readonly property real cardHeight: kbHeight - pad - gap
     readonly property real verticalSlack: cardHeight - pad - gap - (keyRowCount - 1) * gap
+    // 顶栏按 quickH 参与分配；候选栏比它高时由 topH = max(...) 兜住，不再反解 keyH
     readonly property real keyH: {
-        // 先假设顶栏由快捷栏决定（topH = keyH * quickBarRatio）
         const withQuick = verticalSlack / (keyRowCount + quickBarRatio + handleRatio);
-        if (Math.round(withQuick * quickBarRatio) >= candH)
-            return Math.max(28, withQuick);
-
-        // 快捷栏排出来还没候选栏高 → 顶栏由 candH 撑开，重解
-        return Math.max(28, (verticalSlack - candH) / (keyRowCount + handleRatio));
+        return Math.max(28, withQuick);
     }
     readonly property real handleH: keyH * handleRatio
 }

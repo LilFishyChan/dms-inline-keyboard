@@ -1,7 +1,7 @@
 // 候选词列表页：覆盖键盘按键区，把候选摊开。
 // 左侧 DListView 按行虚拟化（右侧一列是翻页/退格键）。
 
-import "Motion.js" as Motion
+import "motion.js" as Motion
 import QtQuick
 import "candidates.js" as Candidates
 import qs.Common
@@ -36,8 +36,7 @@ Item {
     // 按行分组，作为 DListView 的 model
     property var rows: []
     property real contentH: 0
-    // 候选数据变了就重排。candListSlice 是 property var，直接监听不可靠，
-    // 用卡片给的 candRevision（int）当触发源。
+    // 候选数据变了就重排。candListSlice 是 property var，直接监听不可靠，用卡片给的 candRevision（int）当触发源。
     readonly property int relayoutInterval: 80
     property double lastRelayoutAt: 0
     // 右侧一列：上两行翻页、下两行退格/回车，中间留空（绝对坐标，不用 Column）
@@ -91,8 +90,7 @@ Item {
         contentH = laid.contentH;
     }
 
-    // 绕过节流，立刻重排。给「选词」这类明确动作专用：
-    // 列表页本来就不会用来连续打字，没有合并的需要。
+    // 绕过节流，立刻重排。给「选词」这类明确动作专用：列表页本来就不会用来连续打字，没有合并的需要。
     function forceRelayout() {
         relayoutTailTimer.stop();
         candList.lastRelayoutAt = Date.now();
@@ -153,8 +151,7 @@ Item {
 
     width: parent ? parent.width : 0
     height: areaH
-    // 结构类变化（尺寸、开关）立刻重排：这些不是高频事件，
-    // 而且等着 debounce 会让面板在展开瞬间短暂空白。
+    // 结构类变化（尺寸、开关）立刻重排：这些不是高频事件，而且等着 debounce 会让面板在展开瞬间短暂空白。
     onControllerChanged: rebuildLayout()
     onWidthChanged: rebuildLayout()
     onUnitChanged: rebuildLayout()
@@ -182,11 +179,9 @@ Item {
     }
 
     Connections {
-        // candDataSeq 覆盖所有数据来源（真实推送 + 调试注入），
-        // candRevision 只有推送路径才会动
+        // candDataSeq 覆盖所有数据来源（真实推送 + 调试注入），candRevision 只有推送路径才会动
         function onCandDataSeqChanged() {
-            // 选词刚发生：列表页此时不会被用来连续打字，没有合并的需要，
-            // 直接立刻重排（绕过节流）。否则 addon 回包后还要再等一个
+            // 选词刚发生：列表页此时不会被用来连续打字，没有合并的需要，直接立刻重排（绕过节流）。否则 addon 回包后还要再等一个
             if (candList.controller && candList.controller.recentSelect)
                 candList.forceRelayout();
             else
@@ -240,7 +235,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 2
                         // 胶囊：圆角取自身高度的一半（和顶部候选条一致）
-                        radius: height / 2
+                        radius: Theme.fullRadius(width, height)
                         color: cellMouse.containsMouse ? Theme.withAlpha(Theme.primary, 0.18) : "transparent"
                     }
 
@@ -248,8 +243,7 @@ Item {
                         id: labelText
 
                         anchors.centerIn: parent
-                        // implicitWidth 带小数，取到它时 Text.width 是浮点，
-                        // 亚像素排版会把末尾字符判成放不下。两边 ceil 再各留 1px
+                        // implicitWidth 带小数，取到它时 Text.width 是浮点，亚像素排版会把末尾字符判成放不下。两边 ceil 再各留 1px
                         width: Math.min(Math.ceil(implicitWidth) + 1, Math.max(0, Math.ceil(cell.width - candList.unit * 2 / 3) + 2))
                         elide: Text.ElideRight
                         text: cell.modelData.t
@@ -306,7 +300,7 @@ Item {
             if (!candList.controller)
                 return "";
 
-            return candList.controller.candLoading ? candList.controller.tr("Loading…") : candList.controller.tr("No candidates");
+            return candList.controller.candLoading ? I18n.trFor("inlineKeyboard", "Loading…") : I18n.trFor("inlineKeyboard", "No candidates");
         }
         color: Theme.withAlpha(candList.controller ? candList.fgColor : Theme.surfaceText, 0.4)
         font.pixelSize: candList.candFontSize
@@ -330,8 +324,7 @@ Item {
             width: candList.colW
             // 固定高度（见 sideKeyH 的说明），不跟随候选行高
             height: candList.sideKeyH
-            // 圆角、底色、图标色都跟主键盘的特殊键一致（Tab / Enter 那种）：
-            // 这一列是键区的一部分，不该看起来像另一套控件。
+            // 圆角、底色、图标色都跟主键盘的特殊键一致（Tab / Enter 那种）：这一列是键区的一部分，不该看起来像另一套控件。
             radius: Math.min(Theme.cornerRadius, candList.sideKeyH * 0.16)
             color: Theme.surfaceContainerHighest
             opacity: press.pressed ? 0.72 : 1

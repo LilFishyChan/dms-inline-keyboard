@@ -1,4 +1,4 @@
-import "Motion.js" as Motion
+import "motion.js" as Motion
 // Inline Keyboard 的功能动作列表：4 行滚动网格 + 底部编辑按钮；
 // 编辑态下可拖动排序、拖到顶部快捷栏/右上角槽。
 import QtQuick
@@ -12,8 +12,7 @@ Item {
 
     // KeyboardCard 根：状态、函数、信号都从这里取
     property var controller: null
-    // 拖动时的自动滚动速度（px/帧，正数向下）。由拖动事件按「离边缘多近」算出，
-    // 做成常驻 Timer 而不是在手势回调里一次性挪 —— 手指停在边缘不动时也要继续滚。
+    // 拖动时的自动滚动速度（px/帧，正数向下）。由拖动事件按「离边缘多近」算出，做成常驻 Timer 而不是在手势回调里一次性挪 —— 手指停在边缘不动时也要继续滚。
     property real autoScrollSpeed: 0
     readonly property int autoScrollMaxSpeed: 18
     readonly property real rowH: controller.keyH
@@ -102,9 +101,9 @@ Item {
 
         StyledText {
             anchors.centerIn: parent
-            text: controller.tr("Hold and drag to customise")
+            text: I18n.trFor("inlineKeyboard", "Hold and drag to customise")
             color: Theme.withAlpha(controller.fg, 0.6)
-            font.pixelSize: Math.max(11, Math.round(controller.keyH * 0.26))
+            font.pixelSize: Math.max(Theme.fontSizeSmall, Math.round(controller.keyH * 0.26))
         }
 
         Behavior on opacity {
@@ -165,8 +164,7 @@ Item {
             id: fnGrid
 
             readonly property int count: (controller.availableActions || []).length
-            // 幽灵落在 count 格（只可能发生在从快捷栏拖进来时），且 count 是列数的整数倍时，
-            // 那一格在下一行，需要把网格撑高一行。
+            // 幽灵落在 count 格（只可能发生在从快捷栏拖进来时），且 count 是列数的整数倍时，那一格在下一行，需要把网格撑高一行。
             readonly property bool extraRow: controller.ghostAction !== null && count > 0 && functionsArea.ghostPlaceIndex >= count && count % Math.max(1, functionsArea.columns) === 0
 
             width: fnScroll.width
@@ -245,7 +243,7 @@ Item {
                     opacity: (isDragging ? 0 : 1) * (actState === "disabled" ? 0.5 : 1) * controller.keyOpacity
                     width: cellW
                     height: controller.keyH
-                    radius: height / 2
+                    radius: Theme.fullRadius(width, height)
                     // 激活态用和键帽「锁定」同一档：primary 实心 + onPrimary
                     color: actState === "active" ? Theme.primary : Theme.surfaceContainer
 
@@ -268,7 +266,7 @@ Item {
                         label: controller.tr(modelData.label)
                         color: actState === "active" ? Theme.onPrimary : Theme.surfaceText
                         iconSize: Math.round(controller.keyH * 0.42)
-                        pixelSize: Math.max(12, Math.round(controller.keyH * 0.29))
+                        pixelSize: Math.max(Theme.fontSizeSmall, Math.round(controller.keyH * 0.29))
                         dividerOpacity: actState === "active" ? 0.35 : 0.16
                         maxLabelWidth: Math.max(24, parent.width - sidePad * 2 - Math.round(controller.keyH * 0.42) * 2 - 1)
                     }
@@ -368,7 +366,7 @@ Item {
         anchors.margins: -7
         radius: Theme.cornerRadius
         color: "transparent"
-        border.width: 2
+        border.width: Theme.outlineWidthFocused
         border.color: Theme.primary
         z: 6
 
@@ -472,7 +470,7 @@ Item {
             // 宽 2 个单位，高 2/3 个键高
             width: controller.unit * 2 + controller.gap
             height: Math.round(controller.keyH * 2 / 3)
-            radius: height / 2
+            radius: Theme.fullRadius(width, height)
             // 和磁贴同一套填充（比磁贴深一档，读起来像「次级按钮」而不是另一个动作）
             color: Theme.surfaceContainerHigh
 

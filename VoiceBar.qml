@@ -13,15 +13,13 @@ Item {
     property var metrics: null
     property real dragOriginX: 0
     property real dragOriginY: 0
-    // 正在识别到的文字。vinput 录音时只 setPreedit、从不设候选，
-    // 所以这里读的是预编辑字符串。
+    // 正在识别到的文字。vinput 录音时只 setPreedit、从不设候选，所以这里读的是预编辑字符串。
     readonly property string text: (controller.fcitxPreedit || "")
     // 度量来源有两种：
     //   · 主键盘里 controller 是卡片，card 上直接有 keyH / pad / quickH
     readonly property var src: metrics ? metrics : controller
     readonly property real mkeyH: src && src.keyH ? src.keyH : 44
-    // 这一行的高度是 quickH（顶部动作栏那一行），不是底部把手的 handleH：
-    // 拿 handleH 算会小一圈（图标 16 vs 24，按钮 28 vs 41）。
+    // 这一行的高度是 quickH（顶部动作栏那一行），不是底部把手的 handleH：拿 handleH 算会小一圈（图标 16 vs 24，按钮 28 vs 41）。
     readonly property real mrowH: src && src.quickH ? Math.max(src.quickH, src.candH || 0) : 48
     readonly property real mpad: src && src.pad ? src.pad : 8
     // 和功能栏（QuickBar）保持一致：按钮就是整行高度，图标半行高
@@ -38,7 +36,7 @@ Item {
     // 不加的话这一行是透明的，在表情页 / 功能页上会透过分类条、列表看到重叠的内容。
     Rectangle {
         anchors.fill: parent
-        radius: height / 2
+        radius: Theme.fullRadius(width, height)
         color: Theme.withAlpha(Theme.surface, voiceBar.controller ? voiceBar.controller.bgOpacity : 1)
     }
 
@@ -51,13 +49,12 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: voiceBar.btn
         height: voiceBar.btn
-        radius: width / 2
+        radius: Theme.fullRadius(width, height)
         color: Theme.surfaceContainer
 
         DIcon {
             anchors.centerIn: parent
-            // 和调整大小面板的「铺满 / 收起」用同一对图标：
-            //   普通模式 → collapse_content（收成语音条）
+            // 和调整大小面板的「铺满 / 收起」用同一对图标：普通模式 → collapse_content（收成语音条）
             name: voiceBar.controller.voiceMinimal ? "expand_content" : "collapse_content"
             size: voiceBar.icon
             // 文字色，和这一行的其它文字一致
@@ -96,8 +93,7 @@ Item {
         anchors.rightMargin: voiceBar.sidePad
         clip: true
 
-        // 拖动只挂在中间这块：挂在 VoiceBar 根上会先抢事件，
-        // 两侧按钮的 MouseArea 就再也收不到点击了
+        // 拖动只挂在中间这块：挂在 VoiceBar 根上会先抢事件，两侧按钮的 MouseArea 就再也收不到点击了
         DragHandler {
             target: null
             onActiveChanged: {
@@ -120,8 +116,7 @@ Item {
         StyledText {
             id: label
 
-            // 和左边那个圆形按钮之间留一点空隙（textArea 的左 margin 在主键盘里是 0，
-            // 紧贴着按钮看起来像粘在一起）
+            // 和左边那个圆形按钮之间留一点空隙（textArea 的左 margin 在主键盘里是 0，紧贴着按钮看起来像粘在一起）
             readonly property real leadGap: Math.round(voiceBar.mkeyH * 0.35)
 
             anchors.verticalCenter: parent.verticalCenter
@@ -132,7 +127,7 @@ Item {
             wrapMode: Text.NoWrap
             text: voiceBar.text
             color: Theme.surfaceText
-            font.pixelSize: Math.max(12, Math.round(voiceBar.mkeyH * 0.3))
+            font.pixelSize: Math.max(Theme.fontSizeSmall, Math.round(voiceBar.mkeyH * 0.3))
             font.weight: Font.Medium
 
             // 点文字 = 关掉语音
@@ -164,7 +159,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: voiceBar.btn
         height: voiceBar.btn
-        radius: width / 2
+        radius: Theme.fullRadius(width, height)
         // 激活态用主色实心，和固定框同一套：底色 primary、图标 onPrimary
         color: voiceBar.controller.voiceActive ? Theme.primary : Theme.surfaceContainer
 

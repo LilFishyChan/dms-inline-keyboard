@@ -95,8 +95,7 @@ Item {
     }
     // Shift 下的替代键：Enter 在 Shift 激活时变 Del（显示和执行都换）
     readonly property bool hasShiftVariant: !!keyData.shift && upperMode
-    // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），
-    // 那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
+    // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
     readonly property string labelKey: (keyData.swap && useFn && keyData.fn && keyData.fn.l) ? keyData.fn.l : keyData.l
     readonly property var specialLook: (!hasShiftVariant && SpecialKeys.isSpecialKey(labelKey)) ? SpecialKeys.resolve(labelKey, root.specialKeyStyle, root.winKeyStyle, root.winKeyCustomIcon) : null
     readonly property string effectiveLabel: hasShiftVariant ? keyData.shift.l : mainLabel
@@ -205,7 +204,7 @@ Item {
                 color: root.topRatio === root.mainLabelRatio ? root.labelColor : root.minorLabelColor
                 // 长标签按可用宽度自动缩字号，一行不溢出
                 fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: 7
+                minimumPixelSize: Theme.fontSizeSmall
                 font.pixelSize: Math.round(root.keyH * root.topRatio)
                 font.weight: root.topRatio === root.mainLabelRatio ? Font.Medium : Font.Normal
             }
@@ -213,8 +212,7 @@ Item {
             // 图标键（表情 / 第二页 / 菜单）。icon 是图片路径时用 Image 渲染
             DIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
-                // 有文字标签时优先用文字：再叠一个图标会让 Column 变成两行，
-                // 文字被推到键帽顶部，看起来像"没有垂直居中"
+                // 有文字标签时优先用文字：再叠一个图标会让 Column 变成两行，文字被推到键帽顶部，看起来像"没有垂直居中"
                 visible: root.iconName !== "" && !root.iconIsImage && root.topLabel === "" && root.bottomLabel === ""
                 name: root.iconName
                 size: Math.round(root.keyH * (root.bigIcon ? root.bigIconRatio : root.iconRatio))
@@ -251,7 +249,7 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 // 长标签（Backspace / Caps Lock）自动缩到放得下
                 fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: 7
+                minimumPixelSize: Theme.fontSizeSmall
                 font.pixelSize: Math.round(root.keyH * root.bottomRatio)
                 font.weight: Font.Medium
             }

@@ -1,4 +1,4 @@
-import "Motion.js" as Motion
+import "motion.js" as Motion
 // 拖动中的跟手块：圆形主题色底 + 动作图标。
 // 必须是卡片的直接子项（不能放进列表里）：列表的 clip 会把它正好在最需要时裁掉。
 import QtQuick
@@ -14,7 +14,7 @@ Rectangle {
     z: 300
     width: root.controller.keyH
     height: root.controller.keyH
-    radius: width / 2
+    radius: Theme.fullRadius(width, height)
     color: Theme.withAlpha(Theme.primary, 0.92)
     x: root.controller.ghostX - width / 2
     y: root.controller.ghostY - height / 2

@@ -62,7 +62,7 @@ Item {
             width: parent.width
             keyH: root.controller.keyH
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
-            label: root.controller.tr("Background opacity")
+            label: I18n.trFor("inlineKeyboard", "Background opacity")
             value: root.controller.bgOpacity
             onMoved: (v) => {
                 root.controller.bgOpacity = v;
@@ -74,7 +74,7 @@ Item {
             width: parent.width
             keyH: root.controller.keyH
             textColor: Theme.withAlpha(root.controller.fg, 0.85)
-            label: root.controller.tr("Key opacity")
+            label: I18n.trFor("inlineKeyboard", "Key opacity")
             value: root.controller.keyOpacity
             onMoved: (v) => {
                 root.controller.keyOpacity = v;

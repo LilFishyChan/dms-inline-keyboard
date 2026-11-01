@@ -1,4 +1,4 @@
-import "Motion.js" as Motion
+import "motion.js" as Motion
 // Inline Keyboard 顶部快捷栏：左侧导航按钮、中间固定栏动作、右侧圆形动作槽。
 // 编辑态显示「松手后的样子」，但 Repeater 的 model 永远指向真实数组，所以「松手后的样子」要靠 plan 单独算。
 import QtQuick
@@ -11,8 +11,9 @@ Item {
 
     // KeyboardCard 根：状态、函数与信号的唯一来源
     property var controller: null
-    // 两端固定按钮是圆形，直径 = 行高
-    readonly property real btnW: controller.quickH
+    // 两端固定按钮是圆形，直径 = 这一行的实际高度。
+    // 顶栏高度是 max(quickH, candH)，用 quickH 会让按钮比动作块所在的框小一圈。
+    readonly property real btnW: quickBar.height > 0 ? quickBar.height : controller.quickH
     // 中间组：从左边固定按钮右沿到右边固定按钮左沿
     readonly property real midX: btnW + controller.gap
     readonly property real midW: Math.max(0, width - 2 * (btnW + controller.gap))
@@ -28,10 +29,9 @@ Item {
     readonly property real contentRight: slotCount > 0 ? slotGap + (slotCount - 1) * (slotW + slotGap) + slotW : 0
     readonly property real frameX: Math.max(0, slotGap - controller.gap)
     readonly property real frameW: slotCount > 0 ? Math.min(midW, contentRight - slotGap + 2 * controller.gap) : 0
-    // 动作块比槽位小一圈：上下左右各留几像素，免得贴住编辑态的边框
-    readonly property real cellH: Math.round(height * 0.84)
-    // 图标容器做成正圆：宽 = 高。slotW 是布局步长（间距），保持不变，
-    // 靠 slotX 的居中偏移把圆放进每一格。
+    // 动作块和左右两端的圆形按钮同高，三者在同一行上大小一致
+    readonly property real cellH: Math.round(quickBar.btnW)
+    // 图标容器做成正圆：宽 = 高。slotW 是布局步长（间距），保持不变，靠 slotX 的居中偏移把圆放进每一格。
     readonly property real cellW: cellH
 
     // 第 index 个槽位的左沿
@@ -123,17 +123,20 @@ Item {
 
     }
 
-    // 编辑态边框：按内部动作的范围画（第一个动作左沿 - gap 到最后一个动作右沿 + gap）
+    // 编辑态边框：按内部动作的范围画（第一个动作左沿 - gap 到最后一个动作右沿 + gap）。
+    // 高度就是按钮直径；描边整体向外扩一个线宽，画在框外，不占内容空间。
     Rectangle {
+        readonly property real strokeW: Theme.outlineWidthFocused
+
         opacity: (controller.editing && quickBar.slotCount > 0 ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
-        x: quickBar.midX + quickBar.frameX
-        y: 0
-        width: quickBar.frameW
-        height: quickBar.height
-        radius: quickBar.capRadius
+        x: quickBar.midX + quickBar.frameX - strokeW
+        y: -strokeW
+        width: quickBar.frameW + strokeW * 2
+        height: quickBar.btnW + strokeW * 2
+        radius: Theme.fullRadius(width, height)
         color: "transparent"
-        border.width: 2
+        border.width: strokeW
         border.color: Theme.primary
 
         Behavior on opacity {
@@ -176,9 +179,7 @@ Item {
         readonly property var plan: controller.barDropPlan
         // 固定栏 → 槽的交换预览：源格将换成槽里那个动作
         readonly property var swapAction: (controller.dragOverSlot && controller.dragFrom === "bar") ? controller.rightSlot : null
-        // x 手动同步：绑定在 plan 为 null 时会 fallback 到第 0 格，首帧会滑过来。
-        // settling 窗口吸收「出现那一帧」的绑定求值顺序问题。
-        // 不能回落到 x：syncX 会写 x，读 x 就成了绑定循环
+        // x 手动同步，settling 吸收首帧的求值顺序问题；fallback 不能读 x，否则成环
         property bool allowAnim: false
         property bool settling: false
         // 交换时 barDropPlan 也会给出 insertedAt（= 被抓项腾出的那一格）
@@ -202,7 +203,7 @@ Item {
 
         active: plan !== null || swapAction !== null
         action: swapAction !== null ? swapAction : controller.ghostAction
-        iconRatio: 0.6
+        iconRatio: 0.5
         z: 2
         y: (quickBar.height - quickBar.cellH) / 2
         width: quickBar.cellW
@@ -216,8 +217,7 @@ Item {
             settleTimer.restart();
             insertGhost.syncX(false);
         }
-        // 不看 active：它和 targetX 都是绑定，同一帧里可能是旧值，
-        // 那样 syncX 会被跳过，幽灵块停在上一格
+        // 不看 active：它和 targetX 都是绑定，同一帧里可能是旧值，那样 syncX 会被跳过，幽灵块停在上一格
         onTargetXChanged: insertGhost.syncX(!insertGhost.settling)
 
         // 手指在固定栏里持续移动时会给足时间；这段窗口只用来吸收
@@ -261,8 +261,7 @@ Item {
             readonly property bool isActive: actState === "active"
             // 当前不可用（比如浮动模式下「避让窗口」没意义）→ 和列表一样降透明度
             readonly property bool isDisabled: actState === "disabled"
-            // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，
-            // 不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，看着像抖一下。
+            // slotIndex = -1（预览里已被摘掉 / 会被挤出）时**保持原位**，不能钳到第 0 格：那样它先跳到最左边，落位时再从最左边滑回来，看着像抖一下。
             property real lastValidX: 0
             readonly property real cellX: slotIndex >= 0 ? quickBar.slotX(slotIndex) + (quickBar.slotW - quickBar.cellW) / 2 : lastValidX
 
@@ -275,7 +274,7 @@ Item {
             y: (quickBar.height - quickBar.cellH) / 2
             width: quickBar.cellW
             height: quickBar.cellH
-            radius: quickBar.cellH / 2
+            radius: Theme.fullRadius(width, quickBar.cellH)
             // 非编辑态普通动作不要底色（只图标）；编辑态给 surfaceContainer 方便拖；
             // 激活态和右侧动作槽统一：surfaceContainerHigh 底 + primary 图标。
             color: controller.editing ? Theme.surfaceContainer : (isActive ? Theme.surfaceContainerHigh : "transparent")
@@ -294,9 +293,8 @@ Item {
             ActionIcon {
                 anchors.centerIn: parent
                 action: modelData
-                size: Math.round(controller.quickH * 0.5)
-                // 编辑态下所有动作都按默认形态显示：那是在排布动作，
-                // 不是在看状态，染色只会干扰对「拖哪个」的判断。
+                size: Math.round(quickBar.btnW * 0.5)
+                // 编辑态下所有动作都按默认形态显示：那是在排布动作，不是在看状态，染色只会干扰对「拖哪个」的判断。
                 color: (!controller.editing && isActive) ? Theme.primary : Theme.surfaceText
             }
 
@@ -339,8 +337,7 @@ Item {
             }
 
             Behavior on opacity {
-                // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，
-                // 直接隐藏更干净。
+                // leaving 的项不等淡出：淡出会让人看着它在固定栏里慢慢消失，直接隐藏更干净。
                 enabled: !leaving && (controller ? controller.animateCells : true)
 
                 NumberAnimation {
@@ -424,7 +421,7 @@ Item {
             y: (quickBar.height - quickBar.btnW) / 2
             width: quickBar.btnW
             height: quickBar.btnW
-            radius: width / 2
+            radius: Theme.fullRadius(width, height)
             color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.surfaceContainerLow : Theme.surfaceContainer) : Theme.surfaceContainerHigh)
             // 动作槽在编辑态高亮描边，表示可以拖东西进来替换。
             // 非编辑态的激活态改用主色实心底，不需要描边
@@ -445,7 +442,7 @@ Item {
                 anchors.centerIn: parent
                 visible: index === 0
                 name: btnIcon
-                size: Math.round(controller.quickH * 0.5)
+                size: Math.round(quickBar.btnW * 0.5)
                 color: (isConfirm || slotActive) ? Theme.onPrimary : Theme.surfaceText
             }
 
@@ -457,7 +454,7 @@ Item {
                 // 透明度面板下这个位置固定是「取消」，不显示槽里的动作
                 visible: isSlot && controller.mode !== "transparency" && slotShow !== null
                 action: slotShow
-                size: Math.round(controller.quickH * 0.5)
+                size: Math.round(quickBar.btnW * 0.5)
                 // 编辑态下统一显示默认形态（见顶部动作块的同款说明）
                 color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : (slotState === "disabled" ? Theme.withAlpha(Theme.surfaceText, 0.4) : Theme.surfaceText))
             }
@@ -467,7 +464,7 @@ Item {
                 anchors.centerIn: parent
                 visible: isSlot && (controller.mode === "transparency" || slotShow === null)
                 name: controller.mode === "transparency" ? "close" : "add"
-                size: Math.round(controller.quickH * 0.5)
+                size: Math.round(quickBar.btnW * 0.5)
                 color: slotGhost ? Theme.primary : ((isConfirm || slotActive) ? Theme.onPrimary : Theme.surfaceText)
             }
 

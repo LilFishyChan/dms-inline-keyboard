@@ -2,7 +2,6 @@
 // 固定栏的插入位、列表的落点、被挤出到列表首位的动作，共用这一套样式。
 import QtQuick
 import qs.Common
-import qs.Widgets
 
 Rectangle {
     id: root
@@ -19,10 +18,10 @@ Rectangle {
 
     visible: active && action !== null
     opacity: action !== null ? 0.55 : 0
-    radius: height / 2
+    radius: Theme.fullRadius(width, height)
     // 比编辑态背景（surfaceContainerLow）亮一档，否则和背景完全同色、只剩一个淡框
     color: Theme.surface
-    border.width: 2
+    border.width: Theme.outlineWidthFocused
     border.color: Theme.primary
 
     ActionLabel {
@@ -34,9 +33,8 @@ Rectangle {
         label: root.label
         color: Theme.primary
         iconSize: root.iconSize
-        pixelSize: Math.max(12, Math.round(root.height * 0.29))
-        // 不给上限时 ActionLabel 用 implicitWidth，elide 又是 ElideNone，
-        // 名字一长就直接冲出幽灵块右边界。给宽后它自动切 HorizontalFit。
+        pixelSize: Math.max(Theme.fontSizeSmall, Math.round(root.height * 0.29))
+        // 不给上限时 ActionLabel 用 implicitWidth，elide 又是 ElideNone，名字一长就直接冲出幽灵块右边界。给宽后它自动切 HorizontalFit。
         maxLabelWidth: Math.max(24, root.width - Math.round(root.height * 0.34) * 2 - root.iconSize * 2 - 1)
         dividerOpacity: 0.45
     }
