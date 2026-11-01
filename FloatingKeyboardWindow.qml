@@ -87,7 +87,7 @@ PanelWindow {
     signal imSwitchRequested()
     signal imCycleRequested()
     signal selectCandidateRequested(int index)
-    signal imSelected(string name)
+    signal imSelected(string name, var ascii)
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
     signal keyboardClosed()
@@ -257,8 +257,8 @@ PanelWindow {
         onSelectCandidateRequested: (index) => {
             return root.selectCandidateRequested(index);
         }
-        onImSelected: (name) => {
-            return root.imSelected(name);
+        onImSelected: (name, ascii) => {
+            return root.imSelected(name, ascii);
         }
         onOrderChanged: (list) => {
             return root.orderChanged(list);

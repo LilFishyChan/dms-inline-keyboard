@@ -1137,12 +1137,15 @@ PluginComponent {
                 return root.handleQuick(action);
             }
             onImSwitchRequested: root.requestImSwitch()
+            onImSelected: (name, ascii) => {
+                if (ascii === null || ascii === undefined)
+                    root.selectIm(name);
+                else
+                    root.selectImMode(name, ascii);
+            }
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {
                 return root.selectCandidateByIndex(index);
-            }
-            onImSelected: (name) => {
-                return root.selectIm(name);
             }
             onKeyPressed: (keyData) => {
                 root.handleKey(keyData);
@@ -1239,12 +1242,15 @@ PluginComponent {
                 return root.handleQuick(action);
             }
             onImSwitchRequested: root.requestImSwitch()
+            onImSelected: (name, ascii) => {
+                if (ascii === null || ascii === undefined)
+                    root.selectIm(name);
+                else
+                    root.selectImMode(name, ascii);
+            }
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {
                 return root.selectCandidateByIndex(index);
-            }
-            onImSelected: (name) => {
-                return root.selectIm(name);
             }
             onKeyPressed: (keyData) => {
                 root.handleKey(keyData);

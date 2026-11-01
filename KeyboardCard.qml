@@ -148,6 +148,15 @@ Rectangle {
     property var imList: []
     // 给输入法面板用：带 text / current 的加工后列表（imList 是 fcitx 原始列表）
     property var imRows: []
+
+    // 长按选择器点了一行：分派规则和地球键单击一致（纯键盘布局直接切，拼音类要校正中英文）
+    function selectIm(name) {
+        root.imSelected(name, null);
+    }
+
+    function selectImMode(name, wantAscii) {
+        root.imSelected(name, wantAscii);
+    }
     readonly property var rows: {
         const base = Layout.pageRows(page);
         return root.escSwap ? root.swapEscTilde(base) : base;
@@ -328,7 +337,8 @@ Rectangle {
     // fcitx5 当前输入法
     signal imSwitchRequested()
     signal imCycleRequested()
-    signal imSelected(string name)
+    // ascii 为 null 表示纯键盘布局（没有中英文子模式），直接切输入法
+    signal imSelected(string name, var ascii)
     signal resizeCommitRequested()
     // 松手落盘时用：键盘尺寸变成新值后，卡片位置要补偿多少，才能让「拖的那条边」的对侧保持不动。拖动过程中不移动键盘。
     signal resizeOriginShift(real dx, real dy)

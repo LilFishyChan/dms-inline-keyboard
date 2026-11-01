@@ -9,34 +9,34 @@ import qs.Widgets
 Item {
     // 地球键循环和这个列表必须同一份数据（KeyboardCard.imRows，带 text / current）
 
-    id: root
+    id: picker
 
     property var controller: null
 
     anchors.fill: parent
     z: 100
     // 没有输入法列表时不该露出空面板（一片白色方块）
-    visible: root.controller.imPickerOpen && root.controller.imRows.length > 0
+    visible: picker.controller.imPickerOpen && picker.controller.imRows.length > 0
 
     // 点面板外关闭
     MouseArea {
         anchors.fill: parent
-        onClicked: root.controller.imPickerOpen = false
+        onClicked: picker.controller.imPickerOpen = false
     }
 
     // 下拉面板贴着右下角，在地球键上方
     Rectangle {
         id: panel
 
-        readonly property real padding: Math.round(root.controller.keyH * 0.14)
+        readonly property real padding: Math.round(picker.controller.keyH * 0.14)
 
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: Math.round(root.controller.gap * 1.5)
-        anchors.bottomMargin: Math.round(root.controller.keyH * 0.6)
+        anchors.rightMargin: Math.round(picker.controller.gap * 1.5)
+        anchors.bottomMargin: Math.round(picker.controller.keyH * 0.6)
         width: Math.min(parent.width * 0.52, Theme.dialogMaxWidth * 0.72)
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
-        height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
+        height: Math.max(Math.round(picker.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
         radius: Theme.cornerRadiusL
         color: Theme.floatingWindowSurface
         border.width: Theme.layerOutlineWidth
@@ -53,18 +53,22 @@ Item {
             anchors.fill: parent
             anchors.margins: panel.padding
             clip: true
-            model: root.controller.imRows
-            spacing: Math.round(root.controller.gap * 0.6)
+            model: picker.controller.imRows
+            spacing: Math.round(picker.controller.gap * 0.6)
 
             delegate: Rectangle {
                 id: rowItem
 
                 required property var modelData
 
+                // delegate 由 DListView 动态创建，信号处理器里拿不到外层的 id，
+                // 所以在绑定期先把它捞进来
+                property var ctrl: picker.controller
+
                 width: listView.width
-                height: Math.round(root.controller.keyH * 0.68)
+                height: Math.round(picker.controller.keyH * 0.68)
                 radius: Theme.cornerRadiusS
-                color: modelData.current ? Theme.selectedContainer : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, Alpha.Whisper) : "transparent")
+                color: modelData.current ? Theme.selectedContainer : (rowMouse.containsMouse ? Theme.withAlpha(picker.controller.fg, Alpha.Whisper) : "transparent")
 
                 // label 块：托盘上看到的那个字（万 / abc / en）
                 Rectangle {
@@ -73,15 +77,15 @@ Item {
                     width: Math.round(parent.height * 0.82)
                     height: width
                     anchors.left: parent.left
-                    anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
+                    anchors.leftMargin: Math.round(picker.controller.keyH * 0.12)
                     anchors.verticalCenter: parent.verticalCenter
                     radius: Math.round(width * 0.28)
-                    color: modelData.current ? Theme.accentOnSelectedContainer : Theme.withAlpha(root.controller.fg, Alpha.Ghost)
+                    color: modelData.current ? Theme.accentOnSelectedContainer : Theme.withAlpha(picker.controller.fg, Alpha.Ghost)
 
                     StyledText {
                         anchors.centerIn: parent
                         text: modelData.label
-                        color: modelData.current ? Theme.onPrimary : root.controller.fg
+                        color: modelData.current ? Theme.onPrimary : picker.controller.fg
                         font.pixelSize: Math.round(labelChip.height * 0.46)
                         font.weight: Font.DemiBold
                     }
@@ -97,7 +101,7 @@ Item {
                     width: Math.round(parent.height * 0.56)
                     height: width
                     anchors.left: labelChip.right
-                    anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
+                    anchors.leftMargin: Math.round(picker.controller.keyH * 0.12)
                     anchors.verticalCenter: parent.verticalCenter
                     fillMode: Image.PreserveAspectFit
                     smooth: true
@@ -106,14 +110,14 @@ Item {
                 // 「输入法 - 子模式名称」
                 StyledText {
                     anchors.left: rowIcon.visible ? rowIcon.right : labelChip.right
-                    anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
+                    anchors.leftMargin: Math.round(picker.controller.keyH * 0.12)
                     anchors.right: parent.right
-                    anchors.rightMargin: Math.round(root.controller.keyH * 0.1)
+                    anchors.rightMargin: Math.round(picker.controller.keyH * 0.1)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.text
                     elide: Text.ElideRight
-                    color: modelData.current ? Theme.primary : root.controller.fg
-                    font.pixelSize: Math.round(root.controller.keyH * 0.3)
+                    color: modelData.current ? Theme.primary : picker.controller.fg
+                    font.pixelSize: Math.round(picker.controller.keyH * 0.3)
                     font.weight: modelData.current ? Font.DemiBold : Font.Normal
                 }
 
@@ -122,7 +126,7 @@ Item {
                     id: rowRipple
 
                     anchors.fill: parent
-                    anchors.margins: Math.round(root.controller.gap * 0.4)
+                    anchors.margins: Math.round(picker.controller.gap * 0.4)
                     cornerRadius: Theme.cornerRadius
                     rippleColor: modelData.current ? Theme.onPrimary : Theme.primary
                 }
@@ -138,10 +142,10 @@ Item {
                     onClicked: {
                         // 纯键盘布局直接切；拼音类输入法走 selectImMode，它会在切换生效后再校正中英文状态
                         if (modelData.keyboard)
-                            root.controller.selectIm(modelData.name);
+                            rowItem.ctrl.selectIm(modelData.name);
                         else
-                            root.controller.selectImMode(modelData.name, modelData.ascii);
-                        root.controller.imPickerOpen = false;
+                            rowItem.ctrl.selectImMode(modelData.name, modelData.ascii);
+                        rowItem.ctrl.imPickerOpen = false;
                     }
                 }
 
