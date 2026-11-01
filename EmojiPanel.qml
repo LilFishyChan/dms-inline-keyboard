@@ -219,51 +219,39 @@ Item {
         }
 
         // 右：退格（长按连发）
-        Rectangle {
+        DActionButton {
             id: backspaceBtn
-            Accessible.role: Accessible.Button
-            Accessible.name: I18n.trFor("inlineKeyboard", "Backspace")
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            // 宽 1.5 倍键高，长按连发
             width: Math.round(actionRow.btnH * 1.5)
             height: actionRow.btnH
-            radius: Theme.fullRadius(width, height)
-            color: (bsTap.pressed || backRepeat.running) ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
+            buttonSize: height
+            iconName: "backspace"
+            iconSize: Math.round(height * 0.5)
+            iconColor: Theme.withAlpha(panel.controller.fg, Alpha.Bright)
+            backgroundColor: backRepeat.running ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
+            stateColor: Theme.primary
+            tooltipText: I18n.trFor("inlineKeyboard", "Backspace")
 
-            DIcon {
-                anchors.centerIn: parent
-                name: "backspace"
-                size: Math.round(parent.height * 0.5)
-                color: Theme.withAlpha(panel.controller.fg, Alpha.Bright)
+            property bool didRepeat: false
+
+            onPressed: {
+                didRepeat = false;
+                backDelay.start();
             }
-
-            DRipple {
-                id: bsRipple
-
-                anchors.fill: parent
-                cornerRadius: height / 2
+            onReleased: {
+                backDelay.stop();
+                backRepeat.stop();
             }
-
-            TapHandler {
-                id: bsTap
-
-                onPressedChanged: {
-                    if (pressed) {
-                        const p = bsTap.point ? bsTap.point.position : null;
-                        bsRipple.trigger(p && !isNaN(p.x) ? p.x : backspaceBtn.width / 2, p && !isNaN(p.y) ? p.y : backspaceBtn.height / 2);
-                        panel.didRepeat = false;
-                        backDelay.start();
-                    } else {
-                        backDelay.stop();
-                        backRepeat.stop();
-                    }
-                }
-                onTapped: {
-                    if (!panel.didRepeat)
-                        panel.sendBackspace();
-
-                }
+            onCanceled: {
+                backDelay.stop();
+                backRepeat.stop();
+            }
+            onClicked: {
+                if (!didRepeat)
+                    panel.sendBackspace();
             }
 
             // 按住 400ms 后开始连发，60ms 一次
@@ -272,7 +260,7 @@ Item {
 
                 interval: 400
                 onTriggered: {
-                    panel.didRepeat = true;
+                    backspaceBtn.didRepeat = true;
                     panel.sendBackspace();
                     backRepeat.start();
                 }

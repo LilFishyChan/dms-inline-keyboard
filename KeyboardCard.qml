@@ -1533,134 +1533,50 @@ Rectangle {
             z: 10
 
             // 铺满 / 不铺满（停靠态专用，浮窗没有这个概念）
-            Rectangle {
+            // 铺满 / 不铺满（停靠态专用，浮窗没有这个概念）
+            DActionButton {
                 visible: !root.isFloating
-                width: parent.btn
-                height: parent.btn
-                radius: Theme.fullRadius(width, height)
-                color: root.dockFill ? Theme.primary : Theme.chipSurface
+                buttonSize: parent.btn
+                iconName: root.dockFill ? "collapse_content" : "expand_content"
+                iconSize: Math.round(root.keyH * 0.42)
+                iconColor: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
+                backgroundColor: root.dockFill ? Theme.primary : Theme.chipSurface
+                stateColor: root.dockFill ? Theme.onPrimary : Theme.primary
 
-                DIcon {
-                    anchors.centerIn: parent
-                    name: root.dockFill ? "collapse_content" : "expand_content"
-                    size: Math.round(root.keyH * 0.42)
-                    color: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
-                }
-
-                DRipple {
-                    id: fillRipple
-
-                    anchors.fill: parent
-                    cornerRadius: width / 2
-                    rippleColor: root.dockFill ? Theme.onPrimary : Theme.primary
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onPressed: (mouse) => {
-                        return fillRipple.trigger(mouse.x, mouse.y);
-                    }
-                    onClicked: root.resizeFillToggleRequested()
-                }
-
+                onClicked: root.resizeFillToggleRequested()
             }
 
-            // 重置回名义尺寸
-            Rectangle {
-                width: parent.btn
-                height: parent.btn
-                radius: Theme.fullRadius(width, height)
-                color: Theme.chipSurface
+            DActionButton {
+                buttonSize: parent.btn
+                iconName: "restart_alt"
+                iconSize: Math.round(root.keyH * 0.42)
+                iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
+                backgroundColor: Theme.chipSurface
+                stateColor: Theme.withAlpha(root.fg, Alpha.Bright)
 
-                DIcon {
-                    anchors.centerIn: parent
-                    name: "restart_alt"
-                    size: Math.round(root.keyH * 0.42)
-                    color: Theme.withAlpha(root.fg, Alpha.Bright)
-                }
-
-                DRipple {
-                    id: resetRipple
-
-                    anchors.fill: parent
-                    cornerRadius: width / 2
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onPressed: (mouse) => {
-                        return resetRipple.trigger(mouse.x, mouse.y);
-                    }
-                    onClicked: root.resizeResetRequested()
-                }
-
+                onClicked: root.resizeResetRequested()
             }
 
-            // 取消：还原进入时的尺寸
-            Rectangle {
-                width: parent.btn
-                height: parent.btn
-                radius: Theme.fullRadius(width, height)
-                color: Theme.chipSurface
+            DActionButton {
+                buttonSize: parent.btn
+                iconName: "close"
+                iconSize: Math.round(root.keyH * 0.42)
+                iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
+                backgroundColor: Theme.chipSurface
+                stateColor: Theme.withAlpha(root.fg, Alpha.Bright)
 
-                DIcon {
-                    anchors.centerIn: parent
-                    name: "close"
-                    size: Math.round(root.keyH * 0.42)
-                    color: Theme.withAlpha(root.fg, Alpha.Bright)
-                }
-
-                DRipple {
-                    id: cancelRipple
-
-                    anchors.fill: parent
-                    cornerRadius: width / 2
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onPressed: (mouse) => {
-                        return cancelRipple.trigger(mouse.x, mouse.y);
-                    }
-                    onClicked: root.resizeCancelRequested()
-                }
-
+                onClicked: root.resizeCancelRequested()
             }
 
-            // 确定：关面板（尺寸松手时已经落盘）
-            Rectangle {
-                width: parent.btn
-                height: parent.btn
-                radius: Theme.fullRadius(width, height)
-                color: Theme.primary
+            DActionButton {
+                buttonSize: parent.btn
+                iconName: "check"
+                iconSize: Math.round(root.keyH * 0.42)
+                iconColor: Theme.onPrimary
+                backgroundColor: Theme.primary
+                stateColor: Theme.onPrimary
 
-                DIcon {
-                    anchors.centerIn: parent
-                    name: "check"
-                    size: Math.round(root.keyH * 0.42)
-                    color: Theme.onPrimary
-                }
-
-                DRipple {
-                    id: okRipple
-
-                    anchors.fill: parent
-                    cornerRadius: width / 2
-                    rippleColor: Theme.onPrimary
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onPressed: (mouse) => {
-                        return okRipple.trigger(mouse.x, mouse.y);
-                    }
-                    onClicked: root.resizeCloseRequested()
-                }
-
+                onClicked: root.resizeCloseRequested()
             }
 
         }

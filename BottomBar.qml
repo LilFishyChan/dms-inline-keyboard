@@ -20,11 +20,11 @@ Item {
     // 模拟使用流程：底部两个按钮（close = 关闭键盘 / lang = 地球键）
     function pointerTap(which) {
         if (which === "close") {
-            hideMouse.tapAt();
+            hideBtn.tapAt();
             return true;
         }
         if (which === "lang") {
-            langMouse.tapAt();
+            langBtn.tapAt();
             return true;
         }
         return false;
@@ -35,49 +35,25 @@ Item {
     visible: controller.showHandle
 
     // 左端：收起。圆形触控区，背景透明、图标用正文色，和底部整行的观感一致（不额外压一个色块）。
-    Rectangle {
+    DActionButton {
         id: hideBtn
 
         anchors.left: parent.left
         anchors.leftMargin: controller.pad
         anchors.verticalCenter: parent.verticalCenter
-        width: handleBar.endBtn
-        height: handleBar.endBtn
-        radius: Theme.fullRadius(width, height)
-        color: "transparent"
+        buttonSize: handleBar.endBtn
+        iconName: "expand_more"
+        iconSize: handleBar.endIcon
+        iconColor: controller.fg
+        backgroundColor: "transparent"
+        stateColor: controller.fg
+        tooltipText: I18n.trFor("inlineKeyboard", "Collapse keyboard")
 
-        DIcon {
-            anchors.centerIn: parent
-            name: "expand_more"
-            size: handleBar.endIcon
-            color: controller.fg
+        function tapAt() {
+            controller.quickAction("close");
         }
 
-        DRipple {
-            id: hideRipple
-
-            anchors.fill: parent
-            cornerRadius: width / 2
-        }
-
-        MouseArea {
-            Accessible.role: Accessible.Button
-            Accessible.name: I18n.trFor("inlineKeyboard", "Collapse keyboard")
-            id: hideMouse
-
-            function tapAt() {
-                controller.quickAction("close");
-            }
-
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onPressed: (mouse) => {
-                return hideRipple.trigger(mouse.x, mouse.y);
-            }
-            onClicked: tapAt()
-        }
-
+        onClicked: tapAt()
     }
 
     // 中间：拖动把手（仅浮动模式）
@@ -115,56 +91,53 @@ Item {
     }
 
     // 右端：地球 —— 点击切换输入法。样式同左端。
-    Rectangle {
+    DActionButton {
         id: langBtn
 
         anchors.right: parent.right
         anchors.rightMargin: controller.pad
         anchors.verticalCenter: parent.verticalCenter
-        width: handleBar.endBtn
-        height: handleBar.endBtn
-        radius: Theme.fullRadius(width, height)
-        color: "transparent"
+        buttonSize: handleBar.endBtn
+        iconName: "language"
+        iconSize: handleBar.endIcon
+        iconColor: controller.fg
+        backgroundColor: "transparent"
+        stateColor: controller.fg
+        tooltipText: I18n.trFor("inlineKeyboard", "Cycle input method")
 
-        DIcon {
-            anchors.centerIn: parent
-            name: "language"
-            size: handleBar.endIcon
-            color: controller.fg
+        // 长按开选择器，短按循环切换；按钮自己不带长按，按住计时器判定
+        property bool longFired: false
+
+        // 单击逻辑抽成函数：模拟点击和手指点走同一份
+        function tapAt() {
+            controller.imListRequested();
+            controller.imCycleRequested();
         }
 
-        DRipple {
-            id: langRipple
-
-            anchors.fill: parent
-            cornerRadius: width / 2
+        onPressed: {
+            longFired = false;
+            holdTimer.restart();
+        }
+        onReleased: holdTimer.stop()
+        onCanceled: {
+            holdTimer.stop();
+            longFired = false;
+        }
+        onClicked: {
+            if (!longFired)
+                tapAt();
         }
 
-        MouseArea {
-            Accessible.role: Accessible.Button
-            Accessible.name: I18n.trFor("inlineKeyboard", "Expand keyboard")
-            id: langMouse
+        Timer {
+            id: holdTimer
 
-            // 单击逻辑抽成函数：模拟点击和手指点走同一份
-            function tapAt() {
-                controller.imListRequested();
-                controller.imCycleRequested();
-            }
-
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onPressed: (mouse) => {
-                return langRipple.trigger(mouse.x, mouse.y);
-            }
-            // 单击：在本列表里循环切到下一项（含 rime 中英文态）
-            onClicked: tapAt()
-            onPressAndHold: {
+            interval: 500
+            onTriggered: {
+                langBtn.longFired = true;
                 controller.imListRequested();
                 controller.imPickerOpen = true;
             }
         }
-
     }
 
 }

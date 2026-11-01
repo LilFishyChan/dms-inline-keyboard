@@ -237,59 +237,24 @@ Item {
             width: candArea.trailW
             height: candArea.areaH
 
-            Rectangle {
+            DActionButton {
                 id: expandButton
 
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.round(candArea.controller.quickH)
-                height: width
-                radius: Theme.fullRadius(width, height)
-                // 和 QuickBar 右侧固定框同一个底色
-                color: Theme.chipSurface
+                buttonSize: Math.round(candArea.controller.quickH)
+                // 展开态直接换图标，不走旋转（DActionButton 的 rotation 会连底色一起转）
+                iconName: candArea.controller.candListOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"
+                iconSize: Math.round(candArea.controller.quickH * 0.5)
+                iconColor: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
+                backgroundColor: Theme.chipSurface
+                stateColor: Theme.primary
 
-                DRipple {
-                    id: expandRipple
-
-                    anchors.fill: parent
-                    cornerRadius: parent.height / 2
+                function tapAt() {
+                    candArea.controller.toggleCandList();
                 }
 
-                DIcon {
-                    anchors.centerIn: parent
-                    name: "keyboard_arrow_down"
-                    size: Math.round(candArea.controller.quickH * 0.5)
-                    // 展开时图标跟着变主色，和键盘其它激活态一致
-                    color: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
-                    // 展开状态下转 180°，变成「收起」
-                    rotation: candArea.controller.candListOpen ? 180 : 0
-
-                    Behavior on rotation {
-                        enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
-
-                        NumberAnimation {
-                            duration: Motion.expand
-                            easing.type: Easing.OutCubic
-                        }
-
-                    }
-
-                }
-
-                MouseArea {
-                    id: expandMouse
-
-                    function tapAt() {
-                        candArea.controller.toggleCandList();
-                    }
-
-                    anchors.fill: parent
-                    onClicked: tapAt()
-                    onPressed: (mouse) => {
-                        return expandRipple.trigger(mouse.x, mouse.y);
-                    }
-                }
-
+                onClicked: tapAt()
             }
 
         }

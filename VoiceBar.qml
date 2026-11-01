@@ -42,45 +42,22 @@ Item {
     }
 
     // 左：向下箭头 → 小模式
-    Rectangle {
+    DActionButton {
         id: collapseBtn
 
         anchors.left: parent.left
         anchors.leftMargin: voiceBar.sidePad
         anchors.verticalCenter: parent.verticalCenter
-        width: voiceBar.btn
-        height: voiceBar.btn
-        radius: Theme.fullRadius(width, height)
-        color: Theme.chipSurface
+        buttonSize: voiceBar.btn
+        // 和调整大小面板的「铺满 / 收起」用同一对图标
+        iconName: voiceBar.controller.voiceMinimal ? "expand_content" : "collapse_content"
+        iconSize: voiceBar.icon
+        iconColor: Theme.surfaceText
+        backgroundColor: Theme.chipSurface
+        stateColor: Theme.surfaceText
+        tooltipText: I18n.trFor("inlineKeyboard", "Voice input")
 
-        DIcon {
-            anchors.centerIn: parent
-            // 和调整大小面板的「铺满 / 收起」用同一对图标：普通模式 → collapse_content（收成语音条）
-            name: voiceBar.controller.voiceMinimal ? "expand_content" : "collapse_content"
-            size: voiceBar.icon
-            // 文字色，和这一行的其它文字一致
-            color: Theme.surfaceText
-        }
-
-        DRipple {
-            id: collapseRipple
-
-            anchors.fill: parent
-            cornerRadius: width / 2
-        }
-
-        MouseArea {
-            Accessible.role: Accessible.Button
-            Accessible.name: I18n.trFor("inlineKeyboard", "Voice input")
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onPressed: (mouse) => {
-                return collapseRipple.trigger(mouse.x, mouse.y);
-            }
-            onClicked: voiceBar.controller.voiceMinimalRequested()
-        }
-
+        onClicked: voiceBar.controller.voiceMinimalRequested()
     }
 
     // 中：识别文字
@@ -154,46 +131,22 @@ Item {
     }
 
     // 右：麦克风
-    Rectangle {
+    DActionButton {
         id: micBtn
 
         anchors.right: parent.right
         anchors.rightMargin: voiceBar.sidePad
         anchors.verticalCenter: parent.verticalCenter
-        width: voiceBar.btn
-        height: voiceBar.btn
-        radius: Theme.fullRadius(width, height)
-        // 激活态用主色实心，和固定框同一套：底色 primary、图标 onPrimary
-        color: voiceBar.controller.voiceActive ? Theme.primary : Theme.chipSurface
+        buttonSize: voiceBar.btn
+        iconName: "mic"
+        iconSize: voiceBar.icon
+        iconColor: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, Alpha.Strong)
+        // 激活态用主色实心，和固定框同一套
+        backgroundColor: voiceBar.controller.voiceActive ? Theme.primary : Theme.chipSurface
+        stateColor: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.surfaceText
+        tooltipText: I18n.trFor("inlineKeyboard", "Pause recording")
 
-        DIcon {
-            anchors.centerIn: parent
-            name: "mic"
-            size: voiceBar.icon
-            // 激活态图标转 onPrimary；未激活用正文色
-            //（不能写 controller.fg —— 胶囊窗口里 controller 是 daemon，没有 fg），所以直接用 Theme。
-            color: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.withAlpha(Theme.surfaceText, Alpha.Strong)
-        }
-
-        DRipple {
-            id: micRipple
-
-            anchors.fill: parent
-            cornerRadius: width / 2
-        }
-
-        MouseArea {
-            Accessible.role: Accessible.Button
-            Accessible.name: I18n.trFor("inlineKeyboard", "Pause recording")
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onPressed: (mouse) => {
-                return micRipple.trigger(mouse.x, mouse.y);
-            }
-            onClicked: voiceBar.controller.voiceMicRequested()
-        }
-
+        onClicked: voiceBar.controller.voiceMicRequested()
     }
 
 }
