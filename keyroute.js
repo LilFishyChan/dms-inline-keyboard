@@ -8,8 +8,10 @@ var DIGIT = /^[0-9]$/
 
 // 会产生文本、且输入法参与才有意义的键
 function producesText(sym, kind, state) {
+    // 有预编辑时空格交给输入法上屏；没有时输入法只会把它吞掉
+    // （socket 注入的键转发不回焦点应用），必须发真键
     if (sym === "space")
-        return true
+        return !!state.preedit
     // 有预编辑时的 Backspace / Enter 要交给输入法删字、上屏
     if (state.preedit && (sym === "Backspace" || sym === "Enter"))
         return true

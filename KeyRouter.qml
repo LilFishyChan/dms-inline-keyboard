@@ -190,16 +190,16 @@ Item {
             return ;
         }
         if (k === "space")
-            injectKey(57, "space");
+            injectKey(57, "space", k);
         else
-            injectKey(keyData.c, keyData.l, keyData.k);
+            injectKey(keyData.c, keyData.l, keyData.k, keyData.shifted === true);
         // 一次性修饰键用完复位（锁定态保留）
         clearTransientModifiers();
     }
 
     // 注入一个键：修饰键状态包成按下/松开序列，一次 ydotool 调用发完。
     // sym 是布局里的键名（"a" / "Backspace" / "Enter"…），用于走 socket 直通。
-    function injectKey(code, sym, kind) {
+    function injectKey(code, sym, kind, shifted) {
         if (!code)
             return ;
 
@@ -216,8 +216,9 @@ Item {
                 "isAsciiMode": b ? b.isAsciiMode : false,
                 "combo": hasComboModifier
             });
+            // sym 本身已经是移位后的符号时不能再叠 Shift，否则 / → ? 会变成 ? 再移位
             if (route === KeyRoute.ROUTE.fcitx)
-                mods = shiftState ? 1 : 0;
+                mods = (shiftState && !shifted) ? 1 : 0;
 
         }
         // 测试用：只记下要发什么，不真的往系统发

@@ -28,6 +28,8 @@ Item {
     property real keyOpacity: 1
     // 字母是否大写：shift 激活 / caps 锁定时为 true（默认小写）
     property bool upperMode: false
+    // 只表示 Shift 按下（不含 Caps）：符号键的 Shift 变体只跟着 Shift 走
+    property bool shiftActive: false
     // 特殊键（Backspace / Enter / Shift…）画成图标、缩写还是完整名字。
     // 由设置页选，取值见 layouts/special-keys.js 的 STYLES。
     property string specialKeyStyle: "full"
@@ -99,7 +101,15 @@ Item {
     // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
     readonly property string labelKey: (keyData.swap && useFn && keyData.fn && keyData.fn.l) ? keyData.fn.l : keyData.l
     readonly property var specialLook: (!hasShiftVariant && SpecialKeys.isSpecialKey(labelKey)) ? SpecialKeys.resolve(labelKey, root.specialKeyStyle, root.winKeyStyle, root.winKeyCustomIcon) : null
-    readonly property string effectiveLabel: hasShiftVariant ? keyData.shift.l : mainLabel
+    readonly property string effectiveLabel: {
+        if (hasShiftVariant)
+            return keyData.shift.l;
+        // 符号键的 Shift 变体（/ → ?）要直接发移位后的符号，交给输入法的键补不回 Shift
+        if (hasShiftPair && shiftActive)
+            return pairData.s;
+
+        return mainLabel;
+    }
     // 真正要注入的键码：Fn 层的键（F1-F12）和 Shift 变体（Enter→Del）都在这儿定
     readonly property int effectiveCode: {
         if (hasShiftVariant && keyData.shift && keyData.shift.c)
@@ -116,7 +126,9 @@ Item {
         "l": effectiveLabel,
         "c": effectiveCode,
         "w": keyData.w,
-        "to": keyData.to
+        "to": keyData.to,
+        // 标签已经是移位后的符号，注入时不能再叠 Shift
+        "shifted": hasShiftPair && shiftActive
     })
     // 底行右三个图标键（菜单/表情/第二页）图标放大
     readonly property bool bigIcon: keyData.big === true

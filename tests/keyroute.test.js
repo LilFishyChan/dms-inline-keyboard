@@ -23,8 +23,15 @@ test("keyroute: 数字交给合成器（rime 会当候选序号）", () => {
     }
 });
 
-test("keyroute: 空格交给输入法（负责上屏候选）", () => {
-    assert.equal(decideRoute("space", "space", zh), ROUTE.fcitx);
+test("keyroute: 空格有预编辑时交给输入法上屏", () => {
+    assert.equal(decideRoute("space", "space", withPreedit), ROUTE.fcitx);
+    assert.equal(decideRoute("space", undefined, withPreedit), ROUTE.fcitx);
+});
+
+test("keyroute: 空格没有预编辑时必须发真键", () => {
+    // socket 注入的键输入法转发不回焦点应用，喂给它只会被吞掉 —— 空格会丢失
+    assert.equal(decideRoute("space", "space", zh), ROUTE.ydotool);
+    assert.equal(decideRoute("space", undefined, zh), ROUTE.ydotool);
 });
 
 test("keyroute: 无预编辑时的回车/退格必须发真键", () => {
