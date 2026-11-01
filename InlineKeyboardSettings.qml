@@ -167,7 +167,7 @@ PluginSettings {
     property bool settingsReady: false
     // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
     Component.onCompleted: {
-        daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
+        daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
         daemonCheck.running = true;
         Qt.callLater(function() {
             root.settingsReady = true;
@@ -196,7 +196,7 @@ PluginSettings {
         onExited: (code) => {
             if (code !== 0)
                 ToastService.showError(I18n.trFor("inlineKeyboard", "Could not start ydotoold"));
-            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
+            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
             daemonCheck.running = true;
         }
     }
@@ -209,7 +209,7 @@ PluginSettings {
         onExited: (code) => {
             if (code !== 0)
                 ToastService.showError(I18n.trFor("inlineKeyboard", "Could not enable ydotoold"));
-            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket"'];
+            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
             daemonCheck.running = true;
         }
     }

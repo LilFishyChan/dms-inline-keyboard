@@ -155,7 +155,7 @@ Item {
                         Behavior on animW {
                             enabled: controller ? controller.animationsEnabled : true
                             NumberAnimation {
-                                duration: capsule.snapping ? 0 : Motion.shift
+                                duration: capsule.snapping ? 0 : Motion.dur(Motion.shift)
                                 easing.type: Easing.OutCubic
                             }
 
@@ -164,7 +164,7 @@ Item {
                         Behavior on animH {
                             enabled: controller ? controller.animationsEnabled : true
                             NumberAnimation {
-                                duration: capsule.snapping ? 0 : Motion.shift
+                                duration: capsule.snapping ? 0 : Motion.dur(Motion.shift)
                                 easing.type: Easing.OutCubic
                             }
 
@@ -292,7 +292,7 @@ Item {
         enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
         NumberAnimation {
-            duration: Motion.panel
+            duration: Motion.dur(Motion.panel)
             easing.type: Easing.OutCubic
         }
 

@@ -6,6 +6,8 @@ import Quickshell.Io
 import "data.js" as Data
 import "keyroute.js" as KeyRoute
 import "modifiers.js" as Modifiers
+import qs.Services
+import qs.Common
 
 Item {
     id: router
@@ -255,10 +257,10 @@ Item {
             return ;
         // 长按重复时每 60ms 一次，没有节流会刷满屏幕
         const now = Date.now();
-        if (now - root.lastToastAt < 3000)
+        if (now - router.lastToastAt < 3000)
             return ;
 
-        root.lastToastAt = now;
+        router.lastToastAt = now;
 
         // label 通常是「X is not implemented yet」的前半句，但 ydotool 那条本身就是整句
         const term = label === "ydotoold is not running" ? label : label + " is not implemented yet";
@@ -290,7 +292,8 @@ Item {
     }
 
     function probeYdotoold() {
-        ydotooldProbe.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "$XDG_RUNTIME_DIR/.ydotool_socket" && echo up || echo down'];
+        // 有的发行版把 ydotoold 跑成系统服务，socket 不在 XDG_RUNTIME_DIR 下
+        ydotooldProbe.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}" && echo up || echo down'];
         ydotooldProbe.running = true;
     }
 

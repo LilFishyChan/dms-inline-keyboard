@@ -387,7 +387,7 @@ Item {
                 enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                 NumberAnimation {
-                    duration: Motion.quick
+                    duration: Motion.dur(Motion.quick)
                     easing.type: Easing.OutCubic
                 }
 

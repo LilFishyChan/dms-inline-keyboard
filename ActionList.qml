@@ -111,7 +111,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -134,7 +134,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -324,7 +324,7 @@ Item {
                         enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                         NumberAnimation {
-                            duration: Motion.listShift
+                            duration: Motion.dur(Motion.listShift)
                             easing.type: Easing.OutCubic
                         }
 
@@ -334,7 +334,7 @@ Item {
                         enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                         NumberAnimation {
-                            duration: Motion.listShift
+                            duration: Motion.dur(Motion.listShift)
                             easing.type: Easing.OutCubic
                         }
 
@@ -350,7 +350,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.panel
+                duration: Motion.dur(Motion.panel)
                 easing.type: Easing.OutCubic
             }
 
@@ -377,7 +377,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -398,7 +398,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.panel
+                duration: Motion.dur(Motion.panel)
                 easing.type: Easing.OutCubic
             }
 
@@ -431,7 +431,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.panel
+                duration: Motion.dur(Motion.panel)
                 easing.type: Easing.OutCubic
             }
 
@@ -509,7 +509,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.ghost
+                duration: Motion.dur(Motion.ghost)
                 easing.type: Easing.OutCubic
             }
 

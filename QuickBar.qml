@@ -94,7 +94,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -105,7 +105,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.shift
+                duration: Motion.dur(Motion.shift)
                 easing.type: Easing.OutCubic
             }
 
@@ -115,7 +115,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.shift
+                duration: Motion.dur(Motion.shift)
                 easing.type: Easing.OutCubic
             }
 
@@ -143,7 +143,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -153,7 +153,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.shift
+                duration: Motion.dur(Motion.shift)
                 easing.type: Easing.OutCubic
             }
 
@@ -163,7 +163,7 @@ Item {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
             NumberAnimation {
-                duration: Motion.shift
+                duration: Motion.dur(Motion.shift)
                 easing.type: Easing.OutCubic
             }
 
@@ -233,7 +233,7 @@ Item {
             enabled: insertGhost.allowAnim && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
             NumberAnimation {
-                duration: Motion.shift
+                duration: Motion.dur(Motion.shift)
                 easing.type: Easing.OutCubic
             }
 
@@ -332,7 +332,7 @@ Item {
                 enabled: slotIndex >= 0 && !leaving && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
                 NumberAnimation {
-                    duration: Motion.shift
+                    duration: Motion.dur(Motion.shift)
                     easing.type: Easing.OutCubic
                 }
 
@@ -343,7 +343,7 @@ Item {
                 enabled: !leaving && (controller ? (controller.animateCells && controller.animationsEnabled) : true)
 
                 NumberAnimation {
-                    duration: Motion.fade
+                    duration: Motion.dur(Motion.fade)
                     easing.type: Easing.OutCubic
                 }
 
@@ -522,7 +522,7 @@ Item {
                 enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
                 NumberAnimation {
-                    duration: Motion.micro
+                    duration: Motion.dur(Motion.micro)
                     easing.type: Easing.OutCubic
                 }
 

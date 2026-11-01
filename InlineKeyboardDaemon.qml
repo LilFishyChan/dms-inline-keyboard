@@ -767,8 +767,6 @@ PluginComponent {
 
         root.open = true;
         PluginService.setGlobalVar(root.pluginId, "open", true);
-        // 打开瞬间先取一次输入法状态，不用等定时器
-        root.refreshImState();
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
         if (restoreLastMode !== false) {
@@ -839,10 +837,6 @@ PluginComponent {
         root.cycleIm();
     }
 
-    // 输入法清单由 addon 在键盘打开时主动推（imlist: 消息），这里不需要主动拉。
-    function requestImList() {
-    }
-
     // 切中英走 rime 的 D-Bus：键盘窗口持焦点时 ydotool 发的 Shift 落不到输入框
     function setImAscii(want) {
         root.runCommand(["busctl", "--user", "call", "org.fcitx.Fcitx5", "/rime", "org.fcitx.Fcitx.Rime1", "SetAsciiMode", "b", want ? "true" : "false"]);
@@ -866,10 +860,8 @@ PluginComponent {
     function cycleIm() {
         // 下标计算在 data.js 的 nextImRow：current 标错会让地球键原地打转，那条逻辑有单测（连续点一圈必须回到起点）。
         const next = Data.nextImRow(root.imRows);
-        if (next === null) {
-            root.requestImList();
+        if (next === null)
             return ;
-        }
         // 先把目标项的图标挂上去，别等 D-Bus 往返
         root.optimisticTo(next);
         if (next.keyboard)
@@ -910,11 +902,6 @@ PluginComponent {
         }));
         // 用 Controller1.SetCurrentIM（同 fcitx5-remote -s）：addon 里调 API 会被 ABORT
         root.runCommand(["busctl", "--user", "call", "org.fcitx.Fcitx5", "/controller", "org.fcitx.Fcitx.Controller1", "SetCurrentIM", "s", name]);
-    }
-
-    // 输入法名字/图标由 addon 主动推（state: 消息），不需要主动刷新。
-    // 保留空实现：几个调用点（窗口显示时）不用改。
-    function refreshImState() {
     }
 
     // 窗口自己收起时（点收起键 / 动作里的 close）同步全局状态
@@ -1155,7 +1142,6 @@ PluginComponent {
                 return root.handleQuick(action);
             }
             onImSwitchRequested: root.requestImSwitch()
-            onImListRequested: root.requestImList()
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {
                 return root.selectCandidateByIndex(index);
@@ -1258,7 +1244,6 @@ PluginComponent {
                 return root.handleQuick(action);
             }
             onImSwitchRequested: root.requestImSwitch()
-            onImListRequested: root.requestImList()
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {
                 return root.selectCandidateByIndex(index);

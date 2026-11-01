@@ -30,7 +30,7 @@ Rectangle {
         enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
 
         NumberAnimation {
-            duration: Motion.ghost
+            duration: Motion.dur(Motion.ghost)
             easing.type: Easing.OutCubic
         }
 

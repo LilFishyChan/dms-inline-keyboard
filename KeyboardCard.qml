@@ -969,7 +969,7 @@ Rectangle {
             enabled: root.animateCells && root.animationsEnabled
 
             NumberAnimation {
-                duration: Motion.expand
+                duration: Motion.dur(Motion.expand)
                 easing.type: Easing.OutCubic
             }
 
@@ -1008,7 +1008,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1031,7 +1031,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1062,7 +1062,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1102,7 +1102,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1135,7 +1135,7 @@ Rectangle {
                     Behavior on opacity {
                         enabled: root.animationsEnabled
                         NumberAnimation {
-                            duration: Motion.panel
+                            duration: Motion.dur(Motion.panel)
                             easing.type: Easing.OutCubic
                         }
 
@@ -1176,7 +1176,7 @@ Rectangle {
                         target: keyWrapper
                         property: "pageFade"
                         to: 1
-                        duration: Motion.fade
+                        duration: Motion.dur(Motion.fade)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1184,7 +1184,7 @@ Rectangle {
                         target: keyWrapper
                         property: "pageShift"
                         to: 0
-                        duration: Motion.fade
+                        duration: Motion.dur(Motion.fade)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1225,7 +1225,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1247,7 +1247,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1269,7 +1269,7 @@ Rectangle {
                 Behavior on opacity {
                     enabled: root.animationsEnabled
                     NumberAnimation {
-                        duration: Motion.panel
+                        duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
                     }
 
@@ -1575,7 +1575,7 @@ Rectangle {
         Behavior on opacity {
             enabled: root.animationsEnabled
             NumberAnimation {
-                duration: Motion.panel
+                duration: Motion.dur(Motion.panel)
                 easing.type: Easing.OutCubic
             }
 
@@ -1586,7 +1586,7 @@ Rectangle {
     Behavior on opacity {
         enabled: root.animationsEnabled
         NumberAnimation {
-            duration: Motion.fade
+            duration: Motion.dur(Motion.fade)
             easing.type: Easing.OutCubic
         }
 
