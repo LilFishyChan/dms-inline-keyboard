@@ -229,3 +229,5 @@ Walk the matching block whenever you touch neighbouring code:
 One line per release.
 
 - **0.1.5** — Enter / Backspace / F1 / arrows now injected as real keys (`key sent` stays flat in the addon log); candidate rows distribute spare width instead of averaging (`fits=ok`, no truncation); page key moved onto the modifier state machine; candidate panel switched to `DListView`; quick-bar ghost `targetX` binding loop removed
+- **0.1.6** — Touch layout tuned for small keyboards (key labels no longer elided), input-method label centred on the space bar, Shift + symbol now forwards the shifted character, space without preedit falls back to a real key
+- **0.1.7** — Translations actually apply (the `qs.DCommon.Common` `I18n` shadowing was removed); animation follows the DMS speed setting; surfaces, alpha and spacing moved onto theme tokens; debug confirm dialog runs in a `DModal`; long-press picker, clipboard and ydotoold probes hardened

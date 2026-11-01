@@ -147,7 +147,7 @@ clone 出来的目录名必须等于插件 id（`inlineKeyboard`）。
 | `layouts/phone.js` | 布局数据：行、单位、键位表、功能键页 |
 | `layouts/emoji.js` | **生成物**：表情分组（Unicode 16）+ 符号分组 |
 | `tools/gen-emoji.py` | 从 Unicode 的 `emoji-test.txt` 重新生成 `layouts/emoji.js` |
-| `scripts/` | 早期留下的辅助脚本，给托盘图标和输入法清单兜底用 |
+| `scripts/` | 验收工具：`acceptance.py` 与它的 `sections/` 分块、addon 探针、单元测试 |
 | `translations/` | 各语言字符串（`zh_CN.json`）；源串始终是英文 |
 | `icons/` | 手绘 SVG（「浮动」图标） |
 | `docs/` | 协议笔记与布局/几何规则；中文版是 `*.zh-CN.md` |
@@ -269,18 +269,17 @@ keycode，所以这是唯一可行的路径。没装 addon 时字符改为复制
 辅助函数）。译文放在 `translations/<locale>.json`：
 
 ```json
-{ "Inline Keyboard": { "Appearance": "外观" } }
+{ "Appearance": { "Appearance": "外观" } }
 ```
 
 译文由 `PluginService` **在插件 QML 构造之后异步**注册，而且只在 `I18n.onLocaleApplied`
 时（即 DMS 启动时）生效：
 
 - 加/改译文后要重启 shell —— `dms ipc call plugins reload` 不会重新加载译文。
-- 绑定里直接写 `I18n.trFor(...)` 只求值一次，那时表还是空的，之后永远停在英文。
-  `KeyboardCard.qml` 和 `InlineKeyboardSettings.qml` 里的 `tr()` 因此读一个 `localeVersion`
-  属性，由短定时器在表里出现 `inlineKeyboard` 时翻转 —— 这个属性变化才让绑定重算。
-  （在插件内部 `Connections { target: I18n; function onPluginTranslationsChanged() … }`
-  不会触发 —— 得轮询。）
+- 取译文一律走 `I18n.trFor("inlineKeyboard", "…")`。它内部会读 `I18n.pluginTranslations`，
+  这个读取就是依赖来源：表到达后绑定自动重算，不需要定时器，也不需要版本计数。
+- 两个参数都必须写成**字符串字面量**。运行时拼出来的词条（`label + " …"`、变量里存译文）
+  运行期能查对，但提取工具看不见，永远不会进翻译文件。
 - `trFor` 的第一个参数是**插件 id**（`inlineKeyboard`），不是显示名。读取一个未声明的属性
   （在没声明它的组件上读 `root.pluginId`）会得到 `undefined`，于是所有字符串静默退回英文，
   journal 里一个错误都没有 —— 这个失败现象和「译文没加载」一模一样。
@@ -292,7 +291,7 @@ keycode，所以这是唯一可行的路径。没装 addon 时字符改为复制
 
 | 方面 | 怎么验的 |
 |---|---|
-| 纯逻辑（动作表、拖拽计划、修饰键状态机、候选切分、缩放算式、特殊键表） | `node --test tests/` —— **188 条断言** |
+| 纯逻辑（动作表、拖拽计划、修饰键状态机、候选切分、缩放算式、特殊键表） | `node --test tests/` |
 | addon 协议（状态推送、全量候选、按键/选词/提交） | 对活着的 fcitx5 双向跑通；journal 里每次状态变化一行 |
 | 按键注入 | 两台设备上都真的打进过应用 |
 | 键盘内候选 + 拼音串 | rime 万象实打，候选列表开/关/滚动 |

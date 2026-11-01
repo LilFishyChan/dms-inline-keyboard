@@ -162,7 +162,7 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `layouts/phone.js` | Layout data: rows, units, key maps, function-key pages |
 | `layouts/emoji.js` | **Generated**: emoji groups (Unicode 16) + symbol groups |
 | `tools/gen-emoji.py` | Regenerates `layouts/emoji.js` from Unicode's `emoji-test.txt` |
-| `scripts/` | Legacy helpers kept for the tray icon / input-method list fallbacks |
+| `scripts/` | Acceptance harness: `acceptance.py` plus its `sections/` blocks, addon probe and unit tests |
 | `translations/` | Per-locale strings (`zh_CN.json`); source strings stay English |
 | `icons/` | Hand-drawn SVG (the "floating" glyph) |
 | `docs/` | Protocol notes and layout/geometry rules; Chinese versions are `*.zh-CN.md` |
@@ -308,7 +308,7 @@ Source strings are English and go through `I18n.trFor("inlineKeyboard", …)`
 Translations live in `translations/<locale>.json`:
 
 ```json
-{ "Inline Keyboard": { "Appearance": "外观" } }
+{ "Appearance": { "Appearance": "外观" } }
 ```
 
 Translations are registered by `PluginService` **asynchronously, after the plugin
@@ -316,12 +316,13 @@ QML is constructed**, and only on `I18n.onLocaleApplied` (i.e. at DMS start):
 
 - Restart the shell after adding/editing a translation —
   `dms ipc call plugins reload` does not pick it up.
-- A plain `I18n.trFor(...)` call inside a binding is evaluated once, against a
-  still-empty table, and then stays English forever. `tr()` in `KeyboardCard.qml`
-  and `InlineKeyboardSettings.qml` therefore reads a `localeVersion` property that a
-  short timer flips as soon as the table contains `inlineKeyboard`; that property is
-  what makes the bindings recompute. (`Connections { target: I18n; function
-  onPluginTranslationsChanged() … }` does not fire inside the plugin — poll.)
+- Every lookup goes through `I18n.trFor("inlineKeyboard", "…")`. It reads
+  `I18n.pluginTranslations` internally, which establishes the dependency that makes
+  bindings recompute once the table arrives — no timers, no version counters.
+- Write both arguments as **string literals**. Terms assembled at runtime
+  (`label + " …"`, variables holding a translated string) are resolved correctly at
+  runtime but are invisible to the extraction tool, so they never reach the
+  translation file.
 - `trFor`'s first argument is the **plugin id** (`inlineKeyboard`), not the display
   name. Reading an undeclared property (`root.pluginId` on a component without
   it) yields `undefined`, which silently degrades every string to English with no
@@ -336,7 +337,7 @@ IPC/diagnostic output backing the claim:
 
 | Area | How it was verified |
 |---|---|
-| Pure logic (action list, drag plans, modifier state machine, candidate slicing, resize arithmetic, special-key tables) | `node --test tests/` — **188 assertions** |
+| Pure logic (action list, drag plans, modifier state machine, candidate slicing, resize arithmetic, special-key tables) | `node --test tests/` |
 | Addon protocol (state push, bulk candidate list, key/select/commit) | round-tripped against a live fcitx5; journal shows one line per state change |
 | Key injection | real typing into applications through `ydotool`, on both devices |
 | Candidates + preedit drawn in-keyboard | live rime 万象 input, candidate list opened/closed/scrolled |
