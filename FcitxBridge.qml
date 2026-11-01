@@ -14,10 +14,11 @@ Item {
     property bool keyboardOpen: false
     // 该不该连着 addon（最小化时不该，见 daemon 里 shouldConnect 的说明）
     property bool connectEnabled: true
-    readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
-    readonly property string socketPath: runtimeDir + "/inline-keyboard.sock"
-    readonly property string statusPath: runtimeDir + "/inline-keyboard-status.json"
-    readonly property string imListPath: runtimeDir + "/inline-keyboard-imlist.json"
+    // 缺失时不回退 /tmp：那是世界可写目录，别的用户能抢先绑定 socket 把按键全收走
+    readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || ""
+    readonly property string socketPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard.sock"
+    readonly property string statusPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard-status.json"
+    readonly property string imListPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard-imlist.json"
     property var candidates: [] // 候选词（空数组 = 没有候选）
     property string preedit: "" // 拼音串
     property bool panelVisible: false // addon 报告的可见性（不能叫 visible，Item 内建）
@@ -241,6 +242,9 @@ Item {
     function copyText(text) {
         if (!text)
             return false;
+        // 上一条还没退出时改 command 会丢掉这次复制
+        if (clipboardProc.running)
+            return false;
 
         clipboardProc.command = ["dms", "cl", "copy", text];
         clipboardProc.running = true;
@@ -326,9 +330,9 @@ Item {
         triggeredOnStart: true
         onTriggered: {
             socket.connected = true;
-            // 新一轮连接从零算：不清的话上一轮的旧时间戳会让超时判定
-            // 在刚连上时就成立
-            bridge.lastSeenAt = 0;
+            // 从这一刻重新计时：置 0 会让下面的超时判据（lastSeenAt > 0）永不成立，
+            // addon 连上却不发消息时就一直静默挂着
+            bridge.lastSeenAt = Date.now();
             bridge.reconnectDelay = Math.min(bridge.reconnectDelay * 2, 8000);
         }
     }
@@ -362,8 +366,9 @@ Item {
     // 剪贴板兜底：dms cl copy 直接吃文本参数，不经过 shell
     Process {
         id: clipboardProc
-        // 复制失败别静默当成功
+        // 用真实退出码更新可用性：失败后 typeText 会改报「装 addon」而不是「已复制」
         onExited: (code) => {
+            bridge.clipboardAvailable = code === 0;
             if (code !== 0)
                 console.warn("inlineKeyboard: 复制到剪贴板失败，exit " + code);
         }

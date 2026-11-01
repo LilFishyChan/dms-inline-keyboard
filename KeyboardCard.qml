@@ -10,8 +10,8 @@ import "layouts/phone.js" as Layout
 import "layouts/resize.js" as Resize
 import "modifiers.js" as Modifiers
 import qs.Common
+import qs.DCommon.Common
 import qs.DCommon.Widgets
-import qs.Widgets
 
 // 键盘主体：顶部快捷条 + 候选/快捷栏 + 键区（或功能列表） + 底部把手条
 Rectangle {
@@ -55,7 +55,6 @@ Rectangle {
     // 最近一次选词：元素是「传进 addon 的 index」和「此刻该下标对应的词」。
     property string lastSelectInfo: ""
     // 有候选才显示候选行；没有候选时退回快捷键行
-    property bool showCandidates: root.fcitxCandidates.length > 0
     // keys = 正常键盘；functions = 快捷功能列表
     property string mode: "keys"
     // 动作列表的编辑态（拖动排序）
@@ -111,7 +110,7 @@ Rectangle {
     // 让位动画开关。默认 false：卡片构造期间功能栏的 x/width 会从默认值
     property bool animateCells: false
     // 本地 animateCells 只管首帧，DMS 关掉动画时这里也要停
-    readonly property bool animationsEnabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+    readonly property bool animationsEnabled: !Style.reduceMotion && Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
     // 松手后幽灵块淡出，动画结束再真正移除
     property bool ghostFading: false
     // 按下点在"卡片"坐标系里的位置（按下时算一次，之后只加位移）
@@ -160,7 +159,6 @@ Rectangle {
     // 候选 / 快捷条：候选来自 fcitx5 addon（inline-keyboard-status.json），没有候选时显示快捷键
     readonly property var candidates: root.fcitxCandidates
     readonly property string preedit: root.fcitxPreedit
-    readonly property var shortcuts: Layout.demoShortcuts
     readonly property color fg: Theme.surfaceText
     // 顶部快捷条高度 = 圆形按钮直径（按钮填满这一行）。
     // 窗口总会传 metrics.quickH，这里的默认值只是没接线时的兜底，比例要和 KeyboardMetrics.quickBarRatio 保持一致。
@@ -185,7 +183,7 @@ Rectangle {
     property bool recentSelect: false
     // 主键区行数，候选列表页的滚动区高度按它算
     readonly property int keyRowCount: Layout.pageRows("page1").length
-    // 特殊键的表现形式（见 layouts/special-keys.js）
+    // 特殊键的表现形式（见 layouts/specialKeys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
     property string winKeyCustomIcon: ""
@@ -237,7 +235,6 @@ Rectangle {
     property var candListItems: []
     readonly property var candBarSlice: candBarItems
     // 候选列表页显示后一段（不含顶栏已有的，避免重复）。
-    readonly property int candListTotal: Math.max(0, root.candListModel.length - Math.max(0, root.candBarCount))
     // 候选数据的版本号：candListModel 的任何来源变了都 ++。
     // 不能只靠 candRevision：那是 FcitxBridge 的推送计数，调试注入不会动它。
     property int candDataSeq: 0
@@ -890,7 +887,7 @@ Rectangle {
     // 和 Column 的结构逐项对齐，一项都不能少：这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
     height: pad + Math.max(quickH, candH) + gap + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap + handleH
     radius: Theme.windowRadius
-    // 卡片底跟 DMS 设置页同色（surface），透明度仍由插件设置控制
+    // 卡片底跟 DMS 设置页同色（hostSurface），透明度仍由插件设置控制
     color: Theme.withAlpha(Theme.hostSurface, bgOpacity)
     border.width: Theme.outlineWidth
     border.color: Theme.withAlpha(Theme.outlineVariant, 0.7)
@@ -1025,7 +1022,7 @@ Rectangle {
 
                 // 和分类栏 / 候选栏交叉淡入淡出，时长必须一致
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1048,7 +1045,7 @@ Rectangle {
                 z: 20
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1079,7 +1076,7 @@ Rectangle {
                 opacity: root.page === "emoji" ? 1 : 0
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1119,7 +1116,7 @@ Rectangle {
                 shownCountOverride: root.candListOpen ? -1 : 0
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1152,7 +1149,7 @@ Rectangle {
                     enabled: shown && opacity > 0.5
 
                     Behavior on opacity {
-                        enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                        enabled: root.animationsEnabled
                         NumberAnimation {
                             duration: Motion.panel
                             easing.type: Easing.OutCubic
@@ -1217,6 +1214,12 @@ Rectangle {
                     if (root.page === "emoji")
                         return ;
 
+                    // 关动画时直接落到终态，别让旧页停在半透明的中间态
+                    if (!root.animationsEnabled) {
+                        keyWrapper.pageFade = 1;
+                        keyWrapper.pageShift = 0;
+                        return ;
+                    }
                     pageSwap.restart();
                 }
 
@@ -1236,7 +1239,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1258,7 +1261,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1280,7 +1283,7 @@ Rectangle {
                 enabled: shown && opacity > 0.5
 
                 Behavior on opacity {
-                    enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                    enabled: root.animationsEnabled
                     NumberAnimation {
                         duration: Motion.panel
                         easing.type: Easing.OutCubic
@@ -1397,7 +1400,7 @@ Rectangle {
         // 遮罩：整体键盘背景色的 50%
         Rectangle {
             anchors.fill: parent
-            color: Theme.withAlpha(Theme.hostSurface, Alpha.Half)
+            color: Theme.withAlpha(Theme.scrimColor, Theme.scrimAlpha)
             radius: Theme.cornerRadius
 
             // 吞掉点击：下面看得见但点不到
@@ -1471,7 +1474,7 @@ Rectangle {
                     anchors.centerIn: parent
                     width: handleItem.horizontal ? parent.width : 6
                     height: handleItem.vertical ? parent.height : 6
-                    radius: 3
+                    radius: Theme.fullRadius(width, height)
                     color: Theme.primary
                 }
 
@@ -1538,6 +1541,7 @@ Rectangle {
                 visible: !root.isFloating
                 buttonSize: parent.btn
                 iconName: root.dockFill ? "collapse_content" : "expand_content"
+                tooltipText: root.dockFill ? root.tr("Shrink to content") : root.tr("Fill width")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: root.dockFill ? Theme.primary : Theme.chipSurface
@@ -1549,6 +1553,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "restart_alt"
+                tooltipText: root.tr("Reset size")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1560,6 +1565,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "close"
+                tooltipText: root.tr("Cancel")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1571,6 +1577,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "check"
+                tooltipText: root.tr("Confirm")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.onPrimary
                 backgroundColor: Theme.primary
@@ -1582,7 +1589,7 @@ Rectangle {
         }
 
         Behavior on opacity {
-            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+            enabled: root.animationsEnabled
             NumberAnimation {
                 duration: Motion.panel
                 easing.type: Easing.OutCubic
@@ -1593,7 +1600,7 @@ Rectangle {
     }
 
     Behavior on opacity {
-        enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+        enabled: root.animationsEnabled
         NumberAnimation {
             duration: Motion.fade
             easing.type: Easing.OutCubic

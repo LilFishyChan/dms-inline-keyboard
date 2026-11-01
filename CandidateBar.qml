@@ -21,7 +21,6 @@ Item {
     readonly property bool hasPreedit: (controller.preedit || "") !== "" && !controller.fcitxPreeditEmbedded
     // 可见性由卡片按输入法行为算（有候选才显示）。
     // 这里**不能**再叠 preedit 条件：那会让候选栏整条消失。
-    readonly property bool imHasCandidates: controller.showCandBar
     // 和主键盘一致的度量
     readonly property real unit: controller.unit || 63
     readonly property real gap: controller.gap || 6
@@ -154,7 +153,7 @@ Item {
 
                         // 打字时跟着滑
                         Behavior on animW {
-                            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                            enabled: controller ? controller.animationsEnabled : true
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.shift
                                 easing.type: Easing.OutCubic
@@ -163,7 +162,7 @@ Item {
                         }
 
                         Behavior on animH {
-                            enabled: Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+                            enabled: controller ? controller.animationsEnabled : true
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.shift
                                 easing.type: Easing.OutCubic
@@ -202,7 +201,8 @@ Item {
                         // StateLayer 自带 hover/pressed 状态层和涟漪，不用自己判断 containsMouse
                         anchors.fill: parent
                         stateColor: Theme.onSurface
-                        cornerRadius: parent.radius
+                        // 显式引用胶囊：StateLayer 初始化时 parent 还是 null，取 parent.radius 会拿到 undefined
+                        cornerRadius: capsule.radius
                         onClicked: {
                             // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
                             const item = candArea.pool[index] || {
@@ -245,6 +245,7 @@ Item {
                 buttonSize: Math.round(candArea.controller.quickH)
                 // 展开态直接换图标，不走旋转（DActionButton 的 rotation 会连底色一起转）
                 iconName: candArea.controller.candListOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"
+                tooltipText: candArea.controller ? (candArea.controller.candListOpen ? candArea.controller.tr("Collapse candidates") : candArea.controller.tr("Expand candidates")) : ""
                 iconSize: Math.round(candArea.controller.quickH * 0.5)
                 iconColor: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
                 backgroundColor: Theme.chipSurface

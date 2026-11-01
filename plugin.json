@@ -21,14 +21,10 @@
     "dependencies": [
         "ydotool"
     ],
-    "compositors": [
-        "any"
-    ],
     "permissions": [
         "settings_read",
         "settings_write",
         "process"
     ],
-    "repo": "https://github.com/LilFishyChan/dms-inline-keyboard",
     "startupCheck": "./StartupCheck.qml"
 }

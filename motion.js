@@ -4,7 +4,7 @@
 // 列表位移距离更短，快一点才跟手，压成同一个值会让两边手感变得一样。
 // 缓动没有放进来的必要：全仓库 26 处都是 OutCubic，本来就没有分叉。
 //
-// 用法：import "Motion.js" as Motion → duration: Motion.shift
+// 用法：import "motion.js" as Motion → duration: Motion.shift
 
 // 点按反馈：按住时的高亮收敛
 const quick = 90

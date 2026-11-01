@@ -7,7 +7,7 @@ import Quickshell.Io
 import "actions.js" as Actions
 import "data.js" as Data
 import "layouts/resize.js" as Resize
-import "layouts/special-keys.js" as SpecialKeys
+import "layouts/specialKeys.js" as SpecialKeys
 import "modifiers.js" as Modifiers
 import qs.Common
 import qs.Modules.Plugins
@@ -51,7 +51,10 @@ PluginComponent {
     // 切换方式：noLock / toggle / tapLock / doubleTapLock（设置页可选）
     property string modifierMode: PluginService.loadPluginData(root.pluginId, "modifierMode", "doubleTapLock")
     // 长按自动重复的间隔（毫秒）
-    readonly property int repeatInterval: root.pluginData && root.pluginData.repeatInterval !== undefined ? root.pluginData.repeatInterval : 60
+    readonly property int repeatInterval: {
+        const raw = root.pluginData ? Number(root.pluginData.repeatInterval) : NaN;
+        return Number.isFinite(raw) ? Math.min(200, Math.max(20, Math.round(raw))) : 60;
+    }
     // fcitx5 状态实际存在 FcitxBridge 里，这里 alias 给卡片和窗口用
     readonly property alias fcitxCandidates: fcitxBridge.candidates
     readonly property alias fcitxPreedit: fcitxBridge.preedit
@@ -64,7 +67,6 @@ PluginComponent {
     property bool optimisticImActive: false
     readonly property string fcitxImLabel: root.optimisticImActive ? root.optimisticImLabel : fcitxBridge.imLabel
     readonly property string fcitxImIcon: root.optimisticImActive ? root.optimisticImIcon : fcitxBridge.imIcon
-    readonly property alias fcitxHasPrev: fcitxBridge.hasPrev
     readonly property alias fcitxHasMore: fcitxBridge.hasMore
     readonly property alias fcitxSocketUp: fcitxBridge.socketUp
     readonly property alias fcitxLastError: fcitxBridge.lastError
@@ -152,8 +154,8 @@ PluginComponent {
         return Actions.mergeNewBuiltins(root.sanitizeActions(v), root.defaultActions);
     }
     // 外观：缩放 + 透明度，都从设置读（PluginSettings 存的是百分数）
-    property real bgOpacity: PluginService.loadPluginData(root.pluginId, "bgOpacity", 100) / 100
-    property real keyOpacity: PluginService.loadPluginData(root.pluginId, "keyOpacity", 100) / 100
+    property real bgOpacity: root.readNum("bgOpacity", 100, 0, 100) / 100
+    property real keyOpacity: root.readNum("keyOpacity", 100, 0, 100) / 100
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     property bool voiceAvailable: false
@@ -167,8 +169,8 @@ PluginComponent {
     property real miniPosBottom: root.loadRuntime("miniPosBottom", -1)
     // 浮动键盘的位置（-1 = 还没拖过，由窗口按默认位置摆）
     // 窗口位置是运行时状态，走 State；老版本存在 Settings 里，没值才回落一次
-    property real floatPosX: PluginService.loadPluginState(root.pluginId, "floatPosX", PluginService.loadPluginData(root.pluginId, "floatPosX", -1))
-    property real floatPosY: PluginService.loadPluginState(root.pluginId, "floatPosY", PluginService.loadPluginData(root.pluginId, "floatPosY", -1))
+    property real floatPosX: root.loadRuntime("floatPosX", -1)
+    property real floatPosY: root.loadRuntime("floatPosY", -1)
     // 语音模式：切浮动 + 只显示顶部语音行
     property bool voiceMinimal: false
     property real prevBgOpacity: 1
@@ -187,8 +189,8 @@ PluginComponent {
     readonly property real baseKbWidth: 1050
     readonly property real baseKbHeight: 444
     // 键盘实际尺寸：由「调整大小」拖出来并保存，默认是名义尺寸
-    property real savedW: PluginService.loadPluginData(root.pluginId, "keyboardWidth", baseKbWidth)
-    property real savedH: PluginService.loadPluginData(root.pluginId, "keyboardHeight", baseKbHeight)
+    property real savedW: root.readNum("keyboardWidth", baseKbWidth, 200, 4000)
+    property real savedH: root.readNum("keyboardHeight", baseKbHeight, 200, 4000)
     // 停靠时是否横向铺满屏幕（调整大小面板里可以切）
     property bool dockFill: PluginService.loadPluginData(root.pluginId, "dockFillWidth", true)
     readonly property real kbWidth: root.savedW
@@ -236,10 +238,6 @@ PluginComponent {
     }
 
     // 转发给 FcitxBridge 的解析入口（statusRead 兜底和 debug 用）
-    function applyFcitxStatus(raw) {
-        fcitxBridge.applyStatus(raw);
-    }
-
     function applyImList(raw) {
         fcitxBridge.applyImList(raw);
     }
@@ -330,17 +328,6 @@ PluginComponent {
             ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", term) : term);
         }
         return lastTextCommitVia;
-    }
-
-    function safeCall(name, fn) {
-        try {
-            return fn();
-        } catch (e) {
-            const msg = "ERR:" + name + ": " + e;
-            root.lastError = msg;
-            console.error("[inlineKeyboard] " + msg);
-            return msg;
-        }
     }
 
     function runCommand(cmd) {
@@ -457,6 +444,7 @@ PluginComponent {
         root.lastSelfSaveAt = Date.now();
         PluginService.savePluginState(root.pluginId, "floatPosX", px);
         PluginService.savePluginState(root.pluginId, "floatPosY", py);
+        PluginService.savePluginState(root.pluginId, "runtimeMigrated", true);
     }
 
     //* 小圆按钮拖完落盘：下次最小化回到同一个地方。
@@ -466,14 +454,24 @@ PluginComponent {
         root.lastSelfSaveAt = Date.now();
         PluginService.savePluginState(root.pluginId, "miniPosRight", right);
         PluginService.savePluginState(root.pluginId, "miniPosBottom", bottom);
+        PluginService.savePluginState(root.pluginId, "runtimeMigrated", true);
     }
 
     // 运行时状态该走 State 文件（~/.local/state/dms/plugins/<id>_state.json），写 plugin_settings.json 会触发全插件 reloadSettings。
     // 老版本把这几项存在 Settings 里，所以 state 没有时回落到 Settings 读一次。
+    // 设置文件可能被手改坏或留着旧版本的字符串，读回的数一律夹到合法范围
+    function readNum(key, fallback, min, max) {
+        const n = Number(PluginService.loadPluginData(root.pluginId, key, fallback));
+        return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+    }
+
     function loadRuntime(key, fallback) {
         const st = PluginService.loadPluginState(root.pluginId, key, null);
         if (st !== null && st !== undefined)
             return st;
+        // 迁移过之后就只认 State：否则 Settings 里的老值会在每次 State 缺失时复活
+        if (PluginService.loadPluginState(root.pluginId, "runtimeMigrated", false) === true)
+            return fallback;
 
         const legacy = PluginService.loadPluginData(root.pluginId, key, null);
         return legacy === null || legacy === undefined ? fallback : legacy;
@@ -829,10 +827,6 @@ PluginComponent {
     // 切中英走 rime 的 D-Bus：键盘窗口持焦点时 ydotool 发的 Shift 落不到输入框
     function setImAscii(want) {
         root.runCommand(["busctl", "--user", "call", "org.fcitx.Fcitx5", "/rime", "org.fcitx.Fcitx.Rime1", "SetAsciiMode", "b", want ? "true" : "false"]);
-    }
-
-    function toggleImAscii() {
-        root.setImAscii(!root.imAsciiMode);
     }
 
     function selectImMode(name, wantAscii) {
@@ -1332,6 +1326,9 @@ PluginComponent {
 
         // 调试用：直接切 Fn 层（鼠标点击在 layer-shell 上还没验证通过）
         function toggleFn() : string {
+            if (!root.devMode)
+                return "dev mode off";
+
             root.setModifierState("fn", root.fnState > 0 ? 0 : 2);
             return root.fnActive ? "INLINE_KEYBOARD_FN_ON" : "INLINE_KEYBOARD_FN_OFF";
         }

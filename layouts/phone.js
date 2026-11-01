@@ -180,7 +180,6 @@ function layoutFlat(page, overrideRows) {
 
 // 假候选：候选栏先用这个显示，接入 fcitx5 后由真实候选替换
 var demoCandidates = ["你好", "拟好", "你", "泥", "妮", "呢", "逆", "尼"]
-var demoShortcuts = ["⇱", "⤢", "📌", "⤡", "📋", "⚙", "🚀", "🔈", "🔉", "🔇", "☀", "🌙"]
 
 // node --test 用（QML 里没有 module，这段不会执行）
 if (typeof module !== "undefined" && module.exports) {

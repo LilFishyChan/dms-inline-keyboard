@@ -15,7 +15,7 @@ function loadModule(name) {
     return mod.exports;
 }
 
-const SK = loadModule("special-keys.js");
+const SK = loadModule("specialKeys.js");
 
 test("special-keys: 普通字符键原样返回", () => {
     for (const label of ["a", "1", "~", "中文"]) {

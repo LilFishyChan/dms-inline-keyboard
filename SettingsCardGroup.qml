@@ -15,7 +15,7 @@ Item {
         id: inner
 
         width: parent.width
-        spacing: 2
+        spacing: Theme.groupedListGap
         // 组内卡片挨在一起：首张只圆上面两个角，末张只圆下面两个角，中间四角都小
         onChildrenChanged: {
             const n = children.length;

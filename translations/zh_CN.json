@@ -257,9 +257,6 @@
     "Start it once below, or enable it permanently so it survives a reboot: ": {
         "Start it once below, or enable it permanently so it survives a reboot: ": "先点下面的按钮临时启动；想开机自动可用："
     },
-    "Swap the \\`~ key with Esc. Fn layer keeps the other one.": {
-        "Swap the \\`~ key with Esc. Fn layer keeps the other one.": "把 `~ 键和 Esc 对调，Fn 层保留另一个"
-    },
     "Minimize": {
         "Minimize": "最小化"
     },
@@ -320,9 +317,6 @@
     "Collapse keyboard": {
         "Collapse keyboard": "收起键盘"
     },
-    "Expand keyboard": {
-        "Expand keyboard": "展开键盘"
-    },
     "Restore keyboard": {
         "Restore keyboard": "恢复键盘"
     },
@@ -331,5 +325,56 @@
     },
     "Backspace": {
         "Backspace": "退格"
+    },
+    "Fill width": {
+        "Fill width": "铺满宽度"
+    },
+    "Shrink to content": {
+        "Shrink to content": "按内容收窄"
+    },
+    "Reset size": {
+        "Reset size": "重置尺寸"
+    },
+    "Confirm": {
+        "Confirm": "确定"
+    },
+    "Expand candidates": {
+        "Expand candidates": "展开候选"
+    },
+    "Collapse candidates": {
+        "Collapse candidates": "收起候选"
+    },
+    "Action slot": {
+        "Action slot": "动作槽"
+    },
+    "Keyboard page": {
+        "Keyboard page": "键盘页"
+    },
+    "Edit actions": {
+        "Edit actions": "编辑动作"
+    },
+    "Scroll up": {
+        "Scroll up": "向上滚动"
+    },
+    "Scroll down": {
+        "Scroll down": "向下滚动"
+    },
+    "Delete": {
+        "Delete": "删除"
+    },
+    "Submit": {
+        "Submit": "提交"
+    },
+    "Swap the `~ key with Esc. Fn layer keeps the other one.": {
+        "Swap the `~ key with Esc. Fn layer keeps the other one.": "把 `~ 键和 Esc 对调，Fn 层保留另一个"
+    },
+    "Could not start ydotoold": {
+        "Could not start ydotoold": "启动 ydotoold 失败"
+    },
+    "Could not enable ydotoold": {
+        "Could not enable ydotoold": "设置 ydotoold 自启失败"
+    },
+    "Cycle input method": {
+        "Cycle input method": "切换输入法"
     }
 }

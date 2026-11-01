@@ -249,7 +249,8 @@ Item {
         if (typeof ToastService === "undefined" || !ToastService)
             return ;
 
-        const term = label + " is not implemented yet";
+        // label 通常是「X is not implemented yet」的前半句，但 ydotool 那条本身就是整句
+        const term = label === "ydotoold is not running" ? label : label + " is not implemented yet";
         ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", term) : term);
     }
 
@@ -266,7 +267,8 @@ Item {
 
     function runCommand(cmd) {
         if (ydotoolProc.running) {
-            root.pendingCommands.push(cmd);
+            // 必须写 router：root 会解析到外层 daemon 的队列，键会排错队甚至注进别的窗口
+            router.pendingCommands.push(cmd);
             return ;
         }
         ydotoolProc.command = cmd;

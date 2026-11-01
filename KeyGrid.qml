@@ -233,7 +233,7 @@ Item {
         wrapMode: Text.NoWrap
         elide: Text.ElideNone
         fontSizeMode: Text.HorizontalFit
-        minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
+        minimumPixelSize: Math.min(font.pixelSize, Math.round(Theme.fontSizeSmall * 0.75))
         font.pixelSize: Math.round(grid.c.keyH * 0.32)
         font.weight: Font.Medium
         color: Theme.onSurface

@@ -21,7 +21,7 @@ PanelWindow {
     property real bgOpacity: 1
     property int repeatInterval: 60
     property real keyOpacity: 1
-    // 特殊键形态设置（见 layouts/special-keys.js）
+    // 特殊键形态设置（见 layouts/specialKeys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
     property string winKeyCustomIcon: ""

@@ -20,7 +20,7 @@ PluginSettings {
     property int translationPollCount: 0
     // ydotoold 状态：没有它什么键都发不出去，所以摆在最上面
     property bool ydotooldUp: true
-    // 设置值：SettingsRow 不自带存取，这里自己 load / save
+    // 标准设置组件不自带存取，这里自己 load / save
     property int repeatInterval: 60
 
     // 调试 IPC（只读诊断 + 模拟点击 / 长按 / 拖动）给 scripts/acceptance.py 用，普通使用用不到，所以打开前必须过一次确认框。
@@ -157,10 +157,6 @@ PluginSettings {
     }
 
     readonly property var specialStyleLabels: [tr("Icon"), tr("Short"), tr("Full name")]
-    readonly property var modifierModeValues: ["noLock", "toggle", "tapLock", "doubleTapLock"]
-    readonly property var modifierModeLabels: [tr("Active while held"), tr("Tap to activate; any key clears it"), tr("Tap to lock (tap again to unlock)"), tr("Tap to toggle, double-tap to lock")]
-    readonly property var winLookValues: ["mod", "super", "system", "custom"]
-    readonly property var winLookLabels: ["Mod", "Super", "⌘", tr("Custom icon")]
     // DDropdown 初始化时也会发一次 valueChanged（带默认值），这时不能写盘
     property bool settingsReady: false
     // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
@@ -461,7 +457,7 @@ PluginSettings {
 
         }
 
-        // 特殊键的表现形式。三个选项对应 layouts/special-keys.js 的 STYLES；
+        // 特殊键的表现形式。三个选项对应 layouts/specialKeys.js 的 STYLES；
         // 「完整」形态下过长的文字由 Key.qml 的 Text.HorizontalFit 自动缩字号。
         SettingsCard {
             Column {
@@ -581,7 +577,7 @@ PluginSettings {
             ToggleSetting {
                 settingKey: "escSwap"
                 label: I18n.trFor("inlineKeyboard", "Esc on the top-left key")
-                description: I18n.trFor("inlineKeyboard", "Swap the \`~ key with Esc. Fn layer keeps the other one.")
+                description: I18n.trFor("inlineKeyboard", "Swap the `~ key with Esc. Fn layer keeps the other one.")
                 defaultValue: false
             }
 
@@ -757,7 +753,7 @@ PluginSettings {
 
                         width: parent.width
                         // 和设置项一致：行与行之间留 2px，首尾行由 DListRow 自己圆角
-                        spacing: 2
+                        spacing: Theme.groupedListGap
 
                         DCommon.DListRow {
                             width: parent.width

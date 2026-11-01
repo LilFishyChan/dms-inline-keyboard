@@ -22,7 +22,6 @@ Item {
     readonly property real mkeyH: src && src.keyH ? src.keyH : 44
     // 这一行的高度是 quickH（顶部动作栏那一行），不是底部把手的 handleH：拿 handleH 算会小一圈（图标 16 vs 24，按钮 28 vs 41）。
     readonly property real mrowH: src && src.quickH ? Math.max(src.quickH, src.candH || 0) : 48
-    readonly property real mpad: src && src.pad ? src.pad : 8
     // 和功能栏（QuickBar）保持一致：按钮就是整行高度，图标半行高
     readonly property real btn: Math.round(mrowH)
     readonly property real icon: Math.round(mrowH * 0.5)

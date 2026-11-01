@@ -5,7 +5,6 @@ import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 import qs.DCommon.Widgets
-import qs.Widgets
 
 Item {
     id: quickBar
@@ -76,7 +75,7 @@ Item {
     width: parent.width
     height: controller.quickH
 
-    // 编辑态底色：胶囊 + surfaceContainerLow。
+    // 编辑态底色：胶囊 + cardSurface。
     // 没有动作时铺满整条（提示这里可以放），有动作时收窄到和描边同宽（成为描边内部的填充）
     Rectangle {
         readonly property bool hasItems: quickBar.slotCount > 0
@@ -89,7 +88,7 @@ Item {
         width: hasItems ? quickBar.frameW : quickBar.midW
         height: quickBar.height
         radius: quickBar.capRadius
-        color: Theme.surfaceContainerLow
+        color: Theme.cardSurface
 
         Behavior on opacity {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
@@ -301,6 +300,8 @@ Item {
 
             MouseArea {
                 id: barMouse
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.label || ""
 
                 function tapAt() {
                     controller.quickAction(modelData.id);
@@ -423,10 +424,10 @@ Item {
             width: quickBar.btnW
             height: quickBar.btnW
             radius: Theme.fullRadius(width, height)
-            color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.surfaceContainerLow : Theme.chipSurface) : Theme.chipSurface)
+            color: (isConfirm || slotActive) ? Theme.primary : (controller.editing && isSlot ? (slotGhost ? Theme.cardSurface : Theme.chipSurface) : Theme.chipSurface)
             // 动作槽在编辑态高亮描边，表示可以拖东西进来替换。
             // 非编辑态的激活态改用主色实心底，不需要描边
-            border.width: controller.editing && isSlot ? (controller.dragOverSlot ? 3 : 2) : 0
+            border.width: controller.editing && isSlot ? (controller.dragOverSlot ? Theme.outlineWidthFocused + 1 : Theme.outlineWidthFocused) : 0
             border.color: Theme.primary
             scale: controller.editing && isSlot && controller.dragOverSlot ? 1.12 : 1
 
@@ -481,6 +482,8 @@ Item {
 
             MouseArea {
                 id: slotMouse
+                Accessible.role: Accessible.Button
+                Accessible.name: I18n.trFor("inlineKeyboard", isSlot ? "Action slot" : "Keyboard page")
 
                 function tapAt() {
                     if (controller.mode === "transparency") {

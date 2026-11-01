@@ -3,7 +3,7 @@
 
 import QtQuick
 import QtQuick.Effects
-import "layouts/special-keys.js" as SpecialKeys
+import "layouts/specialKeys.js" as SpecialKeys
 import "alpha.js" as Alpha
 import qs.Common
 import qs.DCommon.Widgets
@@ -31,7 +31,7 @@ Item {
     // 只表示 Shift 按下（不含 Caps）：符号键的 Shift 变体只跟着 Shift 走
     property bool shiftActive: false
     // 特殊键（Backspace / Enter / Shift…）画成图标、缩写还是完整名字。
-    // 由设置页选，取值见 layouts/special-keys.js 的 STYLES。
+    // 由设置页选，取值见 layouts/specialKeys.js 的 STYLES。
     property string specialKeyStyle: "full"
     // Win 键单独的表现（mod / system / windows），不受上面那个影响
     property string winKeyStyle: "mod"
@@ -157,7 +157,7 @@ Item {
         return fg;
     }
     readonly property color fg: Theme.surfaceText
-    readonly property real activeBorderWidth: 2
+    readonly property real activeBorderWidth: Theme.outlineWidthFocused
     // 激活态描边宽度（px）
     readonly property real cornerRatio: 0.18
     // 键帽圆角相对键高
@@ -166,7 +166,6 @@ Item {
     readonly property real bigIconRatio: 0.43
     readonly property real upperLabelRatio: 0.2
     readonly property real mainLabelRatio: 0.32
-    readonly property real mainLabelWithUpperRatio: 0.3
     readonly property real labelGapRatio: -0.02
 
     // 本机 DRipple 只有 trigger(x, y)，没有 release()；涟漪自己淡出
@@ -221,7 +220,7 @@ Item {
                 elide: Text.ElideNone
                 fontSizeMode: Text.HorizontalFit
                 // 小键宽下 12px 仍放不下，允许再缩一档
-                minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
+                minimumPixelSize: Math.min(font.pixelSize, Math.round(Theme.fontSizeSmall * 0.75))
                 font.pixelSize: Math.round(root.keyH * root.topRatio)
                 font.weight: root.topRatio === root.mainLabelRatio ? Font.Medium : Font.Normal
             }
@@ -270,7 +269,7 @@ Item {
                 elide: Text.ElideNone
                 fontSizeMode: Text.HorizontalFit
                 // 小键宽下 12px 仍放不下，允许再缩一档
-                minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
+                minimumPixelSize: Math.min(font.pixelSize, Math.round(Theme.fontSizeSmall * 0.75))
                 font.pixelSize: Math.round(root.keyH * root.bottomRatio)
                 font.weight: Font.Medium
             }

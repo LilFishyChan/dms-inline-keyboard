@@ -39,7 +39,7 @@ Item {
         // contentHeight 第一帧是 0，给个下限免得面板闪一下
         height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
         radius: Theme.cornerRadiusL
-        color: Theme.withAlpha(Theme.floatingWindowSurface, 0.99)
+        color: Theme.floatingWindowSurface
         border.width: Theme.outlineWidth
         border.color: Theme.outlineVariant
 

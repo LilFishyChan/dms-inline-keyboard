@@ -119,7 +119,7 @@ Item {
 
     }
 
-    // 编辑态底色：surfaceContainerLow，衬出可拖动的区域
+    // 编辑态底色：cardSurface，衬出可拖动的区域
     Rectangle {
         opacity: (controller.editing ? 1 : 0) * (controller ? controller.bgOpacity : 1)
         visible: opacity > 0.01
@@ -128,7 +128,7 @@ Item {
         y: fnScroll.y
         height: fnScroll.height
         radius: Theme.cornerRadius
-        color: Theme.surfaceContainerLow
+        color: Theme.cardSurface
 
         Behavior on opacity {
             enabled: controller ? (controller.animateCells && controller.animationsEnabled) : true
@@ -493,6 +493,8 @@ Item {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
+                Accessible.role: Accessible.Button
+                Accessible.name: I18n.trFor("inlineKeyboard", "Edit actions")
                 onPressed: (mouse) => {
                     return editRipple.trigger(mouse.x, mouse.y);
                 }

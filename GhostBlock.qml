@@ -19,7 +19,7 @@ Rectangle {
     visible: active && action !== null
     opacity: action !== null ? 0.55 : 0
     radius: Theme.fullRadius(width, height)
-    // 比编辑态背景（surfaceContainerLow）亮一档，否则和背景完全同色、只剩一个淡框
+    // 比编辑态背景（cardSurface）亮一档，否则和背景完全同色、只剩一个淡框
     color: Theme.chipSurface
     border.width: Theme.outlineWidthFocused
     border.color: Theme.primary

@@ -1,4 +1,4 @@
-// 透明度面板的一行：左边标签、右边百分比、下面一条滑块。
+// 透明度面板的一行：左边标签、下面一条滑块。
 // 由 TransparencyPanel 实例化两次（背景 / 按键），改值通过 moved 信号交给调用方。
 import QtQuick
 import qs.Common
