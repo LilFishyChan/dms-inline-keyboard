@@ -14,6 +14,8 @@ Item {
     property bool keyboardOpen: false
     // 该不该连着 addon（最小化时不该，见 daemon 里 shouldConnect 的说明）
     property bool connectEnabled: true
+    // 自动弹出开着时要一直连着：键盘关着才需要它，而关着的时候别的条件都不让连
+    property bool autoShow: false
     // 缺失时不回退 /tmp：那是世界可写目录，别的用户能抢先绑定 socket 把按键全收走
     readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || ""
     readonly property string socketPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard.sock"
@@ -336,7 +338,7 @@ Item {
         interval: bridge.reconnectDelay
         // 连上了就不跑；只有键盘打开、且该连时才连。
         // 无条件 running: true 会让插件在键盘收起后仍然重连，所以这里把条件写全。
-        running: bridge.keyboardOpen && bridge.connectEnabled && bridge.socketPath !== "" && !socket.connected
+        running: (bridge.keyboardOpen || bridge.autoShow) && bridge.connectEnabled && bridge.socketPath !== "" && !socket.connected
         repeat: true
         triggeredOnStart: true
         onTriggered: {

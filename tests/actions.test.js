@@ -592,6 +592,28 @@ test("sanitizeActions: kind 按 cmd 有无推断（老配置没有 kind 字段�
     assert.equal(byId.explicitCmd.kind, "cmd", "显式 kind 优先");
 });
 
+test("shouldAutoShow: 只在开关开、有焦点、键盘没开时才弹", () => {
+    const { shouldAutoShow } = require("../actions.js");
+    assert.equal(shouldAutoShow(true, true, false), true);
+    // 开关关着
+    assert.equal(shouldAutoShow(false, true, false), false);
+    // 没有焦点
+    assert.equal(shouldAutoShow(true, false, false), false);
+    // 键盘已经开着，不该再弹一次
+    assert.equal(shouldAutoShow(true, true, true), false);
+    // 参数缺失当假处理，不能抛
+    assert.equal(shouldAutoShow(), false);
+    assert.equal(shouldAutoShow(true, undefined, false), false);
+});
+
+test("defaultActions: 自动弹出是内置动作", () => {
+    const { defaultActions } = require("../actions.js");
+    const auto = defaultActions().find(a => a.id === "autoShow");
+    assert.ok(auto, "缺少 autoShow 内置动作");
+    assert.equal(auto.kind, "builtin");
+    assert.equal(auto.label, "Auto show");
+});
+
 test("defaultActions: 内置动作的 kind 是 builtin 或 cmd，cmd 类必须有命令", () => {
     const { defaultActions } = require("../actions.js");
     const list = defaultActions();

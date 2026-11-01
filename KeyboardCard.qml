@@ -843,6 +843,8 @@ Rectangle {
         return I18n.trFor("inlineKeyboard", "Voice input");
     case "Minimize":
         return I18n.trFor("inlineKeyboard", "Minimize");
+    case "Auto show":
+        return I18n.trFor("inlineKeyboard", "Auto show");
     case "Smileys & Emotion":
         return I18n.trFor("inlineKeyboard", "Smileys & Emotion");
     case "People & Body":

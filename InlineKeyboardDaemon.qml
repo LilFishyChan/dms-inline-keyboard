@@ -106,6 +106,9 @@ PluginComponent {
         "settings": function() {
             root.runCommand(["dms", "ipc", "call", "settings", "openWith", "plugin:inlineKeyboard"]);
         },
+        "autoShow": function() {
+            root.setAutoShow(!root.autoShow);
+        },
         "nextIm": function() {
             root.cycleIm();
         },
@@ -160,7 +163,9 @@ PluginComponent {
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     property bool voiceAvailable: false
     // 键盘按钮的悬停提示（设置页自己的操作按钮不受影响）
-    property bool tooltips: root.loadRuntime("tooltips", true)
+    property bool tooltips: PluginService.loadPluginData(root.pluginId, "tooltips", true)
+    // 输入框拿到焦点时自动弹出键盘
+    property bool autoShow: PluginService.loadPluginData(root.pluginId, "autoShow", false)
     // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
     // （只有 daemon status，那是服务本身的状态），所以这里记一份乐观状态：
     property bool voiceActive: false
@@ -618,6 +623,11 @@ PluginComponent {
         PluginService.savePluginData(root.pluginId, "tooltips", on);
     }
 
+    function setAutoShow(on) {
+        root.autoShow = on;
+        PluginService.savePluginData(root.pluginId, "autoShow", on);
+    }
+
     function toggleDockFill() {
         root.dockFill = !root.dockFill;
         PluginService.savePluginData(root.pluginId, "dockFillWidth", root.dockFill);
@@ -702,6 +712,10 @@ PluginComponent {
         const nextTooltips = PluginService.loadPluginData(root.pluginId, "tooltips", true);
         if (nextTooltips !== root.tooltips)
             root.tooltips = nextTooltips;
+
+        const nextAutoShow = PluginService.loadPluginData(root.pluginId, "autoShow", false);
+        if (nextAutoShow !== root.autoShow)
+            root.autoShow = nextAutoShow;
 
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
         if (nextDebugMode !== root.debugModeSetting)
@@ -928,11 +942,26 @@ PluginComponent {
     }
 
     // fcitx5 通信全部在这个桥里（socket 推送、状态解析、候选、输入法清单）
+    // 输入框拿到焦点就弹键盘。addon 的 focus:1 只在聚焦变化时发一次，
+    // 所以用户手动收起之后不会被同一份焦点再弹回来
+    Connections {
+        target: fcitxBridge
+
+        function onInputFocusedChanged() {
+            if (!Actions.shouldAutoShow(root.autoShow, fcitxBridge.inputFocused, root.open))
+                return ;
+
+            root.showKeyboard();
+        }
+
+    }
+
     FcitxBridge {
         id: fcitxBridge
 
         keyboardOpen: root.open
         connectEnabled: root.shouldConnect
+        autoShow: root.autoShow
     }
 
     // 按键路由（修饰键状态机 + 直通/ydotool 选择）

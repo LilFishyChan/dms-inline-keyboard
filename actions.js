@@ -363,6 +363,17 @@ function quickBarViewActions(opts) {
  * 返回新数组，调用方可以随便改。
  * @returns {Array} 带 builtin: true 的动作
  */
+/**
+ * 焦点变化时该不该自动弹键盘：开关开着、真的拿到了焦点、键盘还没开。
+ * @param {boolean} autoShow 设置里的开关
+ * @param {boolean} focused addon 推来的 focus 状态
+ * @param {boolean} keyboardOpen 键盘当前是否已经打开
+ * @returns {boolean}
+ */
+function shouldAutoShow(autoShow, focused, keyboardOpen) {
+    return !!autoShow && !!focused && !keyboardOpen
+}
+
 function defaultActions() {
     return markBuiltin([
         { id: "undo", label: "Undo", icon: "undo", kind: "builtin" },
@@ -375,7 +386,8 @@ function defaultActions() {
         { id: "clipboard", label: "Clipboard", icon: "content_paste", kind: "builtin" },
         { id: "avoid", label: "Avoid windows", icon: "unfold_more", kind: "builtin" },
         { id: "mic", label: "Voice input", icon: "mic", kind: "builtin" },
-        { id: "minimize", label: "Minimize", icon: "keyboard_hide", kind: "builtin" }
+        { id: "minimize", label: "Minimize", icon: "keyboard_hide", kind: "builtin" },
+        { id: "autoShow", label: "Auto show", icon: "keyboard", kind: "builtin" }
     ])
 }
 
@@ -497,7 +509,7 @@ if (typeof module !== "undefined" && module.exports) {
         toArray, sanitizeActions, moveActionById, insertAtVisibleIndex,
         visibleActions, dropIndexAt, listShift, listGhostIndex, listBarShift,
         quickBarInsertIndex, planQuickBarDrop, quickBarViewActions, moveActionToEndById,
-        defaultActions, markBuiltin, removeAction, updateAction, appendAction
+        defaultActions, markBuiltin, removeAction, updateAction, appendAction, shouldAutoShow
     }
 }
 

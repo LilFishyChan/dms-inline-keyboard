@@ -396,6 +396,47 @@ PluginSettings {
         }
 
         SettingsCard {
+            Row {
+                width: parent.width
+                spacing: Theme.spacingM
+
+                Column {
+                    width: parent.width - autoShowToggle.width - Theme.spacingM
+                    spacing: Theme.spacingS
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "Auto show")
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.weight: Theme.fontWeightMedium
+                        color: Theme.surfaceText
+                    }
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "Show the keyboard when a text field gets focus.")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.Wrap
+                    }
+
+                }
+
+                DCommon.DToggle {
+                    id: autoShowToggle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    hideText: true
+                    text: I18n.trFor("inlineKeyboard", "Auto show")
+                    checked: root.loadValue("autoShow", false)
+                    onToggled: (value) => root.saveValue("autoShow", value)
+                }
+
+            }
+
+        }
+
+        SettingsCard {
             StyledText {
                 width: parent.width
                 text: I18n.trFor("inlineKeyboard", "Key repeat interval")

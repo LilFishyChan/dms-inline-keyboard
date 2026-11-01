@@ -379,5 +379,11 @@
     },
     "Show hints when hovering over keyboard buttons.": {
         "Show hints when hovering over keyboard buttons.": "鼠标悬停在键盘按钮上时显示功能说明。"
+    },
+    "Auto show": {
+        "Auto show": "自动弹出"
+    },
+    "Show the keyboard when a text field gets focus.": {
+        "Show the keyboard when a text field gets focus.": "输入框拿到焦点时自动弹出键盘。"
     }
 }
