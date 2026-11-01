@@ -72,7 +72,7 @@ PanelWindow {
         id: capsule
 
         anchors.fill: parent
-        anchors.margins: 2
+        anchors.margins: Theme.spacingXXS
         radius: Theme.fullRadius(width, height)
         color: Theme.withAlpha(Theme.hostSurface, controller ? controller.bgOpacity : 1)
 

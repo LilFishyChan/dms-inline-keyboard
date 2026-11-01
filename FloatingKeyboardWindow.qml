@@ -108,7 +108,7 @@ PanelWindow {
                 posY = Math.max(0, Math.min(metrics.screenH - root.kbHeight, sy));
             } else {
                 posX = Math.max(0, (metrics.screenW - metrics.cardW) / 2);
-                posY = Math.max(0, metrics.screenH - root.kbHeight - 120);
+                posY = Math.max(0, metrics.screenH - root.kbHeight - Theme.spacingXL * 5);
             }
             posInitialized = true;
         }

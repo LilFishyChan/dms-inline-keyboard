@@ -472,7 +472,7 @@ Item {
         controller.saveOrder(list);
         controller.quickBarActions = [];
         controller.saveQuickBar([]);
-        controller.slotActionId = "";
+        // slotActionId 是 readonly（真源在 pluginData），只走 saveSlot
         controller.saveSlot("");
         return "INLINE_KEYBOARD_ACTIONS:" + list.length;
     }

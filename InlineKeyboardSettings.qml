@@ -768,6 +768,8 @@ PluginSettings {
 
                                 // 非编辑态只展示图标，改图标走那一行的编辑
                                 ActionIcon {
+                                    id: actionIcon
+
                                     anchors.verticalCenter: parent.verticalCenter
                                     action: modelData
                                     size: Theme.iconSizeMedium
@@ -775,7 +777,7 @@ PluginSettings {
                                 }
 
                                 StyledText {
-                                    width: parent.width - 20 - actionButtons.implicitWidth - parent.spacing * 2
+                                    width: parent.width - actionIcon.width - actionButtons.implicitWidth - parent.spacing * 2
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: root.tr(modelData.label)
                                     font.pixelSize: Theme.fontSizeMedium
