@@ -10,7 +10,6 @@ import "layouts/phone.js" as Layout
 import "layouts/resize.js" as Resize
 import "modifiers.js" as Modifiers
 import qs.Common
-import qs.DCommon.Common
 import qs.DCommon.Widgets
 
 // 键盘主体：顶部快捷条 + 候选/快捷栏 + 键区（或功能列表） + 底部把手条
@@ -110,7 +109,7 @@ Rectangle {
     // 让位动画开关。默认 false：卡片构造期间功能栏的 x/width 会从默认值
     property bool animateCells: false
     // 本地 animateCells 只管首帧，DMS 关掉动画时这里也要停
-    readonly property bool animationsEnabled: !Style.reduceMotion && Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
+    readonly property bool animationsEnabled: !SettingsData.reduceMotion && Theme.currentAnimationSpeed !== SettingsData.AnimationSpeed.None
     // 松手后幽灵块淡出，动画结束再真正移除
     property bool ghostFading: false
     // 按下点在"卡片"坐标系里的位置（按下时算一次，之后只加位移）
@@ -804,7 +803,10 @@ Rectangle {
     // 某个动作在「松手后的固定栏」里排第几；-1 = 它会被挤出去
     // 动态词条（动作名、表情分类名）走这个；字面量直接用 I18n.trFor，提取工具才抓得到
     function tr(term) {
-        if (typeof I18n === "undefined" || !I18n || !I18n.trFor)
+        // 先读一次翻译表：I18n 是异步注册的，构造期拿到的是英文；
+        // 读了 pluginTranslations 才能让调用点的绑定在表就绪后重算
+        const table = (typeof I18n !== "undefined" && I18n) ? I18n.pluginTranslations : null;
+        if (!table || !I18n.trFor)
             return term;
 
         return I18n.trFor("inlineKeyboard", term);

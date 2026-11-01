@@ -3,7 +3,6 @@
 import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
-import qs.DCommon.Common
 import qs.DCommon.Widgets
 import qs.Widgets
 

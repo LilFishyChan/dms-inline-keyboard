@@ -5,7 +5,6 @@ import "alpha.js" as Alpha
 import QtQuick
 import "layouts/emoji.js" as Emoji
 import qs.Common
-import qs.DCommon.Common
 import qs.DCommon.Widgets
 
 Item {

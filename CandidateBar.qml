@@ -4,7 +4,6 @@ import "alpha.js" as Alpha
 // 布局规则（和主键盘共用同一套度量）：
 import QtQuick
 import qs.Common
-import qs.DCommon.Common
 import qs.DCommon.Widgets
 import qs.Widgets
 
