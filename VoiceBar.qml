@@ -70,7 +70,7 @@ Item {
         iconColor: Theme.surfaceText
         backgroundColor: Theme.chipSurface
         stateColor: Theme.surfaceText
-        tooltipText: I18n.trFor("inlineKeyboard", "Voice input")
+        tooltipText: voiceBar.controller.tooltips ? (voiceBar.controller.voiceMinimal ? I18n.trFor("inlineKeyboard", "Expand") : I18n.trFor("inlineKeyboard", "Minimize")) : ""
 
         onClicked: voiceBar.controller.voiceMinimalRequested()
     }
@@ -163,7 +163,7 @@ Item {
         iconColor: Theme.withAlpha(Theme.surfaceText, Alpha.Strong)
         backgroundColor: delRepeat.running ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
         stateColor: Theme.primary
-        tooltipText: discarding ? I18n.trFor("inlineKeyboard", "Discard recording") : I18n.trFor("inlineKeyboard", "Delete")
+        tooltipText: voiceBar.controller.tooltips ? (discarding ? I18n.trFor("inlineKeyboard", "Discard recording") : I18n.trFor("inlineKeyboard", "Delete")) : ""
 
         property bool didRepeat: false
 
@@ -224,7 +224,7 @@ Item {
         // 激活态用主色实心，和固定框同一套
         backgroundColor: voiceBar.controller.voiceActive ? Theme.primary : Theme.chipSurface
         stateColor: voiceBar.controller.voiceActive ? Theme.onPrimary : Theme.surfaceText
-        tooltipText: voiceBar.controller.voiceActive ? I18n.trFor("inlineKeyboard", "Stop recording") : I18n.trFor("inlineKeyboard", "Start recording")
+        tooltipText: voiceBar.controller.tooltips ? (voiceBar.controller.voiceActive ? I18n.trFor("inlineKeyboard", "Stop recording") : I18n.trFor("inlineKeyboard", "Start recording")) : ""
 
         onClicked: voiceBar.controller.voiceMicRequested()
     }

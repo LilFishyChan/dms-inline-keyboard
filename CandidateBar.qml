@@ -245,7 +245,7 @@ Item {
                 buttonSize: Math.round(candArea.controller.quickH)
                 // 展开态直接换图标，不走旋转（DActionButton 的 rotation 会连底色一起转）
                 iconName: candArea.controller.candListOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"
-                tooltipText: candArea.controller && candArea.controller.candListOpen ? I18n.trFor("inlineKeyboard", "Collapse candidates") : I18n.trFor("inlineKeyboard", "Expand candidates")
+                tooltipText: candArea.controller && candArea.controller.tooltips ? (candArea.controller.candListOpen ? I18n.trFor("inlineKeyboard", "Collapse candidates") : I18n.trFor("inlineKeyboard", "Expand candidates")) : ""
                 iconSize: Math.round(candArea.controller.quickH * 0.5)
                 iconColor: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
                 backgroundColor: Theme.chipSurface

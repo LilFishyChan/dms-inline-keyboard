@@ -164,6 +164,53 @@ Item {
     }
 
     // 普通键按下后：软激活(1)清零，锁定(2)与 caps lock 保留
+    // Caps 的真值在系统那边，本地这份只是镜像。两条来源：
+    //   1. DMS 的 evdev 服务（装了就实时推，我们自己发 58 也会绕回来）
+    //   2. 读指示灯（evdev 没装时用它兜底，读不到的设备——比如没有指示灯的平板——保持本地状态）
+    function syncSystemCaps() {
+        // 2 才是「锁定」（背景高亮）；1 是一次性，会被画成描边
+        if (typeof DMSService !== "undefined" && DMSService && DMSService.capsLockState)
+            router.capsState = 2;
+        else if (!capsProbe.running)
+            capsProbe.running = true;
+
+    }
+
+    Process {
+        id: capsProbe
+
+        command: ["sh", "-c", "cat /sys/class/leds/*::capslock/brightness 2>/dev/null | head -1"]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const raw = text.trim();
+                if (raw === "")
+                    return ;
+
+                const v = parseInt(raw, 10);
+                if (!isNaN(v))
+                    router.capsState = v > 0 ? 2 : 0;
+
+            }
+        }
+
+    }
+
+    Connections {
+        target: typeof DMSService !== "undefined" ? DMSService : null
+
+        function onCapsLockStateChanged() {
+            router.syncSystemCaps();
+        }
+
+    }
+
+    // 兼容旧调用点
+    function readSystemCaps() {
+        syncSystemCaps();
+    }
+
     function clearTransientModifiers() {
         const next = Modifiers.clearTransient(modifierStates);
         shiftState = next.shift;
@@ -192,6 +239,9 @@ Item {
         const modifier = Modifiers.modifierNameFor(keyData);
         if (modifier !== "") {
             cycleModifier(modifier);
+            // Caps 是系统的锁定键：本地翻完还要把真键发出去，系统并不知道我们这份状态
+            if (modifier === "caps")
+                injectKey(58, "Caps Lock", "key", false);
             return ;
         }
         if (k === "space")

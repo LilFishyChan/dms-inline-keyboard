@@ -28,7 +28,8 @@ Item {
     property real keyOpacity: 1
     // 字母是否大写：shift 激活 / caps 锁定时为 true（默认小写）
     property bool upperMode: false
-    // 只表示 Shift 按下（不含 Caps）：符号键的 Shift 变体只跟着 Shift 走
+    // 只表示 Shift 按下（不含 Caps）：符号键的上下档和 Enter→Del 这类替代键都只看它，
+    // Caps 只让字母大写，不翻符号键（标准键盘行为）
     property bool shiftActive: false
     // 特殊键（Backspace / Enter / Shift…）画成图标、缩写还是完整名字。
     // 由设置页选，取值见 layouts/specialKeys.js 的 STYLES。
@@ -57,21 +58,21 @@ Item {
     // 双标签键：**当前会输入的那个**用大字号（和字母键一样），另一个小字。
     // 判断按「当前生效的那一份」来：Fn 层看 fn，否则看外层。
     readonly property var pairData: (useFn && keyData.fn) ? keyData.fn : keyData
-    readonly property string pairBig: hasShiftPair ? (upperMode ? pairData.s : pairData.l) : mainLabel
-    readonly property string pairSmall: hasShiftPair ? (upperMode ? pairData.l : pairData.s) : ""
+    readonly property string pairBig: hasShiftPair ? (shiftActive ? pairData.s : pairData.l) : mainLabel
+    readonly property string pairSmall: hasShiftPair ? (shiftActive ? pairData.l : pairData.s) : ""
     // 上面那行文字 / 下面那行文字
-    readonly property string topLabel: hasShiftPair ? (upperMode ? pairBig : pairSmall) : ""
+    readonly property string topLabel: hasShiftPair ? (shiftActive ? pairBig : pairSmall) : ""
     readonly property string bottomLabel: {
         // 特殊键的形态由设置决定；图标形态时 text 为空，交给下面的
         // iconName + DIcon 绘制
         if (root.specialLook !== null)
             return root.specialLook.text;
 
-        return hasShiftVariant ? effectiveLabel : (hasShiftPair ? (upperMode ? pairSmall : pairBig) : mainLabel);
+        return hasShiftVariant ? effectiveLabel : (hasShiftPair ? (shiftActive ? pairSmall : pairBig) : mainLabel);
     }
     // 两行各自的字号比例：大字永远当前输入项
-    readonly property real topRatio: (hasShiftPair && upperMode) ? mainLabelRatio : upperLabelRatio
-    readonly property real bottomRatio: (hasShiftPair && upperMode) ? upperLabelRatio : mainLabelRatio
+    readonly property real topRatio: (hasShiftPair && shiftActive) ? mainLabelRatio : upperLabelRatio
+    readonly property real bottomRatio: (hasShiftPair && shiftActive) ? upperLabelRatio : mainLabelRatio
     // 「非当前状态会输入」的那一行：比正文色再淡一档，层次更清楚
     readonly property color minorLabelColor: Theme.withAlpha(Theme.onSurfaceVariant, Alpha.Secondary)
     // 键面图标（表情、第二页、菜单…）。可以是 Material 名字，也可以是图片路径
@@ -97,7 +98,7 @@ Item {
         return Qt.resolvedUrl(n);
     }
     // Shift 下的替代键：Enter 在 Shift 激活时变 Del（显示和执行都换）
-    readonly property bool hasShiftVariant: !!keyData.shift && upperMode
+    readonly property bool hasShiftVariant: !!keyData.shift && shiftActive
     // hasShiftVariant 为真时显示的是 shift 变体（Backspace→Del），那时不套特殊键样式，否则会把 Del 显示成 Backspace 的图标。
     readonly property string labelKey: (keyData.swap && useFn && keyData.fn && keyData.fn.l) ? keyData.fn.l : keyData.l
     readonly property var specialLook: (!hasShiftVariant && SpecialKeys.isSpecialKey(labelKey)) ? SpecialKeys.resolve(labelKey, root.specialKeyStyle, root.winKeyStyle, root.winKeyCustomIcon) : null

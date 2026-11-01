@@ -47,7 +47,7 @@ Item {
         iconColor: controller.fg
         backgroundColor: "transparent"
         stateColor: controller.fg
-        tooltipText: I18n.trFor("inlineKeyboard", "Collapse keyboard")
+        tooltipText: controller.tooltips ? I18n.trFor("inlineKeyboard", "Collapse keyboard") : ""
 
         function tapAt() {
             controller.quickAction("close");
@@ -103,7 +103,7 @@ Item {
         iconColor: controller.fg
         backgroundColor: "transparent"
         stateColor: controller.fg
-        tooltipText: I18n.trFor("inlineKeyboard", "Cycle input method")
+        tooltipText: controller.tooltips ? I18n.trFor("inlineKeyboard", "Cycle input method") : ""
 
         // 长按开选择器，短按循环切换；按钮自己不带长按，按住计时器判定
         property bool longFired: false

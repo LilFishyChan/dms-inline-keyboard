@@ -159,6 +159,8 @@ PluginComponent {
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     property bool voiceAvailable: false
+    // 键盘按钮的悬停提示（设置页自己的操作按钮不受影响）
+    property bool tooltips: root.loadRuntime("tooltips", true)
     // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
     // （只有 daemon status，那是服务本身的状态），所以这里记一份乐观状态：
     property bool voiceActive: false
@@ -611,6 +613,11 @@ PluginComponent {
         root.runCommand(["vinput", "recording", "stop"]);
     }
 
+    function setTooltips(on) {
+        root.tooltips = on;
+        PluginService.savePluginData(root.pluginId, "tooltips", on);
+    }
+
     function toggleDockFill() {
         root.dockFill = !root.dockFill;
         PluginService.savePluginData(root.pluginId, "dockFillWidth", root.dockFill);
@@ -692,6 +699,10 @@ PluginComponent {
                 root.keyOpacity = nextKeyOpacity;
 
         }
+        const nextTooltips = PluginService.loadPluginData(root.pluginId, "tooltips", true);
+        if (nextTooltips !== root.tooltips)
+            root.tooltips = nextTooltips;
+
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
         if (nextDebugMode !== root.debugModeSetting)
             root.debugModeSetting = nextDebugMode;
@@ -753,6 +764,7 @@ PluginComponent {
             card.editing = false;
 
         root.open = true;
+        keyRouter.readSystemCaps();
         PluginService.setGlobalVar(root.pluginId, "open", true);
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
@@ -1080,6 +1092,7 @@ PluginComponent {
             kbWidth: root.kbWidth
             kbHeight: root.kbHeight
             avoidWindows: root.avoidWindows
+            tooltips: root.tooltips
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable
@@ -1192,6 +1205,7 @@ PluginComponent {
             mode: root.mode
             editing: root.editing
             avoidWindows: root.avoidWindows
+            tooltips: root.tooltips
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable

@@ -370,5 +370,14 @@
     },
     "Stop recording": {
         "Stop recording": "停止录音"
+    },
+    "Expand": {
+        "Expand": "展开"
+    },
+    "Button tooltips": {
+        "Button tooltips": "按钮提示"
+    },
+    "Show hints when hovering over keyboard buttons.": {
+        "Show hints when hovering over keyboard buttons.": "鼠标悬停在键盘按钮上时显示功能说明。"
     }
 }

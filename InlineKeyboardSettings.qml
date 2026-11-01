@@ -355,6 +355,47 @@ PluginSettings {
 
     SettingsCardGroup {
         SettingsCard {
+            Row {
+                width: parent.width
+                spacing: Theme.spacingM
+
+                Column {
+                    width: parent.width - tooltipToggle.width - Theme.spacingM
+                    spacing: Theme.spacingS
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "Button tooltips")
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.weight: Theme.fontWeightMedium
+                        color: Theme.surfaceText
+                    }
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "Show hints when hovering over keyboard buttons.")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.Wrap
+                    }
+
+                }
+
+                DCommon.DToggle {
+                    id: tooltipToggle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    hideText: true
+                    text: I18n.trFor("inlineKeyboard", "Button tooltips")
+                    checked: root.loadValue("tooltips", true)
+                    onToggled: (value) => root.saveValue("tooltips", value)
+                }
+
+            }
+
+        }
+
+        SettingsCard {
             StyledText {
                 width: parent.width
                 text: I18n.trFor("inlineKeyboard", "Key repeat interval")

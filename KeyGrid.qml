@@ -126,7 +126,8 @@ Item {
             span: modelData.rs
             fnActive: grid.c.fnActive
             // 字母大小写：shift 激活 / caps 锁定 → 大写
-            upperMode: (grid.c.modifierStates.shift || 0) > 0 || (grid.c.modifierStates.caps || 0) > 0
+            // 字母大写：Caps 单独生效，Shift 反转 Caps（两个都开时回到小写，和标准键盘一致）
+            upperMode: ((grid.c.modifierStates.shift || 0) > 0) !== ((grid.c.modifierStates.caps || 0) > 0)
             shiftActive: (grid.c.modifierStates.shift || 0) > 0
             modifierState: grid.c.modifierStateFor(modelData.key)
             specialKeyStyle: grid.c.specialKeyStyle

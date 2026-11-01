@@ -97,6 +97,7 @@ Rectangle {
     property real ghostY: 0
     property var ghostAction: null
     // 语音输入是否在录音（daemon 传下来，决定顶部是否切到语音行）
+    property bool tooltips: true
     property bool voiceActive: false
     // 语音模式：只留顶部语音行。由 daemon 传下来（daemon 负责切浮动），卡片只负责按它隐藏主区和底栏。
     property bool voiceMinimal: false
@@ -1597,7 +1598,7 @@ Rectangle {
                 visible: !root.isFloating
                 buttonSize: parent.btn
                 iconName: root.dockFill ? "collapse_content" : "expand_content"
-                tooltipText: root.dockFill ? I18n.trFor("inlineKeyboard", "Shrink to content") : I18n.trFor("inlineKeyboard", "Fill width")
+                tooltipText: root.tooltips ? (root.dockFill ? I18n.trFor("inlineKeyboard", "Shrink to content") : I18n.trFor("inlineKeyboard", "Fill width")) : ""
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: root.dockFill ? Theme.primary : Theme.chipSurface
@@ -1609,7 +1610,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "restart_alt"
-                tooltipText: I18n.trFor("inlineKeyboard", "Reset size")
+                tooltipText: root.tooltips ? I18n.trFor("inlineKeyboard", "Reset size") : ""
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1621,7 +1622,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "close"
-                tooltipText: I18n.trFor("inlineKeyboard", "Cancel")
+                tooltipText: root.tooltips ? I18n.trFor("inlineKeyboard", "Cancel") : ""
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1633,7 +1634,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "check"
-                tooltipText: I18n.trFor("inlineKeyboard", "Confirm")
+                tooltipText: root.tooltips ? I18n.trFor("inlineKeyboard", "Confirm") : ""
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.onPrimary
                 backgroundColor: Theme.primary

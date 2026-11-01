@@ -233,7 +233,7 @@ Item {
             iconColor: Theme.withAlpha(panel.controller.fg, Alpha.Bright)
             backgroundColor: backRepeat.running ? Theme.withAlpha(Theme.primary, Alpha.StateLayer) : Theme.chipSurface
             stateColor: Theme.primary
-            tooltipText: I18n.trFor("inlineKeyboard", "Backspace")
+            tooltipText: controller.tooltips ? I18n.trFor("inlineKeyboard", "Backspace") : ""
 
             property bool didRepeat: false
 
