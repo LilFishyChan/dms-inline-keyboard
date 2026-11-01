@@ -25,6 +25,7 @@ PanelWindow {
     property string mode: "keys"
     property bool editing: false
     property bool avoidWindows: true
+    property bool autoShow: false
     property bool tooltips: true
     property bool voiceActive: false
     property bool voiceMinimal: false
@@ -200,6 +201,7 @@ PanelWindow {
         mode: root.mode
         editing: root.editing
         avoidWindows: root.avoidWindows
+        autoShow: root.autoShow
         tooltips: root.tooltips
         voiceActive: root.voiceActive
         voiceMinimal: root.voiceMinimal

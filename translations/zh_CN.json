@@ -385,5 +385,8 @@
     },
     "Show the keyboard when a text field gets focus.": {
         "Show the keyboard when a text field gets focus.": "输入框拿到焦点时自动弹出键盘。"
+    },
+    "Input method addon needs update": {
+        "Input method addon needs update": "输入法插件需要更新"
     }
 }

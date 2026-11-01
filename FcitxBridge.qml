@@ -34,6 +34,8 @@ Item {
     property bool hasMore: false
     // 当前有没有输入框拿着焦点（addon 的 focus:0/1 消息）
     property bool inputFocused: false
+    // addon 连上时推的版本号，没收到就是空串（老版本 addon 不推）
+    property string addonVersion: ""
     // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
     // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），超时判据就看这个时间戳。
     property double lastSeenAt: 0
@@ -194,6 +196,8 @@ Item {
         if (line.startsWith("ping:")) {
             // 心跳：回一声，addon 靠它判断客户端还在
             sendFcitx("pong");
+        } else if (line.startsWith("version:")) {
+            addonVersion = line.substring(8);
         } else if (line.startsWith("focus:")) {
             inputFocused = line.substring(6) === "1";
         } else if (line.startsWith("state:")) {
@@ -312,7 +316,15 @@ Item {
             bridge.sendFcitx("reclaim");
             return ;
         }
-        if (!keyboardOpen && socket.connected)
+        // 键盘收起时只有不再需要常连（自动弹出关着）才归还连接
+        if (!keyboardOpen && !autoShow && socket.connected)
+            socket.connected = false;
+
+    }
+
+    // 自动弹出关掉之后，键盘也没开就把连接还回去
+    onAutoShowChanged: {
+        if (!autoShow && !keyboardOpen && socket.connected)
             socket.connected = false;
 
     }

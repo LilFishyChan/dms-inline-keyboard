@@ -60,6 +60,7 @@ Rectangle {
     property bool editing: false
     // 停靠模式下是否避让键盘：对应动作的"激活"状态
     property bool avoidWindows: true
+    property bool autoShow: false
     // 当前是否浮动窗口（浮窗下"避让窗口"没有意义 → 禁用态）
     property bool isFloating: false
     // 透明度：由插件设置决定（0.1 ~ 1.0），不跟 DMS 主题走
@@ -276,7 +277,8 @@ Rectangle {
     readonly property var actionStates: ({
         "float": root.isFloating ? "active" : "default",
         "avoid": root.isFloating ? "disabled" : (root.avoidWindows ? "active" : "default"),
-        "mic": root.voiceAvailable ? "default" : "disabled"
+        "mic": root.voiceAvailable ? "default" : "disabled",
+        "autoShow": root.autoShow ? "active" : "default"
     })
     // 拖动预览：编辑态显示「松手后会变成的样子」
     // 固定栏最多放几个：按可用宽度算，另设 6 个的软上限免得挤成一排

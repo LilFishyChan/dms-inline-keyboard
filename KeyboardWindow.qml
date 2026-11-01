@@ -12,6 +12,7 @@ PanelWindow {
 
     property bool keyboardVisible: false
     property bool avoidWindows: true
+    property bool autoShow: false
     // 语音输入是否在录音（决定顶部是否切到语音行）
     property bool tooltips: true
     property bool voiceActive: false
@@ -172,6 +173,7 @@ PanelWindow {
         mode: root.mode
         editing: root.editing
         avoidWindows: root.avoidWindows
+        autoShow: root.autoShow
         tooltips: root.tooltips
         voiceActive: root.voiceActive
         voiceMinimal: root.voiceMinimal

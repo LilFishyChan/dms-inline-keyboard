@@ -19,7 +19,8 @@ PluginComponent {
     id: root
 
     // 状态在窗口销毁后仍保留
-    property bool open: PluginService.getGlobalVar(root.pluginId, "open", false)
+    // 普通属性：绑定会被 globalVars 的变动重新求值，把 showKeyboard 里的赋值冲掉
+    property bool open: false
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // 宿主按 "popoutService" in item 判断是否注入，不声明就永远拿不到
     property var popoutService: null
@@ -164,8 +165,20 @@ PluginComponent {
     property bool voiceAvailable: false
     // 键盘按钮的悬停提示（设置页自己的操作按钮不受影响）
     property bool tooltips: PluginService.loadPluginData(root.pluginId, "tooltips", true)
+    // 和本插件配套的 addon 版本。addon 的 socket 协议变了就改这里，用户在键盘更新后
+    // 会看到「输入法插件需要更新」，而不是遇到各种莫名其妙的不生效
+    readonly property string requiredAddonVersion: "0.1.0"
+    // 收到了版本且对不上才算不匹配；没收到（老 addon 不推）也按不匹配处理
+    readonly property string addonVersionState: {
+        const v = fcitxBridge ? fcitxBridge.addonVersion : "";
+        if (v === "")
+            return "unknown";
+        return v === root.requiredAddonVersion ? "ok" : "mismatch";
+    }
     // 输入框拿到焦点时自动弹出键盘
     property bool autoShow: PluginService.loadPluginData(root.pluginId, "autoShow", false)
+    // 上一次失焦的时刻，用来挡掉「点空白处」引起的焦点抖动
+    property real lastFocusLostAt: 0
     // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
     // （只有 daemon status，那是服务本身的状态），所以这里记一份乐观状态：
     property bool voiceActive: false
@@ -717,6 +730,7 @@ PluginComponent {
         if (nextAutoShow !== root.autoShow)
             root.autoShow = nextAutoShow;
 
+
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
         if (nextDebugMode !== root.debugModeSetting)
             root.debugModeSetting = nextDebugMode;
@@ -779,6 +793,9 @@ PluginComponent {
 
         root.open = true;
         keyRouter.readSystemCaps();
+        // 版本对不上时说一声，否则用户只会看到各种莫名的不生效
+        if (root.addonVersionState === "mismatch")
+            ToastService.showWarning(I18n.trFor("inlineKeyboard", "Input method addon needs update") + " (" + fcitxBridge.addonVersion + " / " + root.requiredAddonVersion + ")");
         PluginService.setGlobalVar(root.pluginId, "open", true);
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
@@ -806,6 +823,10 @@ PluginComponent {
             floatingLoader.item.hide();
 
         root.open = false;
+        // 自动弹出时连接要留着收 focus，但键盘内的 UI 得还给 classicui，
+        // 否则别的应用的候选窗一直不显示
+        if (root.autoShow && fcitxBridge)
+            fcitxBridge.sendFcitx("release");
         PluginService.setGlobalVar(root.pluginId, "open", false);
     }
 
@@ -937,6 +958,7 @@ PluginComponent {
     onBgOpacityChanged: opacitySaveTimer.restart()
     onKeyOpacityChanged: opacitySaveTimer.restart()
     Component.onCompleted: {
+        root.open = PluginService.getGlobalVar(root.pluginId, "open", false);
         root.migrateBuiltinActions();
         root.migrateWinKeyStyle();
     }
@@ -948,6 +970,14 @@ PluginComponent {
         target: fcitxBridge
 
         function onInputFocusedChanged() {
+            if (!fcitxBridge.inputFocused) {
+                // 记下失焦时刻：点空白处时 fcitx 常常失焦后立刻又聚焦一次，
+                // 那不是用户想去输入，不该把键盘弹出来
+                root.lastFocusLostAt = Date.now();
+                return ;
+            }
+            if (Date.now() - root.lastFocusLostAt < 800)
+                return ;
             if (!Actions.shouldAutoShow(root.autoShow, fcitxBridge.inputFocused, root.open))
                 return ;
 
@@ -1122,6 +1152,7 @@ PluginComponent {
             kbHeight: root.kbHeight
             avoidWindows: root.avoidWindows
             tooltips: root.tooltips
+            autoShow: root.autoShow
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable
@@ -1235,6 +1266,7 @@ PluginComponent {
             editing: root.editing
             avoidWindows: root.avoidWindows
             tooltips: root.tooltips
+            autoShow: root.autoShow
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable
@@ -1487,6 +1519,7 @@ PluginComponent {
             parts.push("open=" + root.open);
             parts.push("floating=" + root.floating);
             parts.push("socket=" + root.fcitxSocketUp);
+            parts.push("addon=" + (fcitxBridge ? fcitxBridge.addonVersion : "") + "/" + root.requiredAddonVersion);
             parts.push("op=" + Math.round(root.bgOpacity * 100) + "/" + Math.round(root.keyOpacity * 100));
             parts.push("addonLog=" + root.fcitxLastError);
             parts.push("im=" + root.fcitxImName + "/" + root.fcitxImLabel + (root.fcitxImKeyboard ? "(kb)" : "(ime)"));

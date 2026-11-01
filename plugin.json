@@ -2,7 +2,7 @@
     "id": "inlineKeyboard",
     "name": "Inline Keyboard",
     "description": "On-screen touch keyboard for DMS with fcitx5 candidates drawn in-keyboard. Input-method switching goes through busctl (systemd) over D-Bus.",
-    "version": "0.1.8",
+    "version": "0.1.9",
     "license": "GPL-3.0-only",
     "author": "LilFishyChan",
     "icon": "keyboard",
