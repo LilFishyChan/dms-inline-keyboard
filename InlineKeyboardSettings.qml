@@ -467,26 +467,42 @@ PluginSettings {
         }
 
         SettingsCard {
-            SelectionSetting {
-                id: modifierModeSetting
+            id: modifierModeCard
 
-                settingKey: "modifierMode"
-                label: I18n.trFor("inlineKeyboard", "Modifier tap behaviour")
-                description: I18n.trFor("inlineKeyboard", "How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.")
-                defaultValue: "doubleTapLock"
-                options: [{
-                    "label": I18n.trFor("inlineKeyboard", "Active while held"),
-                    "value": "noLock"
-                }, {
-                    "label": I18n.trFor("inlineKeyboard", "Tap to activate; any key clears it"),
-                    "value": "toggle"
-                }, {
-                    "label": I18n.trFor("inlineKeyboard", "Tap to lock (tap again to unlock)"),
-                    "value": "tapLock"
-                }, {
-                    "label": I18n.trFor("inlineKeyboard", "Tap to toggle, double-tap to lock"),
-                    "value": "doubleTapLock"
-                }]
+            // 同样不用 SelectionSetting：它初始化时会把 defaultValue 写回文件
+            readonly property var modifierModeValues: ["noLock", "toggle", "tapLock", "doubleTapLock"]
+            readonly property var modifierModeLabels: [I18n.trFor("inlineKeyboard", "Active while held"), I18n.trFor("inlineKeyboard", "Tap to activate; any key clears it"), I18n.trFor("inlineKeyboard", "Tap to lock (tap again to unlock)"), I18n.trFor("inlineKeyboard", "Tap to toggle, double-tap to lock")]
+
+            StyledText {
+                width: parent.width
+                text: I18n.trFor("inlineKeyboard", "Modifier tap behaviour")
+                font.pixelSize: Theme.fontSizeMedium
+                font.weight: Theme.fontWeightMedium
+                color: Theme.surfaceText
+            }
+
+            StyledText {
+                width: parent.width
+                text: I18n.trFor("inlineKeyboard", "How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.")
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.Wrap
+            }
+
+            DCommon.DDropdown {
+                width: parent.width
+                options: modifierModeCard.modifierModeLabels
+                currentValue: modifierModeCard.modifierModeLabels[Math.max(0, modifierModeCard.modifierModeValues.indexOf(root.loadValue("modifierMode", "doubleTapLock")))]
+
+                onValueChanged: v => {
+                    if (!root.settingsReady)
+                        return ;
+
+                    const i = modifierModeCard.modifierModeLabels.indexOf(v);
+                    if (i >= 0)
+                        root.saveValue("modifierMode", modifierModeCard.modifierModeValues[i]);
+
+                }
             }
 
         }
@@ -539,33 +555,50 @@ PluginSettings {
     SettingsCardGroup {
         // Win 键实际发的是 Super_L，叫 Win 只对 Windows 用户成立，默认显示 Mod
         SettingsCard {
-            SelectionSetting {
-                id: winLookSetting
+            id: winLookCard
 
-                settingKey: "winKeyStyle"
-                label: I18n.trFor("inlineKeyboard", "Win key label")
-                description: I18n.trFor("inlineKeyboard", "This key sends Super. Show it as text or an icon.")
-                defaultValue: "mod"
-                options: [{
-                    "label": "Mod",
-                    "value": "mod"
-                }, {
-                    "label": "Super",
-                    "value": "super"
-                }, {
-                    "label": "⌘",
-                    "value": "system"
-                }, {
-                    "label": I18n.trFor("inlineKeyboard", "Custom icon"),
-                    "value": "custom"
-                }]
+            // 不用 SelectionSetting：它初始化时会把 defaultValue 写回文件（DDropdown 的 valueChanged 回环），
+            // 表现就是每次打开设置页都回到默认值
+            readonly property var winLookValues: ["mod", "super", "system", "custom"]
+            readonly property var winLookLabels: ["Mod", "Super", "⌘", I18n.trFor("inlineKeyboard", "Custom icon")]
+
+            StyledText {
+                width: parent.width
+                text: I18n.trFor("inlineKeyboard", "Win key label")
+                font.pixelSize: Theme.fontSizeMedium
+                font.weight: Theme.fontWeightMedium
+                color: Theme.surfaceText
+            }
+
+            StyledText {
+                width: parent.width
+                text: I18n.trFor("inlineKeyboard", "This key sends Super. Show it as text or an icon.")
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.Wrap
+            }
+
+            DCommon.DDropdown {
+                width: parent.width
+                options: winLookCard.winLookLabels
+                currentValue: winLookCard.winLookLabels[Math.max(0, winLookCard.winLookValues.indexOf(root.loadValue("winKeyStyle", "mod")))]
+
+                onValueChanged: v => {
+                    if (!root.settingsReady)
+                        return ;
+
+                    const i = winLookCard.winLookLabels.indexOf(v);
+                    if (i >= 0)
+                        root.saveValue("winKeyStyle", winLookCard.winLookValues[i]);
+
+                }
             }
 
         }
 
         // 自定义图标：DIconPicker 选 Material 图标，或者直接填图片路径
         SettingsCard {
-            visible: winLookSetting.value === "custom"
+            visible: root.loadValue("winKeyStyle", "mod") === "custom"
 
             // 和动作编辑表单里的图标行同一种布局：左侧 48px 标签，右侧选择器 + 路径
             Row {
