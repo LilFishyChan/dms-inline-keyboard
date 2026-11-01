@@ -18,7 +18,7 @@ Item {
         const out = [{
             "id": "all",
             // chips 在初始化时就求值，那时 I18n 单例的 trFor 还没就绪，走卡片上的守卫版
-            "label": controller.tr("All")
+            "label": I18n.trFor("inlineKeyboard", "All")
         }];
         for (let i = 0; i < groups.length; i++) out.push({
             "id": groups[i].id,

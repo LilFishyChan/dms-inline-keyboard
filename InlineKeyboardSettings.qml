@@ -8,16 +8,13 @@ import "alpha.js" as Alpha
 import qs.Common
 import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
+import qs.Modals.Common
 import qs.Services
 import qs.Widgets
 
 PluginSettings {
     id: root
 
-    // DMS 会在插件翻译表就绪之前预实例化设置页，文案会停在英文。
-    // 用短轮询把「表就绪」变成属性变化，让绑定重算（同 KeyboardCard 里的做法）
-    property int localeVersion: 0
-    property int translationPollCount: 0
     // ydotoold 状态：没有它什么键都发不出去，所以摆在最上面
     property bool ydotooldUp: true
     // 标准设置组件不自带存取，这里自己 load / save
@@ -165,7 +162,7 @@ PluginSettings {
         return I18n.trFor("inlineKeyboard", term);
     }
 
-    readonly property var specialStyleLabels: [tr("Icon"), tr("Short"), tr("Full name")]
+    readonly property var specialStyleLabels: [I18n.trFor("inlineKeyboard", "Icon"), I18n.trFor("inlineKeyboard", "Short"), I18n.trFor("inlineKeyboard", "Full name")]
     // DDropdown 初始化时也会发一次 valueChanged（带默认值），这时不能写盘
     property bool settingsReady: false
     // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
@@ -179,19 +176,6 @@ PluginSettings {
         bridgeCheck.running = true;
         root.reloadSettings();
         root.refreshDebugMode();
-    }
-
-    Timer {
-        interval: 100
-        repeat: true
-        running: root.localeVersion === 0 && root.translationPollCount < 100
-        onTriggered: {
-            root.translationPollCount++;
-            const tables = (typeof I18n !== "undefined" && I18n) ? I18n.pluginTranslations : null;
-            if (tables && tables[root.pluginId])
-                root.localeVersion = 1;
-
-        }
     }
 
     Process {
@@ -949,36 +933,51 @@ PluginSettings {
 
     }
 
-    // 确认框：embedded 默认 true 会把整块排进设置页列表，浮起必须显式关掉
-    DCommon.DDialog {
+    // 确认框：DDialog 直接放在设置页里只会占列表一行，必须包进独立的 DModal
+    DModal {
         id: debugConfirm
 
-        // embedded: false 会浮起，但关着的时候仍占一行高度 → 用 visible 收掉
-        embedded: false
-        popout: true
-        visible: root.debugConfirmOpen
-        opened: root.debugConfirmOpen
-        title: I18n.trFor("inlineKeyboard", "Turn on debug mode?")
-        supportingText: I18n.trFor("inlineKeyboard", "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
-        maximumWidth: 420
-        onRejected: root.debugConfirmOpen = false
-        actions: [
-            DCommon.DButton {
-                text: I18n.trFor("inlineKeyboard", "Cancel")
-                backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
-                textColor: Theme.surfaceText
-                onClicked: root.debugConfirmOpen = false
-            },
-            DCommon.DButton {
-                text: I18n.trFor("inlineKeyboard", "Enable")
-                backgroundColor: Theme.primary
-                textColor: Theme.onPrimary
-                onClicked: {
-                    root.writeDebugMode(true);
-                    root.debugConfirmOpen = false;
-                }
+        modalWidth: Math.min(Theme.dialogMaxWidth, screenWidth - Theme.spacingXL * 2)
+        modalHeight: Math.min(screenHeight * 0.7, 360)
+        onBackgroundClicked: root.debugConfirmOpen = false
+
+        content: Component {
+            DCommon.DDialog {
+                title: I18n.trFor("inlineKeyboard", "Turn on debug mode?")
+                supportingText: I18n.trFor("inlineKeyboard", "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.")
+                maximumWidth: Math.min(Theme.dialogMaxWidth, screenWidth - Theme.spacingXL * 2)
+                onRejected: root.debugConfirmOpen = false
+                actions: [
+                    DCommon.DButton {
+                        text: I18n.trFor("inlineKeyboard", "Cancel")
+                        backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
+                        textColor: Theme.surfaceText
+                        onClicked: root.debugConfirmOpen = false
+                    },
+                    DCommon.DButton {
+                        text: I18n.trFor("inlineKeyboard", "Enable")
+                        backgroundColor: Theme.primary
+                        textColor: Theme.onPrimary
+                        onClicked: {
+                            root.writeDebugMode(true);
+                            root.debugConfirmOpen = false;
+                        }
+                    }
+                ]
             }
-        ]
+        }
+    }
+
+    // 显式开关：DModal 的 shouldBeVisible 只同步状态，不建窗口
+    Connections {
+        function onDebugConfirmOpenChanged() {
+            if (root.debugConfirmOpen)
+                debugConfirm.open();
+            else
+                debugConfirm.close();
+        }
+
+        target: root
     }
 
 }

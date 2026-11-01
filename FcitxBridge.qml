@@ -231,7 +231,8 @@ Item {
         if (bridge.socketPath === "" || !socket.connected)
             return false;
 
-        socket.write(line + "\n");
+        // 协议按行分帧：任何字段带换行都会变成第二条命令
+        socket.write(String(line).replace(/[\r\n]/g, " ") + "\n");
         return true;
     }
 

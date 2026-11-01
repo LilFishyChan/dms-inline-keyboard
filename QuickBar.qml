@@ -483,7 +483,7 @@ Item {
             MouseArea {
                 id: slotMouse
                 Accessible.role: Accessible.Button
-                Accessible.name: I18n.trFor("inlineKeyboard", isSlot ? "Action slot" : "Keyboard page")
+                Accessible.name: isSlot ? I18n.trFor("inlineKeyboard", "Action slot") : I18n.trFor("inlineKeyboard", "Keyboard page")
 
                 function tapAt() {
                     if (controller.mode === "transparency") {

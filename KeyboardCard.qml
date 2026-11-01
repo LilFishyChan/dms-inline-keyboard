@@ -318,9 +318,6 @@ Rectangle {
     readonly property real spaceW: spaceEntry ? spaceEntry.key.w * unit + (spaceEntry.key.w - 1) * gap : 0
     // I18n.trFor 的上下文 id（= plugin.json 的 id），缺词条时回退英文原串
     readonly property string pluginId: "inlineKeyboard"
-    // 插件翻译表由 PluginService 异步注册，晚于卡片构造。
-    property int localeVersion: 0
-    property int translationPollCount: 0
     // 卡片高度**固定**：一律按主键区的行数算。
     // 不能用 rows.length —— 那是「当前页」的行数，切到表情页（0 行）、功能列表页都会算错高度。
     readonly property int layoutRowCount: Layout.pageRows("page1").length
@@ -957,21 +954,6 @@ Rectangle {
         onTriggered: root.candLoading = false
     }
 
-    Timer {
-        id: translationPoll
-
-        interval: 100
-        repeat: true
-        running: root.localeVersion === 0 && root.translationPollCount < 100
-        onTriggered: {
-            root.translationPollCount++;
-            const tables = (typeof I18n !== "undefined" && I18n) ? I18n.pluginTranslations : null;
-            if (tables && tables[root.pluginId])
-                root.localeVersion = 1;
-
-        }
-    }
-
     // 透明度调整时，键盘外围画一圈提示边框
     Rectangle {
         anchors.fill: parent
@@ -1543,7 +1525,7 @@ Rectangle {
                 visible: !root.isFloating
                 buttonSize: parent.btn
                 iconName: root.dockFill ? "collapse_content" : "expand_content"
-                tooltipText: root.dockFill ? root.tr("Shrink to content") : root.tr("Fill width")
+                tooltipText: root.dockFill ? I18n.trFor("inlineKeyboard", "Shrink to content") : I18n.trFor("inlineKeyboard", "Fill width")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: root.dockFill ? Theme.primary : Theme.chipSurface
@@ -1555,7 +1537,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "restart_alt"
-                tooltipText: root.tr("Reset size")
+                tooltipText: I18n.trFor("inlineKeyboard", "Reset size")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1567,7 +1549,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "close"
-                tooltipText: root.tr("Cancel")
+                tooltipText: I18n.trFor("inlineKeyboard", "Cancel")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
@@ -1579,7 +1561,7 @@ Rectangle {
             DActionButton {
                 buttonSize: parent.btn
                 iconName: "check"
-                tooltipText: root.tr("Confirm")
+                tooltipText: I18n.trFor("inlineKeyboard", "Confirm")
                 iconSize: Math.round(root.keyH * 0.42)
                 iconColor: Theme.onPrimary
                 backgroundColor: Theme.primary

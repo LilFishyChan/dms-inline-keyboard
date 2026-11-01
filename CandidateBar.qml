@@ -43,14 +43,15 @@ Item {
         return true;
     }
 
-    width: parent.width
-    height: controller.showCandBar ? areaH : 0
-    onHeightChanged: {
-        if (height <= 0)
-            candArea.entered = false;
+    // 尺寸与 visible 由父级的 anchors.fill 决定；读 height 会被它覆盖，entered 只能跟开关状态复位
+    Connections {
+        function onShowCandBarChanged() {
+            if (candArea.controller && !candArea.controller.showCandBar)
+                candArea.entered = false;
+        }
 
+        target: candArea.controller
     }
-    visible: height > 0
     // 切换时整条淡入淡出
     opacity: controller.showCandBar ? 1 : 0
     z: 20
@@ -244,7 +245,7 @@ Item {
                 buttonSize: Math.round(candArea.controller.quickH)
                 // 展开态直接换图标，不走旋转（DActionButton 的 rotation 会连底色一起转）
                 iconName: candArea.controller.candListOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"
-                tooltipText: candArea.controller ? (candArea.controller.candListOpen ? candArea.controller.tr("Collapse candidates") : candArea.controller.tr("Expand candidates")) : ""
+                tooltipText: candArea.controller && candArea.controller.candListOpen ? I18n.trFor("inlineKeyboard", "Collapse candidates") : I18n.trFor("inlineKeyboard", "Expand candidates")
                 iconSize: Math.round(candArea.controller.quickH * 0.5)
                 iconColor: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
                 backgroundColor: Theme.chipSurface

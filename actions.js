@@ -446,6 +446,9 @@ function updateAction(list, id, patch) {
         const next = { id: a.id, label: a.label, icon: a.icon,
                        hidden: a.hidden === true, builtin: a.builtin === true,
                        cmd: typeof a.cmd === "string" ? a.cmd : "" }
+        // kind 决定点击怎么执行，重建对象时不能丢（否则 cmd 类动作会退化成内置）
+        if (typeof a.kind === "string")
+            next.kind = a.kind
         if (patch && typeof patch.label === "string")
             next.label = patch.label
         if (patch && typeof patch.icon === "string")

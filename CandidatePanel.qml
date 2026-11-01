@@ -142,10 +142,11 @@ Item {
     function pointerTapSide(act) {
         for (let i = 0; i < sideRepeater.count; i++) {
             const item = sideRepeater.itemAt(i);
-            if (item && item.modelData && item.modelData.act === act && item.pressArea)
+            if (item && item.modelData && item.modelData.act === act && item.pressArea) {
                 item.pressArea.tapAt();
+                return true;
+            }
 
-            return true;
         }
         return false;
     }
@@ -341,7 +342,17 @@ Item {
 
                 id: press
                 Accessible.role: Accessible.Button
-                Accessible.name: I18n.trFor("inlineKeyboard", sideBtn.modelData.act === "up" ? "Scroll up" : sideBtn.modelData.act === "down" ? "Scroll down" : sideBtn.modelData.act === "backspace" ? "Delete" : "Submit")
+                Accessible.name: {
+                    const act = sideBtn.modelData.act;
+                    if (act === "up")
+                        return I18n.trFor("inlineKeyboard", "Scroll up");
+                    if (act === "down")
+                        return I18n.trFor("inlineKeyboard", "Scroll down");
+                    if (act === "backspace")
+                        return I18n.trFor("inlineKeyboard", "Delete");
+
+                    return I18n.trFor("inlineKeyboard", "Submit");
+                }
 
                 function tapAt() {
                     switch (sideBtn.modelData.act) {
