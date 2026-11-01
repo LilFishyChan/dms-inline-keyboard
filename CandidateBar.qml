@@ -267,10 +267,10 @@ Item {
 
         visible: candArea.hasPreedit
         anchors.bottom: panel.top
-        anchors.bottomMargin: 5
+        anchors.bottomMargin: Theme.spacingXS
         anchors.left: panel.left
-        width: preeditLabel.width + 20
-        height: preeditLabel.height + 8
+        width: preeditLabel.width + Theme.spacingXL - Theme.spacingXS
+        height: preeditLabel.height + Theme.spacingS
         radius: Theme.cornerRadiusS
         color: Theme.withAlpha(Theme.hostSurface, controller.bgOpacity)
 

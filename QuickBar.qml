@@ -301,7 +301,7 @@ Item {
             MouseArea {
                 id: barMouse
                 Accessible.role: Accessible.Button
-                Accessible.name: modelData.label || ""
+                Accessible.name: controller ? controller.tr(modelData.label || "") : ""
 
                 function tapAt() {
                     controller.quickAction(modelData.id);

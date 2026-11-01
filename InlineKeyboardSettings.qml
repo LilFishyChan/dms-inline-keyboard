@@ -843,9 +843,9 @@ PluginSettings {
                                 color: isHidden ? Theme.chipSurfaceNested : Theme.chipSurface
                                 border.width: Theme.layerOutlineWidth
                                 border.color: Theme.outlineMedium
-                                topLeftRadius: parent.firstInGroup ? Theme.cornerRadiusM : 2
+                                topLeftRadius: parent.firstInGroup ? Theme.groupedListOuterRadius : Theme.groupedListInnerRadius
                                 topRightRadius: topLeftRadius
-                                bottomLeftRadius: parent.lastInGroup ? Theme.cornerRadiusM : 2
+                                bottomLeftRadius: parent.lastInGroup ? Theme.groupedListOuterRadius : Theme.groupedListInnerRadius
                                 bottomRightRadius: bottomLeftRadius
                             }
 

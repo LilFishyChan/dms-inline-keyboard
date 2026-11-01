@@ -203,9 +203,12 @@ Item {
                 const arr = JSON.parse(line.substring(8));
                 if (Array.isArray(arr))
                     allCandidates = arr.map((x, n) => {
-                    return (x && typeof x === "object") ? x : {
-                        "i": n,
-                        "t": String(x == null ? "" : x)
+                    const item = (x && typeof x === "object") ? x : {};
+                    const idx = Number(item.i);
+                    // i 必须是整数：addon 那边是 atoi，传对象/NaN 会选错词
+                    return {
+                        "i": Number.isFinite(idx) ? Math.trunc(idx) : n,
+                        "t": String(item.t == null ? "" : item.t).slice(0, 64)
                     };
                 });
 
@@ -236,7 +239,8 @@ Item {
         if (!text || !textSupported || !socket.connected)
             return false;
 
-        socket.write("text:" + text + "\n");
+        // 协议按行分帧，文本里的换行会变成第二条命令
+        socket.write("text:" + String(text).replace(/[\r\n]/g, " ") + "\n");
         return true;
     }
 

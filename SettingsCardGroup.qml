@@ -27,9 +27,9 @@ Item {
                 const first = i === 0;
                 const last = i === n - 1;
                 c.radius = 0;
-                c.topLeftRadius = first ? Theme.cornerRadiusM : Theme.cornerRadiusXS;
+                c.topLeftRadius = first ? Theme.groupedListOuterRadius : Theme.groupedListInnerRadius;
                 c.topRightRadius = c.topLeftRadius;
-                c.bottomLeftRadius = last ? Theme.cornerRadiusM : Theme.cornerRadiusXS;
+                c.bottomLeftRadius = last ? Theme.groupedListOuterRadius : Theme.groupedListInnerRadius;
                 c.bottomRightRadius = c.bottomLeftRadius;
             }
         }

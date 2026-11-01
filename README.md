@@ -157,7 +157,6 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `EmojiCategoryBar.qml` | Category chips shown in the top bar on the emoji page |
 | `Key.qml` | One key: two-line cap, Fn layer substitution, ripple |
 | `ActionIcon.qml` | One action icon — shared by list / quick bar / slot / drag ghost |
-| `Ripple.qml`, `Slider.qml` | Small widgets used by keys, buttons and the opacity panel |
 | `InlineKeyboardWidget.qml` | Optional DankBar pill that toggles the same global "open" var |
 | `actions.js` | **Pure** action-list logic (sanitize, move, filter, hit-test). Unit-tested |
 | `layouts/phone.js` | Layout data: rows, units, key maps, function-key pages |

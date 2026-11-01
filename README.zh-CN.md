@@ -142,7 +142,6 @@ clone 出来的目录名必须等于插件 id（`inlineKeyboard`）。
 | `EmojiCategoryBar.qml` | 表情页顶部那行分类条 |
 | `Key.qml` | 单个按键：双行键帽、Fn 层替换、涟漪 |
 | `ActionIcon.qml` | 单个动作图标 —— 列表 / 快捷栏 / 圆槽 / 拖拽块共用 |
-| `Ripple.qml`、`Slider.qml` | 按键、按钮和透明度面板用的小控件 |
 | `InlineKeyboardWidget.qml` | 可选的 DankBar 药丸，切换同一个全局「打开」变量 |
 | `actions.js` | **纯函数**动作表逻辑（清洗、移动、过滤、命中测试），有单测 |
 | `layouts/phone.js` | 布局数据：行、单位、键位表、功能键页 |

@@ -48,6 +48,7 @@ Item {
     property var ydotooldUp: undefined
     // ydotool 一次只能跑一条，连按要排队
     property var pendingCommands: []
+    property double lastToastAt: 0
     // 测试用：只记录「会发什么」，不真的注入（不调 ydotool、不发 socket）。
     // 由 debugSetDryRun / debugInjected 驱动，见 scripts/acceptance.py。
     property bool dryRun: false
@@ -252,6 +253,12 @@ Item {
     function notifyUnimplemented(label) {
         if (typeof ToastService === "undefined" || !ToastService)
             return ;
+        // 长按重复时每 60ms 一次，没有节流会刷满屏幕
+        const now = Date.now();
+        if (now - root.lastToastAt < 3000)
+            return ;
+
+        root.lastToastAt = now;
 
         // label 通常是「X is not implemented yet」的前半句，但 ydotool 那条本身就是整句
         const term = label === "ydotoold is not running" ? label : label + " is not implemented yet";

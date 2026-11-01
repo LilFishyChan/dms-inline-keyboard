@@ -327,7 +327,7 @@ Item {
             // 圆角、底色、图标色都跟主键盘的特殊键一致（Tab / Enter 那种）：这一列是键区的一部分，不该看起来像另一套控件。
             radius: Math.min(Theme.cornerRadius, candList.sideKeyH * 0.18)
             color: Theme.chipSurfaceNested
-            opacity: press.pressed ? 0.72 : 1
+            opacity: press.pressed ? Alpha.High : 1
 
             DIcon {
                 anchors.centerIn: parent

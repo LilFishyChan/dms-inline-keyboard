@@ -889,8 +889,8 @@ Rectangle {
     radius: Theme.windowRadius
     // 卡片底跟 DMS 设置页同色（hostSurface），透明度仍由插件设置控制
     color: Theme.withAlpha(Theme.hostSurface, bgOpacity)
-    border.width: Theme.outlineWidth
-    border.color: Theme.withAlpha(Theme.outlineVariant, 0.7)
+    border.width: Theme.layerOutlineWidth
+    border.color: Theme.outlineMedium
 
     // 选词窗口：600ms 后恢复正常（覆盖 addon 回包 + 一次状态推送）
     Timer {
@@ -973,7 +973,7 @@ Rectangle {
     // 透明度调整时，键盘外围画一圈提示边框
     Rectangle {
         anchors.fill: parent
-        radius: Theme.cornerRadius
+        radius: Theme.windowRadius
         color: "transparent"
         border.width: Theme.outlineWidthFocused
         border.color: Theme.primary
@@ -1401,7 +1401,7 @@ Rectangle {
         Rectangle {
             anchors.fill: parent
             color: Theme.withAlpha(Theme.scrimColor, Theme.scrimAlpha)
-            radius: Theme.cornerRadius
+            radius: Theme.windowRadius
 
             // 吞掉点击：下面看得见但点不到
             MouseArea {

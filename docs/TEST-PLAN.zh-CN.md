@@ -28,7 +28,7 @@ node --test tests/          # 243 条，纯逻辑层
 只改下列文件时，跑一遍单测即可：
 
 - `actions.js`、`data.js`、`keyroute.js`、`candidates.js`、`modifiers.js`
-- `layouts/phone.js`、`layouts/emoji.js`、`layouts/resize.js`、`layouts/special-keys.js`
+- `layouts/phone.js`、`layouts/emoji.js`、`layouts/resize.js`、`layouts/specialKeys.js`
 
 改 QML 组件、窗口、手势、设置页 → 必须走后面的手工清单。
 

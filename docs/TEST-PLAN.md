@@ -30,7 +30,7 @@ node --test tests/          # 243 cases, pure logic only
 Changing only these files? Running the unit tests is enough:
 
 - `actions.js`, `data.js`, `keyroute.js`, `candidates.js`, `modifiers.js`
-- `layouts/phone.js`, `layouts/emoji.js`, `layouts/resize.js`, `layouts/special-keys.js`
+- `layouts/phone.js`, `layouts/emoji.js`, `layouts/resize.js`, `layouts/specialKeys.js`
 
 Changes to QML components, windows, gestures or the settings page require the manual checklist below.
 

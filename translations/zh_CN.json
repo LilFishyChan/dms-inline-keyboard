@@ -376,5 +376,8 @@
     },
     "Cycle input method": {
         "Cycle input method": "切换输入法"
+    },
+    "Copy is still finishing, try again": {
+        "Copy is still finishing, try again": "上一次复制还没完成，请稍后再试"
     }
 }

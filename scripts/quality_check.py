@@ -236,15 +236,22 @@ def check_manifest():
 def check_i18n(manifest):
     tr_file = REPO / "translations" / "zh_CN.json"
     strings = set()
+    # 两种调用形态都要统计：字面量走 I18n.trFor，只有动态词条才用 tr(变量)
+    patterns = [
+        r'tr\(\s*"((?:[^"\\]|\\.)*)"',
+        r'I18n\.trFor\(\s*"inlineKeyboard"\s*,\s*"((?:[^"\\]|\\.)*)"',
+    ]
     for p in sources("*.qml"):
-        for m in re.finditer(r'tr\(\s*"((?:[^"\\]|\\.)*)"', "\n".join(read_lines(p))):
-            raw = m.group(1)
-            try:
-                s = json.loads('"%s"' % raw)
-            except json.JSONDecodeError:
-                s = raw
-            if len(s) > 1:
-                strings.add(s)
+        text = "\n".join(read_lines(p))
+        for pat in patterns:
+            for m in re.finditer(pat, text):
+                raw = m.group(1)
+                try:
+                    s = json.loads('"%s"' % raw)
+                except json.JSONDecodeError:
+                    s = raw
+                if len(s) > 1:
+                    strings.add(s)
     if not tr_file.exists():
         if strings:
             add("WARN", "i18n", "translations/zh_CN.json", 0,
@@ -255,8 +262,11 @@ def check_i18n(manifest):
     except json.JSONDecodeError as exc:
         add("FAIL", "i18n", "translations/zh_CN.json", exc.lineno, "JSON 解析失败: %s" % exc.msg)
         return
-    name = (manifest or {}).get("name", "")
-    entries = table.get(name) or next((v for v in table.values() if isinstance(v, dict)), {})
+    # 表结构是「每词条一 bucket」：{"<term>": {"<term>": "<译文>"}}
+    entries = {}
+    for bucket in table.values():
+        if isinstance(bucket, dict):
+            entries.update(bucket)
     missing = sorted(s for s in strings if s not in entries)
     if missing:
         add("WARN", "i18n", "translations/zh_CN.json", 0,

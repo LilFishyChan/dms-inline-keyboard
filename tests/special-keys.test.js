@@ -1,4 +1,4 @@
-// layouts/special-keys.js 的单元测试：node --test tests/
+// layouts/specialKeys.js 的单元测试：node --test tests/
 //
 // 测的是「特殊键该画图标还是文字」这个纯决策。它错了的表现很具体：
 // 键帽上出现空图标（选图标但没这个图标）、或者 Win 键没跟着自己的设置走。

@@ -315,7 +315,17 @@ PluginComponent {
             lastTextCommitVia = "commit";
             return "commit";
         }
-        fcitxBridge.copyText(text);
+        // copyText 返回 false = 上一条 dms cl copy 还没退出，这次根本没发出去
+        if (!fcitxBridge.copyText(text)) {
+            lastTextCommitVia = "none";
+            const now0 = Date.now();
+            if (typeof ToastService !== "undefined" && ToastService && now0 - root.lastTextToastAt > 3000) {
+                root.lastTextToastAt = now0;
+                const busy = "Copy is still finishing, try again";
+                ToastService.showInfo((typeof I18n !== "undefined" && I18n && I18n.trFor) ? I18n.trFor("inlineKeyboard", busy) : busy);
+            }
+            return "none";
+        }
         const copied = fcitxBridge.clipboardAvailable;
         lastTextCommitVia = copied ? "clipboard" : "none";
         // 连点几个表情时别刷一屏提示：同一条消息 3 秒内只弹一次

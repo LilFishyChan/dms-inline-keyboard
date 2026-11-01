@@ -40,8 +40,8 @@ Item {
         height: Math.max(Math.round(root.controller.keyH * 0.9), Math.min(listView.contentHeight + padding * 2, parent.height * 0.75))
         radius: Theme.cornerRadiusL
         color: Theme.floatingWindowSurface
-        border.width: Theme.outlineWidth
-        border.color: Theme.outlineVariant
+        border.width: Theme.layerOutlineWidth
+        border.color: Theme.outlineMedium
 
         // 吃掉面板内的点击，避免穿透到下面的关闭区域
         MouseArea {
@@ -64,8 +64,8 @@ Item {
 
                 width: listView.width
                 height: Math.round(root.controller.keyH * 0.68)
-                radius: Math.round(Theme.cornerRadius * 0.7)
-                color: modelData.current ? Theme.withAlpha(Theme.primary, 0.14) : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, Alpha.Whisper) : "transparent")
+                radius: Theme.cornerRadiusS
+                color: modelData.current ? Theme.selectedContainer : (rowMouse.containsMouse ? Theme.withAlpha(root.controller.fg, Alpha.Whisper) : "transparent")
 
                 // label 块：托盘上看到的那个字（万 / abc / en）
                 Rectangle {
@@ -77,7 +77,7 @@ Item {
                     anchors.leftMargin: Math.round(root.controller.keyH * 0.12)
                     anchors.verticalCenter: parent.verticalCenter
                     radius: Math.round(width * 0.28)
-                    color: modelData.current ? Theme.primary : Theme.withAlpha(root.controller.fg, 0.09)
+                    color: modelData.current ? Theme.accentOnSelectedContainer : Theme.withAlpha(root.controller.fg, Alpha.Ghost)
 
                     StyledText {
                         anchors.centerIn: parent

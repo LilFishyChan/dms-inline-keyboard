@@ -1,5 +1,6 @@
 // 落点幽灵块：半透明 + 主题色描边，表示「松手之后这个动作会在这里」。
 // 固定栏的插入位、列表的落点、被挤出到列表首位的动作，共用这一套样式。
+import "alpha.js" as Alpha
 import QtQuick
 import qs.Common
 
@@ -17,7 +18,7 @@ Rectangle {
     readonly property int iconSize: hasLabel ? Math.round(height * 0.42) : Math.round(height * iconRatio)
 
     visible: active && action !== null
-    opacity: action !== null ? 0.55 : 0
+    opacity: action !== null ? Alpha.Muted : 0
     radius: Theme.fullRadius(width, height)
     // 比编辑态背景（cardSurface）亮一档，否则和背景完全同色、只剩一个淡框
     color: Theme.chipSurface
