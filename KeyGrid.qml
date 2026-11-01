@@ -216,7 +216,7 @@ Item {
         visible: grid.c.spaceEntry !== null && grid.c.fcitxImLabel === "" && source !== ""
         // addon 直接给绝对路径（从 icon theme 解析），不需要缓存破除参数
         source: grid.c.fcitxImIcon === "" ? "" : "file://" + grid.c.fcitxImIcon
-        width: Math.round(grid.c.keyH * 0.4)
+        width: Math.round(grid.c.keyH * 0.32)
         height: width
         x: grid.c.spaceX + (grid.c.spaceW - width) / 2
         y: grid.c.spaceY + (grid.c.keyH - height) / 2
@@ -224,14 +224,22 @@ Item {
         smooth: true
     }
 
+    // 字号跟键帽主字同级（0.32）；小键宽下同样靠 HorizontalFit 缩，别触发省略
     StyledText {
         visible: grid.c.spaceEntry !== null && grid.c.fcitxImLabel !== ""
         text: grid.c.fcitxImLabel
-        font.pixelSize: Math.max(10, Math.round(grid.c.keyH * 0.42))
+        width: Math.round(grid.c.spaceW * 0.6)
+        wrapMode: Text.NoWrap
+        elide: Text.ElideNone
+        fontSizeMode: Text.HorizontalFit
+        minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
+        font.pixelSize: Math.round(grid.c.keyH * 0.32)
         font.weight: Font.Medium
         color: Theme.onSurface
+        // 行框比字号高，按 height 居中会让汉字偏上（下方是 descent 空白），改用 baseline 对齐
+        horizontalAlignment: Text.AlignHCenter
         x: grid.c.spaceX + (grid.c.spaceW - width) / 2
-        y: grid.c.spaceY + (grid.c.keyH - height) / 2
+        y: grid.c.spaceY + grid.c.keyH / 2 + font.pixelSize / 2 - baselineOffset
     }
 
     Timer {

@@ -204,8 +204,12 @@ Item {
                 // shift 激活时这行是「当前输入的大字」，用正文色；否则是次要标签，淡一档
                 color: root.topRatio === root.mainLabelRatio ? root.labelColor : root.minorLabelColor
                 // 长标签按可用宽度自动缩字号，一行不溢出
+                // 缩小字号要配合 NoWrap：默认 WordWrap 会先换行，第二行被 clip 裁掉只剩省略号
+                wrapMode: Text.NoWrap
+                elide: Text.ElideNone
                 fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: Theme.fontSizeSmall
+                // 小键宽下 12px 仍放不下，允许再缩一档
+                minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
                 font.pixelSize: Math.round(root.keyH * root.topRatio)
                 font.weight: root.topRatio === root.mainLabelRatio ? Font.Medium : Font.Normal
             }
@@ -249,8 +253,12 @@ Item {
                 color: root.bottomRatio === root.mainLabelRatio ? root.labelColor : root.minorLabelColor
                 verticalAlignment: Text.AlignVCenter
                 // 长标签（Backspace / Caps Lock）自动缩到放得下
+                // 缩小字号要配合 NoWrap：默认 WordWrap 会先换行，第二行被 clip 裁掉只剩省略号
+                wrapMode: Text.NoWrap
+                elide: Text.ElideNone
                 fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: Theme.fontSizeSmall
+                // 小键宽下 12px 仍放不下，允许再缩一档
+                minimumPixelSize: Math.round(Theme.fontSizeSmall * 0.75)
                 font.pixelSize: Math.round(root.keyH * root.bottomRatio)
                 font.weight: Font.Medium
             }
