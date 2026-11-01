@@ -172,7 +172,7 @@ Item {
         }).filter((s) => {
             return s !== "";
         });
-        return controller.debugCandItems.length + " 项";
+        return controller.debugCandItems.length + " items";
     }
 
     // dms ipc call inlineKeyboard debugCandList   切换候选列表页

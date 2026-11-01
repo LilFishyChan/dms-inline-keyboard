@@ -757,8 +757,8 @@ PluginSettings {
 
                         DCommon.DListRow {
                             width: parent.width
-                            // 行高按内容算；firstInGroup/lastInGroup 给出分组的圆角
-                            implicitHeight: Math.max(Theme.listItemHeight, actionRow.implicitHeight + Theme.spacingM * 2)
+                            // 行高要把展开的表单算进去，否则表单会压到下一行上
+                            implicitHeight: Math.max(Theme.listItemHeight, actionRow.implicitHeight + Theme.spacingM * 2) + (inlineForm.active ? inlineForm.height + Theme.spacingS : 0)
                             firstInGroup: index === 0
                             lastInGroup: index === actionList.items.length - 1
 
@@ -769,7 +769,8 @@ PluginSettings {
                                 anchors.right: parent.right
                                 anchors.leftMargin: Theme.spacingL
                                 anchors.rightMargin: Theme.spacingM
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: Theme.spacingM
                                 spacing: Theme.spacingM
 
                                 // 非编辑态只展示图标，改图标走那一行的编辑
@@ -783,7 +784,7 @@ PluginSettings {
                                 StyledText {
                                     width: parent.width - 20 - actionButtons.implicitWidth - parent.spacing * 2
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: modelData.label
+                                    text: root.tr(modelData.label)
                                     font.pixelSize: Theme.fontSizeMedium
                                     color: isHidden ? Theme.withAlpha(Theme.surfaceText, Alpha.Muted) : Theme.surfaceText
                                     elide: Text.ElideRight
@@ -830,6 +831,9 @@ PluginSettings {
                             Loader {
                                 id: inlineForm
 
+                                // 不给锚点会叠在行的左上角
+                                anchors.top: actionRow.bottom
+                                anchors.topMargin: Theme.spacingS
                                 width: parent.width
                                 active: root.editingId === modelData.id
                                 // 卸载后 implicitHeight 会留着上次的高度，显式收成 0
