@@ -332,7 +332,7 @@ PluginSettings {
                 anchors.margins: Theme.spacingL
                 text: root.installCommands
                 color: Theme.surfaceText
-                font.family: "monospace"
+                font.family: Theme.monoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.WrapAnywhere
             }
@@ -542,7 +542,7 @@ PluginSettings {
                 DCommon.DIconPicker {
                     id: winIconPicker2
 
-                    width: Math.min(160, parent.width * 0.3)
+                    width: Math.min(Theme.iconSizeLarge * 5, parent.width * 0.3)
                     currentIcon: root.winIconValue
                     onIconSelected: (iconName, iconType) => root.setWinIcon(iconName)
                 }
@@ -661,7 +661,7 @@ PluginSettings {
                         DCommon.DIconPicker {
                             id: iconField
 
-                            width: Math.min(160, parent.width * 0.3)
+                            width: Math.min(Theme.iconSizeLarge * 5, parent.width * 0.3)
                             anchors.verticalCenter: parent.verticalCenter
                             currentIcon: root.draftIcon
                             onIconSelected: (iconName, iconType) => {
@@ -770,7 +770,7 @@ PluginSettings {
                                 ActionIcon {
                                     anchors.verticalCenter: parent.verticalCenter
                                     action: modelData
-                                    size: 20
+                                    size: Theme.iconSizeMedium
                                     color: Theme.surfaceText
                                 }
 

@@ -281,11 +281,9 @@ Item {
         if (bridge.socketPath === "")
             return ;
 
-        if (!statusRead.running)
-            statusRead.running = true;
+        statusFile.reload();
 
-        if (!imListRead.running)
-            imListRead.running = true;
+        imListFile.reload();
 
     }
 
@@ -391,27 +389,20 @@ Item {
     }
 
     // socket 没连上时（fcitx5 没起 / addon 没加载）读一次文件兜底
-    Process {
-        id: statusRead
+    FileView {
+        id: statusFile
 
-        command: ["cat", bridge.statusPath]
-        running: false
-
-        stdout: StdioCollector {
-            onStreamFinished: bridge.applyStatus(text)
-        }
-
+        path: bridge.statusPath
+        blockLoading: true
+        onLoaded: bridge.applyStatus(statusFile.text())
     }
 
-    Process {
-        id: imListRead
+    FileView {
+        id: imListFile
 
-        command: ["cat", bridge.imListPath]
-        running: false
-
-        stdout: StdioCollector {
-            onStreamFinished: bridge.applyImList(text)
-        }
+        path: bridge.imListPath
+        blockLoading: true
+        onLoaded: bridge.applyImList(imListFile.text())
 
     }
 
