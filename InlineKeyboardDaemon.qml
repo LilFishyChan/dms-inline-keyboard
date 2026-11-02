@@ -172,7 +172,7 @@ PluginComponent {
     property bool longPressNote: PluginService.loadPluginData(root.pluginId, "longPressNote", false)
     // 和本插件配套的 addon 版本。addon 的 socket 协议变了就改这里，用户在键盘更新后
     // 会看到「输入法插件需要更新」，而不是遇到各种莫名其妙的不生效
-    readonly property string requiredAddonVersion: "0.1.0"
+    readonly property string requiredAddonVersion: "0.1.1"
     // 收到了版本且对不上才算不匹配；没收到（老 addon 不推）也按不匹配处理
     readonly property string addonVersionState: {
         const v = fcitxBridge ? fcitxBridge.addonVersion : "";
