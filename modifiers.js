@@ -160,6 +160,23 @@ var MODIFIER_KEYCODES = {
  * @param {Object} states {shift, ctrl, alt, super, ...} 值 > 0 视为按下
  * @returns {{down: string[], up: string[]}} 形如 ["29:1"] / ["29:0"]
  */
+/**
+ * 是不是 Ctrl+Alt+F1..F12：这个组合由内核直接处理成 VT 切换，合成器拦不住。
+ * 带 Shift 的不算 —— 内核对 VT 切换只匹配 ctrl+alt，加了 Shift 就放行给应用了。
+ * @param {string} label 按键的显示名（Fn 层要给 fn.l，不是外层的数字）
+ * @param {number} ctrl Ctrl 状态
+ * @param {number} alt Alt 状态
+ * @param {number} shift Shift 状态
+ * @returns {boolean}
+ */
+function isTtySwitchCombo(label, ctrl, alt, shift) {
+    if (!((ctrl || 0) > 0 && (alt || 0) > 0))
+        return false
+    if ((shift || 0) > 0)
+        return false
+    return /^F([1-9]|1[0-2])$/.test(label || "")
+}
+
 function modifierSequence(states) {
     const source = states || {}
     const order = ["ctrl", "alt", "shift", "super"]
@@ -198,6 +215,7 @@ if (typeof module !== "undefined" && module.exports) {
         releaseModifierState: releaseModifierState,
         clearTransient: clearTransient,
         MODIFIER_KEYCODES: MODIFIER_KEYCODES,
-        modifierSequence: modifierSequence
+        modifierSequence: modifierSequence,
+        isTtySwitchCombo: isTtySwitchCombo
     }
 }

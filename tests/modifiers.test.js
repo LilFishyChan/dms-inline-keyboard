@@ -246,3 +246,20 @@ test("keyDataFor: 未知名字返回 null", () => {
     assert.equal(keyDataFor("nope"), null);
     assert.equal(keyDataFor(""), null);
 });
+
+test("isTtySwitchCombo: 只认 Ctrl+Alt+F1..F12", () => {
+    const { isTtySwitchCombo } = require("../modifiers.js");
+    assert.equal(isTtySwitchCombo("F1", 1, 1), true);
+    assert.equal(isTtySwitchCombo("F12", 2, 1), true);
+    // 缺一个修饰键都不算
+    assert.equal(isTtySwitchCombo("F1", 1, 0), false);
+    assert.equal(isTtySwitchCombo("F1", 0, 1), false);
+    // 带 Shift 的不算：内核只匹配 ctrl+alt，加了 Shift 就放行给应用
+    assert.equal(isTtySwitchCombo("F1", 1, 1, 1), false);
+    assert.equal(isTtySwitchCombo("F12", 1, 1, 2), false);
+    // 不是 F1..F12
+    assert.equal(isTtySwitchCombo("F13", 1, 1), false);
+    assert.equal(isTtySwitchCombo("1", 1, 1), false);
+    assert.equal(isTtySwitchCombo("", 1, 1), false);
+    assert.equal(isTtySwitchCombo(undefined, 1, 1), false);
+});

@@ -388,5 +388,11 @@
     },
     "Input method addon needs update": {
         "Input method addon needs update": "输入法插件需要更新"
+    },
+    "Block Ctrl+Alt+F1-F12": {
+        "Block Ctrl+Alt+F1-F12": "拦截 Ctrl+Alt+F1-F12"
+    },
+    "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": {
+        "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": "这些组合键由内核直接切换到虚拟终端，合成器拦不住。除非需要从键盘进 TTY，否则保持开启。"
     }
 }

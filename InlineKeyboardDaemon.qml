@@ -175,6 +175,8 @@ PluginComponent {
             return "unknown";
         return v === root.requiredAddonVersion ? "ok" : "mismatch";
     }
+    // 拦下 Ctrl+Alt+F1..F12：这个组合由内核直接处理成 VT 切换，合成器拦不住
+    property bool blockTtySwitch: PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true)
     // 输入框拿到焦点时自动弹出键盘
     property bool autoShow: PluginService.loadPluginData(root.pluginId, "autoShow", false)
     // 上一次失焦的时刻，用来挡掉「点空白处」引起的焦点抖动
@@ -636,6 +638,11 @@ PluginComponent {
         PluginService.savePluginData(root.pluginId, "tooltips", on);
     }
 
+    function setBlockTtySwitch(on) {
+        root.blockTtySwitch = on;
+        PluginService.savePluginData(root.pluginId, "blockTtySwitch", on);
+    }
+
     function setAutoShow(on) {
         root.autoShow = on;
         PluginService.savePluginData(root.pluginId, "autoShow", on);
@@ -729,6 +736,10 @@ PluginComponent {
         const nextAutoShow = PluginService.loadPluginData(root.pluginId, "autoShow", false);
         if (nextAutoShow !== root.autoShow)
             root.autoShow = nextAutoShow;
+
+        const nextBlockTty = PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true);
+        if (nextBlockTty !== root.blockTtySwitch)
+            root.blockTtySwitch = nextBlockTty;
 
 
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
@@ -999,6 +1010,7 @@ PluginComponent {
         id: keyRouter
 
         bridge: fcitxBridge
+        blockTtySwitch: root.blockTtySwitch
         active: root.keyboardVisible
         actions: root.actions
         modifierMode: root.modifierMode

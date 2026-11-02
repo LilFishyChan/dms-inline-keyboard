@@ -477,6 +477,48 @@ PluginSettings {
     }
 
     SettingsCardGroup {
+        // 手写 DToggle：SelectionSetting 那种「初始化写回默认值」的坑不想再碰一次
+        SettingsCard {
+            Row {
+                width: parent.width
+                spacing: Theme.spacingM
+
+                Column {
+                    width: parent.width - blockTtyToggle.width - Theme.spacingM
+                    spacing: Theme.spacingS
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "Block Ctrl+Alt+F1-F12")
+                        font.pixelSize: Theme.fontSizeMedium
+                        font.weight: Theme.fontWeightMedium
+                        color: Theme.surfaceText
+                    }
+
+                    StyledText {
+                        width: parent.width
+                        text: I18n.trFor("inlineKeyboard", "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.Wrap
+                    }
+
+                }
+
+                DCommon.DToggle {
+                    id: blockTtyToggle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    hideText: true
+                    text: I18n.trFor("inlineKeyboard", "Block Ctrl+Alt+F1-F12")
+                    checked: root.loadValue("blockTtySwitch", true)
+                    onToggled: (value) => root.saveValue("blockTtySwitch", value)
+                }
+
+            }
+
+        }
+
         SettingsCard {
             ToggleSetting {
                 settingKey: "avoidWindows"

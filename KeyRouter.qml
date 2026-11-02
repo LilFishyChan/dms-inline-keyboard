@@ -14,6 +14,8 @@ Item {
 
     // fcitx5 桥（由 daemon 注入）。直通要靠它发按键、读当前输入法类型。
     property var bridge: null
+    // Ctrl+Alt+F1..F12 会被内核当成 VT 切换，虚拟键盘上误触就是整个桌面跳走
+    property bool blockTtySwitch: true
     // 键盘是否开着。关着的时候没必要每 3 秒起一次 sh 去探 ydotoold。
     property bool active: false
     // 当前动作表（自定义动作要拿 cmd）
@@ -236,6 +238,11 @@ Item {
             notifyUnimplemented();
             return ;
         }
+        // 内核级的 VT 切换拦不住，只能不发
+        const label = keyData.fn && keyData.fn.l ? keyData.fn.l : (keyData.l || "");
+        if (router.blockTtySwitch && Modifiers.isTtySwitchCombo(label, ctrlState, altState, shiftState))
+            return ;
+
         const modifier = Modifiers.modifierNameFor(keyData);
         if (modifier !== "") {
             cycleModifier(modifier);
