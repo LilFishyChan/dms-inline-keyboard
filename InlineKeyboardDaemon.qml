@@ -24,7 +24,6 @@ PluginComponent {
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // 宿主按 "popoutService" in item 判断是否注入，不声明就永远拿不到
     property var popoutService: null
-
     readonly property bool avoidWindows: root.pluginData && root.pluginData.avoidWindows !== undefined ? root.pluginData.avoidWindows : true
     readonly property bool fnActive: root.fnState > 0
     // 调试 IPC（debug* 系列）的开关：设置页那个「调试模式」，环境变量兜底。
@@ -58,6 +57,7 @@ PluginComponent {
     }
     // fcitx5 状态实际存在 FcitxBridge 里，这里 alias 给卡片和窗口用
     readonly property alias fcitxCandidates: fcitxBridge.candidates
+    readonly property alias fcitxCandidateComments: fcitxBridge.candidateComments
     readonly property alias fcitxPreedit: fcitxBridge.preedit
     readonly property alias fcitxVisible: fcitxBridge.panelVisible
     readonly property alias fcitxImKeyboard: fcitxBridge.imKeyboard
@@ -85,6 +85,7 @@ PluginComponent {
     readonly property int candRevision: fcitxBridge.candRevision
     // 调试候选：终端这类不支持 text-input 的窗口里 fcitx5 不产生候选，靠它把候选栏调出来看布局。真实候选非空时仍然以真实值为准。
     property var debugCandItems: []
+    property var debugCandComments: []
     // 优先级：addon 进程内 commit（直接进输入框，用户不用再操作）
     property string lastTextCommit: ""
     property string lastTextCommitVia: ""
@@ -160,11 +161,15 @@ PluginComponent {
     // 外观：缩放 + 透明度，都从设置读（PluginSettings 存的是百分数）
     property real bgOpacity: root.readNum("bgOpacity", 100, 0, 100) / 100
     property real keyOpacity: root.readNum("keyOpacity", 100, 0, 100) / 100
+    // 按键和键盘卡片的描边粗细（px）。0 = 不画边框
+    property real borderWidth: root.readNum("borderWidth", 0, 0, 4)
     // 进入透明度面板时的快照，取消要还原。
     // ActionList 里点击动作时总会写这两个属性，缺了就是 ReferenceError ——
     property bool voiceAvailable: false
     // 键盘按钮的悬停提示（设置页自己的操作按钮不受影响）
     property bool tooltips: PluginService.loadPluginData(root.pluginId, "tooltips", true)
+    // 长按候选词时上屏它后面的注释。注释是显示提示不是输入内容（五笔/仓颉给的是编码），默认关
+    property bool longPressNote: PluginService.loadPluginData(root.pluginId, "longPressNote", false)
     // 和本插件配套的 addon 版本。addon 的 socket 协议变了就改这里，用户在键盘更新后
     // 会看到「输入法插件需要更新」，而不是遇到各种莫名其妙的不生效
     readonly property string requiredAddonVersion: "0.1.0"
@@ -173,8 +178,11 @@ PluginComponent {
         const v = fcitxBridge ? fcitxBridge.addonVersion : "";
         if (v === "")
             return "unknown";
+
         return v === root.requiredAddonVersion ? "ok" : "mismatch";
     }
+    // 状态区开关（rime 的简体/标点/表情那些），从 addon 的 status: 帧来
+    readonly property var statusItems: fcitxBridge ? fcitxBridge.statusItems : []
     // 拦下 Ctrl+Alt+F1..F12：这个组合由内核直接处理成 VT 切换，合成器拦不住
     property bool blockTtySwitch: PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true)
     // 输入框拿到焦点时自动弹出键盘
@@ -354,9 +362,11 @@ PluginComponent {
     function runCommand(cmd) {
         if (quickProc.running) {
             // 长按重复每秒能压十几条，ydotool 卡住时无限堆会把键一次性泄到别的窗口
-            if (root.pendingCommands.length >= 32)
-                root.pendingCommands.shift();
-
+            // 丢最新的一条而不是最早的：旧的已经在路上，删掉最早那条会让先敲的字消失、后面的照常出现
+            if (root.pendingCommands.length >= 32) {
+                console.warn("inlineKeyboard: 按键队列已满，丢弃最新一条");
+                return ;
+            }
             root.pendingCommands.push(cmd);
             return ;
         }
@@ -497,6 +507,7 @@ PluginComponent {
         const st = PluginService.loadPluginState(root.pluginId, key, null);
         if (st !== null && st !== undefined)
             return st;
+
         // 迁移过之后就只认 State：否则 Settings 里的老值会在每次 State 缺失时复活
         if (PluginService.loadPluginState(root.pluginId, "runtimeMigrated", false) === true)
             return fallback;
@@ -638,6 +649,11 @@ PluginComponent {
         PluginService.savePluginData(root.pluginId, "tooltips", on);
     }
 
+    function setLongPressNote(on) {
+        root.longPressNote = on;
+        PluginService.savePluginData(root.pluginId, "longPressNote", on);
+    }
+
     function setBlockTtySwitch(on) {
         root.blockTtySwitch = on;
         PluginService.savePluginData(root.pluginId, "blockTtySwitch", on);
@@ -729,6 +745,10 @@ PluginComponent {
                 root.keyOpacity = nextKeyOpacity;
 
         }
+        const nextBorderWidth = root.readNum("borderWidth", 0, 0, 4);
+        if (nextBorderWidth !== root.borderWidth)
+            root.borderWidth = nextBorderWidth;
+
         const nextTooltips = PluginService.loadPluginData(root.pluginId, "tooltips", true);
         if (nextTooltips !== root.tooltips)
             root.tooltips = nextTooltips;
@@ -740,7 +760,6 @@ PluginComponent {
         const nextBlockTty = PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true);
         if (nextBlockTty !== root.blockTtySwitch)
             root.blockTtySwitch = nextBlockTty;
-
 
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
         if (nextDebugMode !== root.debugModeSetting)
@@ -775,6 +794,7 @@ PluginComponent {
         const merged = Actions.mergeNewBuiltins(nextActions, root.defaultActions);
         if (JSON.stringify(merged) !== JSON.stringify(rawActions))
             PluginService.savePluginData(root.pluginId, "actions", merged);
+
         if (JSON.stringify(merged) !== JSON.stringify(root.actions))
             root.actions = merged;
 
@@ -807,6 +827,7 @@ PluginComponent {
         // 版本对不上时说一声，否则用户只会看到各种莫名的不生效
         if (root.addonVersionState === "mismatch")
             ToastService.showWarning(I18n.trFor("inlineKeyboard", "Input method addon needs update") + " (" + fcitxBridge.addonVersion + " / " + root.requiredAddonVersion + ")");
+
         PluginService.setGlobalVar(root.pluginId, "open", true);
         // 恢复上次关闭时的形态。延后一拍：现在窗口刚建好，立刻最小化
         // 从最小化按钮恢复时传 false：否则读到 lastMode="minimized" 的瞬间
@@ -838,6 +859,7 @@ PluginComponent {
         // 否则别的应用的候选窗一直不显示
         if (root.autoShow && fcitxBridge)
             fcitxBridge.sendFcitx("release");
+
         PluginService.setGlobalVar(root.pluginId, "open", false);
     }
 
@@ -907,6 +929,7 @@ PluginComponent {
         const next = Data.nextImRow(root.imRows);
         if (next === null)
             return ;
+
         // 先把目标项的图标挂上去，别等 D-Bus 往返
         root.optimisticTo(next);
         if (next.keyboard)
@@ -937,10 +960,18 @@ PluginComponent {
         optimisticImTimer.restart();
     }
 
+    // 状态区开关：交给 addon 找到 action 执行，执行完由界面那边决定收起还是返回
+    function activateStatus(name) {
+        if (fcitxBridge)
+            fcitxBridge.activateStatus(name);
+
+    }
+
     function selectIm(name) {
         // 以 - 开头会被 busctl 当成选项；名字来自 addon，不可信
         if (typeof name !== "string" || name === "" || name.startsWith("-"))
-            return;
+            return ;
+
         // 乐观显示：中文行（非 ascii）的标签/图标先顶上
         root.optimisticTo(root.imRows.find((r) => {
             return r.name === name && !r.ascii;
@@ -978,8 +1009,6 @@ PluginComponent {
     // 输入框拿到焦点就弹键盘。addon 的 focus:1 只在聚焦变化时发一次，
     // 所以用户手动收起之后不会被同一份焦点再弹回来
     Connections {
-        target: fcitxBridge
-
         function onInputFocusedChanged() {
             if (!fcitxBridge.inputFocused) {
                 // 记下失焦时刻：点空白处时 fcitx 常常失焦后立刻又聚焦一次，
@@ -989,12 +1018,14 @@ PluginComponent {
             }
             if (Date.now() - root.lastFocusLostAt < 800)
                 return ;
+
             if (!Actions.shouldAutoShow(root.autoShow, fcitxBridge.inputFocused, root.open))
                 return ;
 
             root.showKeyboard();
         }
 
+        target: fcitxBridge
     }
 
     FcitxBridge {
@@ -1045,7 +1076,7 @@ PluginComponent {
             // 连点几个表情时别刷一屏提示：同一条消息 3 秒内只弹一次
             const now = Date.now();
             if (typeof ToastService === "undefined" || !ToastService || now - root.lastTextToastAt <= 3000)
-                return;
+                return ;
 
             root.lastTextToastAt = now;
             // 「什么都没成功」要说清楚缺什么、怎么补 ——
@@ -1165,11 +1196,13 @@ PluginComponent {
             avoidWindows: root.avoidWindows
             tooltips: root.tooltips
             autoShow: root.autoShow
+            statusItems: root.statusItems
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            borderWidth: root.borderWidth
             onOpacityAdjusted: (bg, key) => {
                 root.bgOpacity = bg;
                 root.keyOpacity = key;
@@ -1197,12 +1230,15 @@ PluginComponent {
             dockFill: root.dockFill
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
+            fcitxCandidateComments: root.fcitxCandidateComments
+            longPressNote: root.longPressNote
             fcitxImKeyboard: root.fcitxImKeyboard
             fcitxHasMore: root.fcitxHasMore
             fcitxImIcon: root.fcitxImIcon
             fcitxImLabel: root.fcitxImLabel
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
             debugCandItems: root.debugCandItems
+            debugCandComments: root.debugCandComments
             allCandidates: root.allCandidates
             candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
@@ -1238,6 +1274,9 @@ PluginComponent {
                     root.selectIm(name);
                 else
                     root.selectImMode(name, ascii);
+            }
+            onActivateStatusRequested: (name) => {
+                return root.activateStatus(name);
             }
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {
@@ -1279,11 +1318,13 @@ PluginComponent {
             avoidWindows: root.avoidWindows
             tooltips: root.tooltips
             autoShow: root.autoShow
+            statusItems: root.statusItems
             voiceActive: root.voiceActive
             voiceMinimal: root.voiceMinimal
             voiceAvailable: root.voiceAvailable
             bgOpacity: root.bgOpacity
             keyOpacity: root.keyOpacity
+            borderWidth: root.borderWidth
             onOpacityAdjusted: (bg, key) => {
                 root.bgOpacity = bg;
                 root.keyOpacity = key;
@@ -1311,12 +1352,15 @@ PluginComponent {
             dockFill: root.dockFill
             actionList: root.actions
             fcitxCandidates: root.fcitxCandidates
+            fcitxCandidateComments: root.fcitxCandidateComments
+            longPressNote: root.longPressNote
             fcitxImKeyboard: root.fcitxImKeyboard
             fcitxHasMore: root.fcitxHasMore
             fcitxImIcon: root.fcitxImIcon
             fcitxImLabel: root.fcitxImLabel
             fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
             debugCandItems: root.debugCandItems
+            debugCandComments: root.debugCandComments
             allCandidates: root.allCandidates
             candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
@@ -1346,6 +1390,9 @@ PluginComponent {
                     root.selectIm(name);
                 else
                     root.selectImMode(name, ascii);
+            }
+            onActivateStatusRequested: (name) => {
+                return root.activateStatus(name);
             }
             onImCycleRequested: root.cycleIm()
             onSelectCandidateRequested: (index) => {

@@ -1,57 +1,360 @@
 {
-    "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": {
-        "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": "键盘用 `dms ipc call inlineKeyboard toggle` 开合，也可以把 DankBar 上的小部件加进来。"
+    "Action slot": {
+        "Action slot": "动作槽"
     },
-    "Optional: fcitx5 bridge": {
-        "Optional: fcitx5 bridge": "可选扩展：fcitx5 桥接"
+    "Actions": {
+        "Actions": "动作"
     },
-    "Connected — candidates, preedit and the globe switcher are live.": {
-        "Connected — candidates, preedit and the globe switcher are live.": "已连接 —— 候选、拼音串和地球键切换都可用。"
+    "Active while held": {
+        "Active while held": "按住才生效（松手取消）"
     },
-    "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": {
-        "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": "候选、拼音串和地球键切换都来自一个 fcitx5 小扩展。没装它也能打字（按键走 ydotool），只是候选栏一直是空的。"
+    "Activities": {
+        "Activities": "活动"
     },
-    "Copy install commands": {
-        "Copy install commands": "复制安装命令"
+    "Add": {
+        "Add": "添加"
     },
-    "Appearance": {
-        "Appearance": "外观"
+    "Add a custom action": {
+        "Add a custom action": "添加自定义动作"
     },
-    "Background opacity": {
-        "Background opacity": "背景透明度"
-    },
-    "Key opacity": {
-        "Key opacity": "按键透明度"
-    },
-    "Behaviour": {
-        "Behaviour": "行为"
-    },
-    "Avoid windows when docked": {
-        "Avoid windows when docked": "停靠时避让窗口"
-    },
-    "Shrink other windows so the keyboard does not cover them.": {
-        "Shrink other windows so the keyboard does not cover them.": "键盘出现时把其它窗口往上收，不让键盘挡住内容"
+    "All": {
+        "All": "全部"
     },
     "Always show the preedit in the keyboard": {
         "Always show the preedit in the keyboard": "始终在键盘内显示预编辑"
     },
-    "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.": {
-        "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.": "有些应用会在输入框里自己画拼音串；打开这个开关后键盘里也显示一份。"
+    "Animals & Nature": {
+        "Animals & Nature": "动物与自然"
     },
-    "Use the floating keyboard by default": {
-        "Use the floating keyboard by default": "默认使用浮动键盘"
+    "Appearance": {
+        "Appearance": "外观"
     },
-    "Off opens the docked keyboard.": {
-        "Off opens the docked keyboard.": "关掉时按停靠模式打开"
+    "Arrows": {
+        "Arrows": "箭头"
     },
-    "Modifier tap behaviour": {
-        "Modifier tap behaviour": "修饰键切换方式"
+    "Auto show": {
+        "Auto show": "自动弹出"
+    },
+    "Avoid windows": {
+        "Avoid windows": "避让窗口"
+    },
+    "Avoid windows when docked": {
+        "Avoid windows when docked": "停靠时避让窗口"
+    },
+    "Back": {
+        "Back": "返回"
+    },
+    "Background opacity": {
+        "Background opacity": "背景透明度"
+    },
+    "Backspace": {
+        "Backspace": "退格"
+    },
+    "Behaviour": {
+        "Behaviour": "行为"
+    },
+    "Block Ctrl+Alt+F1-F12": {
+        "Block Ctrl+Alt+F1-F12": "拦截 Ctrl+Alt+F1-F12"
+    },
+    "Border width for the keys and the keyboard card. 0 draws no border.": {
+        "Border width for the keys and the keyboard card. 0 draws no border.": "按键和键盘卡片的描边粗细（0–4），0 表示不画边框（默认）。"
+    },
+    "Box drawing": {
+        "Box drawing": "框线"
+    },
+    "Built-in actions can only be hidden; the ones you add can be removed.": {
+        "Built-in actions can only be hidden; the ones you add can be removed.": "内置动作只能隐藏，自己添加的可以删除。点图标可以更换。"
+    },
+    "Button tooltips": {
+        "Button tooltips": "按钮提示"
+    },
+    "Cancel": {
+        "Cancel": "取消"
+    },
+    "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": {
+        "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": "候选、拼音串和地球键切换都来自一个 fcitx5 小扩展。没装它也能打字（按键走 ydotool），只是候选栏一直是空的。"
+    },
+    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": {
+        "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）"
+    },
+    "Clipboard": {
+        "Clipboard": "剪贴板"
+    },
+    "Collapse candidates": {
+        "Collapse candidates": "收起候选"
+    },
+    "Collapse keyboard": {
+        "Collapse keyboard": "收起键盘"
+    },
+    "Command": {
+        "Command": "命令"
+    },
+    "Confirm": {
+        "Confirm": "确定"
+    },
+    "Connected — candidates, preedit and the globe switcher are live.": {
+        "Connected — candidates, preedit and the globe switcher are live.": "已连接 —— 候选、拼音串和地球键切换都可用。"
+    },
+    "Copied — long press the text field to paste": {
+        "Copied — long press the text field to paste": "已复制，长按输入框粘贴"
+    },
+    "Copy install commands": {
+        "Copy install commands": "复制安装命令"
+    },
+    "Copy is still finishing, try again": {
+        "Copy is still finishing, try again": "上一次复制还没完成，请稍后再试"
+    },
+    "Could not enable ydotoold": {
+        "Could not enable ydotoold": "设置 ydotoold 自启失败"
+    },
+    "Could not start ydotoold": {
+        "Could not start ydotoold": "启动 ydotoold 失败"
+    },
+    "Currency": {
+        "Currency": "货币"
+    },
+    "Custom icon": {
+        "Custom icon": "自定义图标"
+    },
+    "Cycle input method": {
+        "Cycle input method": "切换输入法"
+    },
+    "Debug mode": {
+        "Debug mode": "调试模式"
+    },
+    "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": {
+        "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": "调试模式会加载插件的调试 IPC，供 scripts/acceptance.py 驱动：只读诊断、几何读取，以及按键 / 候选 / 动作 / 浮动开关的模拟点击。\n\n普通使用不需要它，测完记得关掉。"
+    },
+    "Debugging": {
+        "Debugging": "调试"
+    },
+    "Delay between repeated keystrokes while a key is held down.": {
+        "Delay between repeated keystrokes while a key is held down.": "按住按键时重复输入的间隔"
+    },
+    "Delete": {
+        "Delete": "删除"
+    },
+    "Discard recording": {
+        "Discard recording": "丢弃录音"
+    },
+    "Edit": {
+        "Edit": "编辑"
+    },
+    "Edit action": {
+        "Edit action": "编辑动作"
+    },
+    "Edit actions": {
+        "Edit actions": "编辑动作"
+    },
+    "Emoji": {
+        "Emoji": "表情"
+    },
+    "Empty": {
+        "Empty": "暂无内容"
+    },
+    "Enable": {
+        "Enable": "启用"
+    },
+    "Enable at login": {
+        "Enable at login": "开机自启"
+    },
+    "Esc on the top-left key": {
+        "Esc on the top-left key": "左上角按键为 Esc"
+    },
+    "Expand": {
+        "Expand": "展开"
+    },
+    "Expand candidates": {
+        "Expand candidates": "展开候选"
+    },
+    "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": {
+        "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": "只提供 acceptance.py 验收脚本要用的 IPC，普通使用不需要打开。"
+    },
+    "Fill width": {
+        "Fill width": "铺满宽度"
+    },
+    "Flags": {
+        "Flags": "旗帜"
+    },
+    "Float": {
+        "Float": "悬浮"
+    },
+    "Food & Drink": {
+        "Food & Drink": "食物与饮品"
+    },
+    "Full name": {
+        "Full name": "完整名字"
+    },
+    "Hide": {
+        "Hide": "隐藏"
+    },
+    "Hold and drag to customise": {
+        "Hold and drag to customise": "按住并拖动以自定义"
+    },
+    "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": {
+        "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": "Backspace、Enter、Shift、Ctrl、Alt、Tab 这些键怎么画。选完整名字时字号会自动缩小以放得下。"
     },
     "How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.": {
         "How Shift / Ctrl / Alt / Win respond to touch. Caps Lock always toggles.": "Shift / Ctrl / Alt / Win 的触摸行为；Caps Lock 始终是开关。"
     },
-    "Active while held": {
-        "Active while held": "按住才生效（松手取消）"
+    "Icon": {
+        "Icon": "图标"
+    },
+    "Inline Keyboard requires: %1": {
+        "Inline Keyboard requires: %1": "Inline Keyboard 需要以下命令：%1"
+    },
+    "Input method addon needs update": {
+        "Input method addon needs update": "输入法插件需要更新"
+    },
+    "Input method list is empty — is the fcitx5 addon running?": {
+        "Input method list is empty — is the fcitx5 addon running?": "输入法列表是空的——fcitx5 addon 没在跑？"
+    },
+    "Keeps the candidate when there is no pinyin": {
+        "Keeps the candidate when there is no pinyin": "没有拼音时仍选中候选词"
+    },
+    "Key and keyboard border": {
+        "Key and keyboard border": "按键与键盘边框"
+    },
+    "Key opacity": {
+        "Key opacity": "按键透明度"
+    },
+    "Key repeat interval": {
+        "Key repeat interval": "按键重复间隔"
+    },
+    "Keyboard page": {
+        "Keyboard page": "键盘页"
+    },
+    "Loading…": {
+        "Loading…": "加载中…"
+    },
+    "Long-press candidate for pinyin": {
+        "Long-press candidate for pinyin": "长按候选上屏拼音"
+    },
+    "Math": {
+        "Math": "数学"
+    },
+    "Minimize": {
+        "Minimize": "最小化"
+    },
+    "Misc": {
+        "Misc": "杂项"
+    },
+    "Modifier tap behaviour": {
+        "Modifier tap behaviour": "修饰键切换方式"
+    },
+    "Name": {
+        "Name": "名称"
+    },
+    "New action": {
+        "New action": "新建动作"
+    },
+    "Next input method": {
+        "Next input method": "下个输入法"
+    },
+    "No candidates": {
+        "No candidates": "没有候选词"
+    },
+    "Numbers": {
+        "Numbers": "序号"
+    },
+    "Objects": {
+        "Objects": "物品"
+    },
+    "Off opens the docked keyboard.": {
+        "Off opens the docked keyboard.": "关掉时按停靠模式打开"
+    },
+    "Opacity": {
+        "Opacity": "透明度"
+    },
+    "Optional: fcitx5 bridge": {
+        "Optional: fcitx5 bridge": "可选扩展：fcitx5 桥接"
+    },
+    "People & Body": {
+        "People & Body": "人物与身体"
+    },
+    "Punctuation": {
+        "Punctuation": "标点"
+    },
+    "Redo": {
+        "Redo": "重做"
+    },
+    "Remove": {
+        "Remove": "删除"
+    },
+    "Reset size": {
+        "Reset size": "重置尺寸"
+    },
+    "Restore keyboard": {
+        "Restore keyboard": "恢复键盘"
+    },
+    "Save": {
+        "Save": "保存"
+    },
+    "Scroll down": {
+        "Scroll down": "向下滚动"
+    },
+    "Scroll up": {
+        "Scroll up": "向上滚动"
+    },
+    "Settings": {
+        "Settings": "设置"
+    },
+    "Shapes": {
+        "Shapes": "几何"
+    },
+    "Short": {
+        "Short": "简写"
+    },
+    "Show": {
+        "Show": "显示"
+    },
+    "Show hints when hovering over keyboard buttons.": {
+        "Show hints when hovering over keyboard buttons.": "鼠标悬停在键盘按钮上时显示功能说明。"
+    },
+    "Show the keyboard when a text field gets focus.": {
+        "Show the keyboard when a text field gets focus.": "输入框拿到焦点时自动弹出键盘。"
+    },
+    "Shrink other windows so the keyboard does not cover them.": {
+        "Shrink other windows so the keyboard does not cover them.": "键盘出现时把其它窗口往上收，不让键盘挡住内容"
+    },
+    "Shrink to content": {
+        "Shrink to content": "按内容收窄"
+    },
+    "Size": {
+        "Size": "调整大小"
+    },
+    "Smileys & Emotion": {
+        "Smileys & Emotion": "表情与情绪"
+    },
+    "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.": {
+        "Some apps draw the pinyin string inside the text field themselves; turn this on to also show it in the keyboard.": "有些应用会在输入框里自己画拼音串；打开这个开关后键盘里也显示一份。"
+    },
+    "Special key labels": {
+        "Special key labels": "特殊键显示方式"
+    },
+    "Start": {
+        "Start": "启动"
+    },
+    "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": {
+        "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": "先在下面启动一次，或者永久启用让它开机自启：systemctl --user enable --now ydotool"
+    },
+    "Start recording": {
+        "Start recording": "开始录音"
+    },
+    "Stop recording": {
+        "Stop recording": "停止录音"
+    },
+    "Submit": {
+        "Submit": "提交"
+    },
+    "Swap the `~ key with Esc. Fn layer keeps the other one.": {
+        "Swap the `~ key with Esc. Fn layer keeps the other one.": "把 `~ 键和 Esc 对调，Fn 层保留另一个"
+    },
+    "Symbols": {
+        "Symbols": "符号"
+    },
+    "Tap the mic on the right to start": {
+        "Tap the mic on the right to start": "点按右侧语音按钮以开始"
     },
     "Tap to activate; any key clears it": {
         "Tap to activate; any key clears it": "点击激活（按其它键即取消）"
@@ -62,337 +365,43 @@
     "Tap to toggle, double-tap to lock": {
         "Tap to toggle, double-tap to lock": "单击切换、双击锁定（300 毫秒内）"
     },
-    "Actions": {
-        "Actions": "动作"
-    },
-    "Icon": {
-        "Icon": "图标"
-    },
-    "Command": {
-        "Command": "命令"
-    },
-    "Hold and drag to customise": {
-        "Hold and drag to customise": "按住并拖动以自定义"
-    },
-    "Undo": {
-        "Undo": "撤销"
-    },
-    "Redo": {
-        "Redo": "重做"
-    },
-    "Settings": {
-        "Settings": "设置"
-    },
-    "Float": {
-        "Float": "悬浮"
-    },
-    "Size": {
-        "Size": "调整大小"
-    },
-    "Opacity": {
-        "Opacity": "透明度"
-    },
-    "Next input method": {
-        "Next input method": "下个输入法"
-    },
-    "Clipboard": {
-        "Clipboard": "剪贴板"
-    },
-    "Avoid windows": {
-        "Avoid windows": "避让窗口"
-    },
-    "Voice input": {
-        "Voice input": "语音输入"
-    },
-    "Inline Keyboard requires: %1": {
-        "Inline Keyboard requires: %1": "Inline Keyboard 需要以下命令：%1"
-    },
-    "ydotoold is not running — the keyboard cannot type until it starts.": {
-        "ydotoold is not running — the keyboard cannot type until it starts.": "ydotoold 没有运行 —— 启动之前键盘打不了字。"
-    },
-    "Start": {
-        "Start": "启动"
-    },
-    "ydotoold is not running": {
-        "ydotoold is not running": "ydotoold 没有运行"
-    },
-    "Enable at login": {
-        "Enable at login": "开机自启"
-    },
-    "All": {
-        "All": "全部"
-    },
-    "Emoji": {
-        "Emoji": "表情"
-    },
-    "Symbols": {
-        "Symbols": "符号"
-    },
-    "Back": {
-        "Back": "返回"
-    },
-    "Empty": {
-        "Empty": "暂无内容"
-    },
-    "Smileys & Emotion": {
-        "Smileys & Emotion": "表情与情绪"
-    },
-    "People & Body": {
-        "People & Body": "人物与身体"
-    },
-    "Animals & Nature": {
-        "Animals & Nature": "动物与自然"
-    },
-    "Food & Drink": {
-        "Food & Drink": "食物与饮品"
-    },
-    "Travel & Places": {
-        "Travel & Places": "出行与地点"
-    },
-    "Activities": {
-        "Activities": "活动"
-    },
-    "Objects": {
-        "Objects": "物品"
-    },
-    "Flags": {
-        "Flags": "旗帜"
-    },
-    "Math": {
-        "Math": "数学"
-    },
-    "Punctuation": {
-        "Punctuation": "标点"
-    },
-    "Arrows": {
-        "Arrows": "箭头"
-    },
-    "Currency": {
-        "Currency": "货币"
-    },
-    "Shapes": {
-        "Shapes": "几何"
-    },
-    "Box drawing": {
-        "Box drawing": "框线"
-    },
-    "Numbers": {
-        "Numbers": "序号"
-    },
-    "Misc": {
-        "Misc": "杂项"
-    },
-    "Copied — long press the text field to paste": {
-        "Copied — long press the text field to paste": "已复制，长按输入框粘贴"
-    },
-    "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": {
-        "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）"
-    },
-    "Special key labels": {
-        "Special key labels": "特殊键显示方式"
-    },
-    "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": {
-        "How Backspace, Enter, Shift, Ctrl, Alt and Tab are drawn. Full names shrink to fit the key.": "Backspace、Enter、Shift、Ctrl、Alt、Tab 这些键怎么画。选完整名字时字号会自动缩小以放得下。"
-    },
-    "Short": {
-        "Short": "简写"
-    },
-    "Full name": {
-        "Full name": "完整名字"
-    },
-    "Win key label": {
-        "Win key label": "Win 键显示"
-    },
-    "Cancel": {
-        "Cancel": "取消"
-    },
-    "Tap the mic on the right to start": {
-        "Tap the mic on the right to start": "点按右侧语音按钮以开始"
-    },
-    "Add": {
-        "Add": "添加"
-    },
-    "Add a custom action": {
-        "Add a custom action": "添加自定义动作"
-    },
-    "Built-in actions can only be hidden; the ones you add can be removed. Tap an icon to change it.": {
-        "Built-in actions can only be hidden; the ones you add can be removed. Tap an icon to change it.": "内置动作只能隐藏，自己添加的可以删除。点图标可以更换。"
-    },
-    "Delay between repeated keystrokes while a key is held down.": {
-        "Delay between repeated keystrokes while a key is held down.": "按住按键时重复输入的间隔"
-    },
-    "Edit action": {
-        "Edit action": "编辑动作"
-    },
-    "Esc on the top-left key": {
-        "Esc on the top-left key": "左上角按键为 Esc"
-    },
-    "Key repeat interval": {
-        "Key repeat interval": "按键重复间隔"
-    },
-    "Loading…": {
-        "Loading…": "加载中…"
-    },
-    "Name": {
-        "Name": "名称"
-    },
-    "New action": {
-        "New action": "新建动作"
-    },
-    "No candidates": {
-        "No candidates": "没有候选词"
-    },
-    "Minimize": {
-        "Minimize": "最小化"
+    "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": {
+        "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": "这些组合键由内核直接切换到虚拟终端，合成器拦不住。除非需要从键盘进 TTY，否则保持开启。"
     },
     "This key sends Super. Show it as text or an icon.": {
         "This key sends Super. Show it as text or an icon.": "这个键实际发的是 Super，可以显示成文字或图标。"
     },
-    "Custom icon": {
-        "Custom icon": "自定义图标"
+    "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": {
+        "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": "键盘用 `dms ipc call inlineKeyboard toggle` 开合，也可以把 DankBar 上的小部件加进来。"
     },
-    "Debugging": {
-        "Debugging": "调试"
-    },
-    "Debug mode": {
-        "Debug mode": "调试模式"
-    },
-    "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": {
-        "Exposes the IPC that scripts/acceptance.py drives. Normal use does not need it.": "只提供 acceptance.py 验收脚本要用的 IPC，普通使用不需要打开。"
+    "Travel & Places": {
+        "Travel & Places": "出行与地点"
     },
     "Turn on debug mode?": {
         "Turn on debug mode?": "开启调试模式？"
     },
-    "Enable": {
-        "Enable": "启用"
+    "Undo": {
+        "Undo": "撤销"
     },
-    "Save": {
-        "Save": "保存"
+    "Use the floating keyboard by default": {
+        "Use the floating keyboard by default": "默认使用浮动键盘"
     },
-    "svg/png path": {
-        "svg/png path": "svg/png 路径"
+    "Voice input": {
+        "Voice input": "语音输入"
     },
-    "Show": {
-        "Show": "显示"
-    },
-    "Hide": {
-        "Hide": "隐藏"
-    },
-    "Edit": {
-        "Edit": "编辑"
-    },
-    "Remove": {
-        "Remove": "删除"
-    },
-    "Win key": {
-        "Win key": "Win 键"
-    },
-    "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": {
-        "Debug mode loads the plugin's debug IPC so scripts/acceptance.py can drive it: read-only diagnostics, geometry readout, and simulated taps on keys, candidates, actions and the floating toggle.\n\nNormal use does not need it. Turn it off again when you are done testing.": "调试模式会加载插件的调试 IPC，供 scripts/acceptance.py 驱动：只读诊断、几何读取，以及按键 / 候选 / 动作 / 浮动开关的模拟点击。\n\n普通使用不需要它，测完记得关掉。"
+    "Win key label": {
+        "Win key label": "Win 键显示"
     },
     "e.g. grim -g \"$(slurp)\"": {
         "e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\""
     },
-    "Collapse keyboard": {
-        "Collapse keyboard": "收起键盘"
+    "svg/png path": {
+        "svg/png path": "svg/png 路径"
     },
-    "Restore keyboard": {
-        "Restore keyboard": "恢复键盘"
+    "ydotoold is not running": {
+        "ydotoold is not running": "ydotoold 没有运行"
     },
-    "Backspace": {
-        "Backspace": "退格"
-    },
-    "Fill width": {
-        "Fill width": "铺满宽度"
-    },
-    "Shrink to content": {
-        "Shrink to content": "按内容收窄"
-    },
-    "Reset size": {
-        "Reset size": "重置尺寸"
-    },
-    "Confirm": {
-        "Confirm": "确定"
-    },
-    "Expand candidates": {
-        "Expand candidates": "展开候选"
-    },
-    "Collapse candidates": {
-        "Collapse candidates": "收起候选"
-    },
-    "Action slot": {
-        "Action slot": "动作槽"
-    },
-    "Keyboard page": {
-        "Keyboard page": "键盘页"
-    },
-    "Edit actions": {
-        "Edit actions": "编辑动作"
-    },
-    "Scroll up": {
-        "Scroll up": "向上滚动"
-    },
-    "Scroll down": {
-        "Scroll down": "向下滚动"
-    },
-    "Delete": {
-        "Delete": "删除"
-    },
-    "Submit": {
-        "Submit": "提交"
-    },
-    "Swap the `~ key with Esc. Fn layer keeps the other one.": {
-        "Swap the `~ key with Esc. Fn layer keeps the other one.": "把 `~ 键和 Esc 对调，Fn 层保留另一个"
-    },
-    "Could not start ydotoold": {
-        "Could not start ydotoold": "启动 ydotoold 失败"
-    },
-    "Could not enable ydotoold": {
-        "Could not enable ydotoold": "设置 ydotoold 自启失败"
-    },
-    "Cycle input method": {
-        "Cycle input method": "切换输入法"
-    },
-    "Copy is still finishing, try again": {
-        "Copy is still finishing, try again": "上一次复制还没完成，请稍后再试"
-    },
-    "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": {
-        "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": "先在下面启动一次，或者永久启用让它开机自启：systemctl --user enable --now ydotool"
-    },
-    "Input method list is empty — is the fcitx5 addon running?": {
-        "Input method list is empty — is the fcitx5 addon running?": "输入法列表是空的——fcitx5 addon 没在跑？"
-    },
-    "Discard recording": {
-        "Discard recording": "丢弃录音"
-    },
-    "Start recording": {
-        "Start recording": "开始录音"
-    },
-    "Stop recording": {
-        "Stop recording": "停止录音"
-    },
-    "Expand": {
-        "Expand": "展开"
-    },
-    "Button tooltips": {
-        "Button tooltips": "按钮提示"
-    },
-    "Show hints when hovering over keyboard buttons.": {
-        "Show hints when hovering over keyboard buttons.": "鼠标悬停在键盘按钮上时显示功能说明。"
-    },
-    "Auto show": {
-        "Auto show": "自动弹出"
-    },
-    "Show the keyboard when a text field gets focus.": {
-        "Show the keyboard when a text field gets focus.": "输入框拿到焦点时自动弹出键盘。"
-    },
-    "Input method addon needs update": {
-        "Input method addon needs update": "输入法插件需要更新"
-    },
-    "Block Ctrl+Alt+F1-F12": {
-        "Block Ctrl+Alt+F1-F12": "拦截 Ctrl+Alt+F1-F12"
-    },
-    "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": {
-        "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.": "这些组合键由内核直接切换到虚拟终端，合成器拦不住。除非需要从键盘进 TTY，否则保持开启。"
+    "ydotoold is not running — the keyboard cannot type until it starts.": {
+        "ydotoold is not running — the keyboard cannot type until it starts.": "ydotoold 没有运行 —— 启动之前键盘打不了字。"
     }
 }

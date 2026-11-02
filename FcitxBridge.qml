@@ -7,6 +7,8 @@ import "data.js" as Data
 
 Item {
     // 新格式 [{i,t}]；旧 addon 给纯字符串数组，补上下标
+    // 条数封顶：addon 一次 bulk 推几千条会把 shell 顶住
+    // 候选后面的小字，addon 只在有注释时才带这个字段
 
     id: bridge
 
@@ -22,6 +24,7 @@ Item {
     readonly property string statusPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard-status.json"
     readonly property string imListPath: runtimeDir === "" ? "" : runtimeDir + "/inline-keyboard-imlist.json"
     property var candidates: [] // 候选词（空数组 = 没有候选）
+    property var candidateComments: [] // 每项后面的小字（rime 的拼音），和 candidates 同下标
     property string preedit: "" // 拼音串
     property bool panelVisible: false // addon 报告的可见性（不能叫 visible，Item 内建）
     property bool imKeyboard: false // 当前输入法是否纯键盘布局（无候选能力）
@@ -36,6 +39,8 @@ Item {
     property bool inputFocused: false
     // addon 连上时推的版本号，没收到就是空串（老版本 addon 不推）
     property string addonVersion: ""
+    // 状态区开关（StatusGroup::InputMethod）。空数组表示当前输入法没有开关，keyboard-us 就是这种
+    property var statusItems: []
     // 最后一次收到 addon 任何消息的时刻。心跳超时判据：addon 每 2s 发一次
     // ping，超过 5s 一条都没有就说明它卡住了（rime 冻结、主循环阻塞），超时判据就看这个时间戳。
     property double lastSeenAt: 0
@@ -115,6 +120,11 @@ Item {
     // connected 是开关，初始 false 且不会自动连；断线（fcitx5 重启）也靠它重连。
     // 退避重连：1s → 2s → 4s → 8s 封顶。没装 addon 的用户整天开着键盘，不能一直按 1s 重试。
     property int reconnectDelay: 1000
+    // 上一条还在跑时记下来，它退出后再发：没装 addon 时剪贴板是唯一的上屏通道，丢掉就等于丢字
+    property string clipboardPending: ""
+
+    // 复制是异步的：发起后还不知道成败，结果由 copyFinished 带回
+    signal copyFinished(bool ok)
 
     // parseStatus 每次都 JSON.parse 出新数组，只能逐项比内容
     function sameStrings(a, b) {
@@ -136,6 +146,7 @@ Item {
         // data.js 的 parseStatus 解析失败时返回上一次的副本，所以文件半写 / 还没生成的情况不会把候选闪空。
         const st = Data.parseStatus(raw, {
             "items": candidates,
+            "comments": candidateComments,
             "preedit": preedit,
             "visible": panelVisible,
             "keyboard": imKeyboard,
@@ -152,13 +163,16 @@ Item {
         // 只在内容真的变了才赋值。这一句挡住的是「数组对象换了但内容一样」
         // 的推送（打字时很常见：每次按键 addon 都会给一份新 items）。
         const itemsChanged = !sameStrings(candidates, st.items);
-        if (itemsChanged)
+        // addon 在一条注释都没有时整个省略 comments 字段，items 没变也得把旧的注释清掉
+        const commentsChanged = !sameStrings(candidateComments, st.comments);
+        if (itemsChanged || commentsChanged) {
             candidates = st.items;
-
+            candidateComments = st.comments;
+        }
         if (preedit !== st.preedit)
             preedit = st.preedit;
 
-        if (itemsChanged || (candidates.length > 0 && String(candidates[0]) !== prevFirst) || preedit !== prevPre)
+        if (itemsChanged || commentsChanged || (candidates.length > 0 && String(candidates[0]) !== prevFirst) || preedit !== prevPre)
             candRevision++;
 
         panelVisible = st.visible;
@@ -202,20 +216,23 @@ Item {
             inputFocused = line.substring(6) === "1";
         } else if (line.startsWith("state:")) {
             applyStatus(line.substring(6));
+        } else if (line.startsWith("status:")) {
+            statusItems = Data.parseStatusItems(line.substring(7), statusItems);
         } else if (line.startsWith("imlist:")) {
             applyImList(line.substring(7));
         } else if (line.startsWith("allcand:")) {
             try {
                 const arr = JSON.parse(line.substring(8));
                 if (Array.isArray(arr))
-                    // 条数封顶：addon 一次 bulk 推几千条会把 shell 顶住
                     allCandidates = arr.slice(0, 128).map((x, n) => {
-                    const item = (x && typeof x === "object") ? x : {};
+                    const item = (x && typeof x === "object") ? x : {
+                    };
                     const idx = Number(item.i);
                     // i 必须是整数：addon 那边是 atoi，传对象/NaN 会选错词
                     return {
                         "i": Number.isFinite(idx) ? Math.trunc(idx) : n,
-                        "t": String(item.t == null ? "" : item.t).slice(0, 64)
+                        "t": String(item.t == null ? "" : item.t).slice(0, 64),
+                        "c": String(item.c == null ? "" : item.c).slice(0, 64)
                     };
                 });
 
@@ -230,6 +247,15 @@ Item {
 
             console.error("[inline-keyboard/fcitx] addon 报告: " + lastError);
         }
+    }
+
+    // 键盘里点了状态区的某一项：把 name 交给 addon，由它找到 action 执行
+    // name 来自 addon 的 status: 帧，不当可信输入；返回 false 表示没发出去
+    function activateStatus(name) {
+        if (typeof name !== "string" || name === "" || name.length > 64)
+            return false;
+
+        return sendFcitx("activate:" + name);
     }
 
     // 发一行到 addon。没连上返回 false，调用方据此回退 ydotool。
@@ -252,16 +278,14 @@ Item {
         return true;
     }
 
-    // 复制是异步的：发起后还不知道成败，结果由 copyFinished 带回
-    signal copyFinished(bool ok)
-
     function copyText(text) {
         if (!text)
             return false;
-        // 上一条还没退出时改 command 会丢掉这次复制
-        if (clipboardProc.running)
-            return false;
 
+        if (clipboardProc.running) {
+            clipboardPending = text;
+            return true;
+        }
         clipboardProc.command = ["dms", "cl", "copy", text];
         clipboardProc.running = true;
         return true;
@@ -288,9 +312,7 @@ Item {
             return ;
 
         statusFile.reload();
-
         imListFile.reload();
-
     }
 
     // 非可视组件：Item 才能装子对象（QtObject 没有 default property）
@@ -321,7 +343,6 @@ Item {
             socket.connected = false;
 
     }
-
     // 自动弹出关掉之后，键盘也没开就把连接还回去
     onAutoShowChanged: {
         if (!autoShow && !keyboardOpen && socket.connected)
@@ -391,14 +412,22 @@ Item {
     // 剪贴板兜底：dms cl copy 直接吃文本参数，不经过 shell
     Process {
         id: clipboardProc
+
         // 用真实退出码更新可用性：失败后 typeText 会改报「装 addon」而不是「已复制」
         onExited: (code) => {
             bridge.clipboardAvailable = code === 0;
             bridge.copyFinished(code === 0);
             if (code !== 0)
                 console.warn("inlineKeyboard: 复制到剪贴板失败，exit " + code);
-        }
 
+            // 有排队的就接着发
+            if (bridge.clipboardPending !== "") {
+                const next = bridge.clipboardPending;
+                bridge.clipboardPending = "";
+                clipboardProc.command = ["dms", "cl", "copy", next];
+                clipboardProc.running = true;
+            }
+        }
         command: ["true"]
     }
 
@@ -417,7 +446,6 @@ Item {
         path: bridge.imListPath
         blockLoading: true
         onLoaded: bridge.applyImList(imListFile.text())
-
     }
 
 }

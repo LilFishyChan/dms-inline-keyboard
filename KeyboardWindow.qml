@@ -13,6 +13,7 @@ PanelWindow {
     property bool keyboardVisible: false
     property bool avoidWindows: true
     property bool autoShow: false
+    property var statusItems: []
     // 语音输入是否在录音（决定顶部是否切到语音行）
     property bool tooltips: true
     property bool voiceActive: false
@@ -23,6 +24,7 @@ PanelWindow {
     property real bgOpacity: 1
     property int repeatInterval: 60
     property real keyOpacity: 1
+    property real borderWidth: 0
     // 特殊键形态设置（见 layouts/specialKeys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
@@ -37,10 +39,13 @@ PanelWindow {
     property var actionList: []
     // fcitx5 候选（由 daemon 从 inline-keyboard-status.json 读入）
     property var fcitxCandidates: []
+    property var fcitxCandidateComments: []
+    property bool longPressNote: true
     // 当前输入法是否纯键盘布局（无候选能力）
     property bool fcitxImKeyboard: false
     // 调试候选（daemon 的 debugCand 注入），非空时优先显示
     property var debugCandItems: []
+    property var debugCandComments: []
     // 全量候选（daemon 从 FcitxBridge 转发）
     property var allCandidates: []
     property int candRevision: 0
@@ -92,6 +97,7 @@ PanelWindow {
     signal imCycleRequested()
     signal selectCandidateRequested(int index)
     signal imSelected(string name, var ascii)
+    signal activateStatusRequested(string name)
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
     signal keyboardClosed()
@@ -159,6 +165,7 @@ PanelWindow {
         designScale: metrics.uiScale
         showCandBar: root.showCandBar
         debugCandItems: root.debugCandItems
+        debugCandComments: root.debugCandComments
         allCandidates: root.allCandidates
         candRevision: root.candRevision
         handleH: metrics.handleH
@@ -174,12 +181,14 @@ PanelWindow {
         editing: root.editing
         avoidWindows: root.avoidWindows
         autoShow: root.autoShow
+        statusItems: root.statusItems
         tooltips: root.tooltips
         voiceActive: root.voiceActive
         voiceMinimal: root.voiceMinimal
         voiceAvailable: root.voiceAvailable
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
+        borderWidth: root.borderWidth
         specialKeyStyle: root.specialKeyStyle
         winKeyStyle: root.winKeyStyle
         winKeyCustomIcon: root.winKeyCustomIcon
@@ -206,6 +215,8 @@ PanelWindow {
         dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
+        fcitxCandidateComments: root.fcitxCandidateComments
+        longPressNote: root.longPressNote
         fcitxImKeyboard: root.fcitxImKeyboard
         fcitxHasMore: root.fcitxHasMore
         fcitxImIcon: root.fcitxImIcon
@@ -232,6 +243,9 @@ PanelWindow {
         }
         onImSelected: (name, ascii) => {
             return root.imSelected(name, ascii);
+        }
+        onActivateStatusRequested: (name) => {
+            return root.activateStatusRequested(name);
         }
         onOrderChanged: (list) => {
             return root.orderChanged(list);

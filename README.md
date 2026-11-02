@@ -133,7 +133,7 @@ dms ipc call plugins status inlineKeyboard
 dms ipc call inlineKeyboard toggle
 ```
 
-The clone directory name must equal the plugin id (`inlineKeyboard`).
+Cloning into a directory named after the plugin id (`inlineKeyboard`) keeps things tidy, but the manifest id is what DMS keys on.
 
 ## Layout of the source
 
@@ -163,6 +163,25 @@ The clone directory name must equal the plugin id (`inlineKeyboard`).
 | `layouts/emoji.js` | **Generated**: emoji groups (Unicode 16) + symbol groups |
 | `tools/gen-emoji.py` | Regenerates `layouts/emoji.js` from Unicode's `emoji-test.txt` |
 | `scripts/` | Acceptance harness: `acceptance.py` plus its `sections/` blocks, addon probe and unit tests |
+| `InlineKeyboardSettings.qml` | Settings page: appearance / behaviour / actions / debugging, all on MD3 `SettingsGroup` rows |
+| `SettingsSection.qml` | Section heading inside the settings page |
+| `FcitxBridge.qml` | fcitx5 socket bridge: state, candidates, comments, input-method list |
+| `KeyRouter.qml` | Modifier state machine + injection; decides fcitx5 vs ydotool |
+| `KeyGrid.qml` | Key grid: absolute positioning, auto-repeat, input-method badge on the space bar |
+| `CandidatePanel.qml` | Expanded candidate list page |
+| `VoiceBar.qml`, `VoiceMiniWindow.qml` | Voice-input row and its floating capsule window |
+| `DragInitiator.qml` | Turns drag gestures into controller begin / update / end |
+| `GhostBlock.qml` | Drop-target ghost block |
+| `ActionLabel.qml` | One action row: icon, divider, title — shared by list / ghost / drop target |
+| `DebugIpc.qml` | Debug IPC (loaded only in debug mode): diagnostics, injection, simulated taps |
+| `data.js` | **Pure** addon payload → keyboard model. Unit-tested |
+| `candidates.js` | **Pure** candidate row layout and spare-width distribution. Unit-tested |
+| `keyroute.js` | **Pure** "hand to fcitx5 or send a real key" decision. Unit-tested |
+| `modifiers.js` | **Pure** modifier state machine. Unit-tested |
+| `alpha.js` | Alpha steps named once instead of scattered magic numbers |
+| `motion.js` | Animation durations, scaled by the DMS speed setting |
+| `layouts/resize.js` | Resize-handle hit regions |
+| `layouts/specialKeys.js` | Special-key styles (icon / short / full name) |
 | `translations/` | Per-locale strings (`zh_CN.json`); source strings stay English |
 | `icons/` | Hand-drawn SVG (the "floating" glyph) |
 | `docs/` | Protocol notes and layout/geometry rules; Chinese versions are `*.zh-CN.md` |

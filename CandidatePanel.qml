@@ -1,10 +1,10 @@
 // 候选词列表页：覆盖键盘按键区，把候选摊开。
 // 左侧 DListView 按行虚拟化（右侧一列是翻页/退格键）。
 
-import "motion.js" as Motion
-import "alpha.js" as Alpha
 import QtQuick
+import "alpha.js" as Alpha
 import "candidates.js" as Candidates
+import "motion.js" as Motion
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Widgets
@@ -146,7 +146,6 @@ Item {
                 item.pressArea.tapAt();
                 return true;
             }
-
         }
         return false;
     }
@@ -244,14 +243,36 @@ Item {
                     StyledText {
                         id: labelText
 
-                        anchors.centerIn: parent
+                        // 小字占的那一段，居中时要从可用宽度里扣掉
+                        readonly property real noteW: noteText.visible ? noteText.noteGap + noteText.noteW : 0
+
                         // implicitWidth 带小数，取到它时 Text.width 是浮点，亚像素排版会把末尾字符判成放不下。两边 ceil 再各留 1px
-                        width: Math.min(Math.ceil(implicitWidth) + 1, Math.max(0, Math.ceil(cell.width - candList.unit * 2 / 3) + 2))
+                        width: Math.min(Math.ceil(implicitWidth) + 1, Math.max(0, Math.ceil(cell.width - candList.unit * 2 / 3 - noteW) + 2))
+                        x: Math.round((cell.width - width - noteW) / 2)
+                        anchors.verticalCenter: parent.verticalCenter
                         elide: Text.ElideRight
                         text: cell.modelData.t
                         color: candList.fgColor
                         font.pixelSize: candList.candFontSize
                         font.weight: Font.Normal
+                    }
+
+                    // 候选词后面的小字（rime 的拼音），比正文小一号、淡一点
+                    StyledText {
+                        id: noteText
+
+                        readonly property real noteGap: Math.round(candList.candFontSize * candList.controller.candNoteGapRatio)
+                        readonly property string value: cell.modelData.c !== undefined && cell.modelData.c !== null ? String(cell.modelData.c) : ""
+                        readonly property real noteW: value === "" ? 0 : Math.min(Math.ceil(implicitWidth) + 1, Math.max(0, Math.ceil(cell.width - candList.unit * 2 / 3 - labelText.implicitWidth - noteGap) + 2))
+
+                        visible: value !== ""
+                        x: labelText.x + labelText.width + noteGap
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: noteW
+                        text: value
+                        elide: Text.ElideRight
+                        color: Theme.withAlpha(candList.fgColor, Alpha.Medium)
+                        font.pixelSize: Math.round(candList.candFontSize * candList.controller.candNoteScale)
                     }
 
                     // 涟漪：trigger 后自行淡出
@@ -270,6 +291,12 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
+                        onPressAndHold: {
+                            // 长按优先把注释（拼音）上屏；没有注释或开关关着就退回正常选词
+                            if (!candList.controller.commitCandidateNote(cell.modelData))
+                                candList.controller.selectCandidate(cell.modelData.i);
+
+                        }
                         onClicked: candList.controller.selectCandidate(cell.modelData.i)
                         onPressed: (mouse) => {
                             return cellRipple.trigger(mouse.x, mouse.y);
@@ -341,18 +368,6 @@ Item {
                 // 按键交给 daemon.handleKey 处理，不另开按键通道
 
                 id: press
-                Accessible.role: Accessible.Button
-                Accessible.name: {
-                    const act = sideBtn.modelData.act;
-                    if (act === "up")
-                        return I18n.trFor("inlineKeyboard", "Scroll up");
-                    if (act === "down")
-                        return I18n.trFor("inlineKeyboard", "Scroll down");
-                    if (act === "backspace")
-                        return I18n.trFor("inlineKeyboard", "Delete");
-
-                    return I18n.trFor("inlineKeyboard", "Submit");
-                }
 
                 function tapAt() {
                     switch (sideBtn.modelData.act) {
@@ -379,6 +394,20 @@ Item {
                     }
                 }
 
+                Accessible.role: Accessible.Button
+                Accessible.name: {
+                    const act = sideBtn.modelData.act;
+                    if (act === "up")
+                        return I18n.trFor("inlineKeyboard", "Scroll up");
+
+                    if (act === "down")
+                        return I18n.trFor("inlineKeyboard", "Scroll down");
+
+                    if (act === "backspace")
+                        return I18n.trFor("inlineKeyboard", "Delete");
+
+                    return I18n.trFor("inlineKeyboard", "Submit");
+                }
                 anchors.fill: parent
                 onClicked: tapAt()
             }

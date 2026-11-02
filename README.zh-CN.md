@@ -118,7 +118,7 @@ dms ipc call plugins status inlineKeyboard
 dms ipc call inlineKeyboard toggle
 ```
 
-clone 出来的目录名必须等于插件 id（`inlineKeyboard`）。
+建议把 clone 目录命名成插件 id（`inlineKeyboard`），不过 DMS 认的是 manifest 里的 id。
 
 ## 源码结构
 
@@ -148,6 +148,25 @@ clone 出来的目录名必须等于插件 id（`inlineKeyboard`）。
 | `layouts/emoji.js` | **生成物**：表情分组（Unicode 16）+ 符号分组 |
 | `tools/gen-emoji.py` | 从 Unicode 的 `emoji-test.txt` 重新生成 `layouts/emoji.js` |
 | `scripts/` | 验收工具：`acceptance.py` 与它的 `sections/` 分块、addon 探针、单元测试 |
+| `InlineKeyboardSettings.qml` | 设置页：外观 / 行为 / 动作 / 调试，全部走 MD3 `SettingsGroup` 行 |
+| `SettingsSection.qml` | 设置页的分组标题 |
+| `FcitxBridge.qml` | fcitx5 socket 桥：状态、候选、注释、输入法清单 |
+| `KeyRouter.qml` | 修饰键状态机 + 注入；决定走 fcitx5 还是 ydotool |
+| `KeyGrid.qml` | 键位网格：绝对定位、长按重复、空格上的输入法标识 |
+| `CandidatePanel.qml` | 展开的候选列表页 |
+| `VoiceBar.qml`、`VoiceMiniWindow.qml` | 语音输入行和它的浮动胶囊窗口 |
+| `DragInitiator.qml` | 把拖动手势翻译成 controller 的 begin / update / end |
+| `GhostBlock.qml` | 落点幽灵块 |
+| `ActionLabel.qml` | 动作的一行展示：图标、分隔线、标题 —— 列表 / 幽灵 / 落点共用 |
+| `DebugIpc.qml` | 调试 IPC（只在调试模式加载）：诊断、注入、模拟点击 |
+| `data.js` | **纯逻辑** addon 输出 → 键盘数据模型，有单测 |
+| `candidates.js` | **纯逻辑** 候选分行与余量分配，有单测 |
+| `keyroute.js` | **纯逻辑**「交给 fcitx5 还是发真键」的判据，有单测 |
+| `modifiers.js` | **纯逻辑** 修饰键状态机，有单测 |
+| `alpha.js` | 透明度梯度集中命名，避免魔法数散落 |
+| `motion.js` | 动画时长，按 DMS 速度设置等比缩放 |
+| `layouts/resize.js` | 调整大小把手的命中区 |
+| `layouts/specialKeys.js` | 特殊键的形态（图标 / 缩写 / 完整名字） |
 | `translations/` | 各语言字符串（`zh_CN.json`）；源串始终是英文 |
 | `icons/` | 手绘 SVG（「浮动」图标） |
 | `docs/` | 协议笔记与布局/几何规则；中文版是 `*.zh-CN.md` |

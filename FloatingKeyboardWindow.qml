@@ -26,6 +26,7 @@ PanelWindow {
     property bool editing: false
     property bool avoidWindows: true
     property bool autoShow: false
+    property var statusItems: []
     property bool tooltips: true
     property bool voiceActive: false
     property bool voiceMinimal: false
@@ -33,6 +34,7 @@ PanelWindow {
     property real bgOpacity: 1
     property int repeatInterval: 60
     property real keyOpacity: 1
+    property real borderWidth: 0
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
     property string winKeyCustomIcon: ""
@@ -43,8 +45,11 @@ PanelWindow {
     property bool dockFill: true
     property var actionList: []
     property var fcitxCandidates: []
+    property var fcitxCandidateComments: []
+    property bool longPressNote: true
     property bool fcitxImKeyboard: false
     property var debugCandItems: []
+    property var debugCandComments: []
     property var allCandidates: []
     property int candRevision: 0
     property bool fcitxHasMore: false
@@ -91,6 +96,7 @@ PanelWindow {
     signal imCycleRequested()
     signal selectCandidateRequested(int index)
     signal imSelected(string name, var ascii)
+    signal activateStatusRequested(string name)
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
     signal keyboardClosed()
@@ -126,8 +132,16 @@ PanelWindow {
     }
 
     // 首次定位是 show() 摆出来的，不是用户拖的，别写盘
-    onPosXChanged: if (posInitialized) posSaveTimer.restart()
-    onPosYChanged: if (posInitialized) posSaveTimer.restart()
+    onPosXChanged: {
+        if (posInitialized)
+            posSaveTimer.restart();
+
+    }
+    onPosYChanged: {
+        if (posInitialized)
+            posSaveTimer.restart();
+
+    }
     visible: keyboardVisible && !root.voiceMinimal
     color: "transparent"
     implicitWidth: metrics.screenW
@@ -187,6 +201,7 @@ PanelWindow {
         designScale: metrics.uiScale
         showCandBar: root.showCandBar
         debugCandItems: root.debugCandItems
+        debugCandComments: root.debugCandComments
         allCandidates: root.allCandidates
         candRevision: root.candRevision
         handleH: metrics.handleH
@@ -202,12 +217,14 @@ PanelWindow {
         editing: root.editing
         avoidWindows: root.avoidWindows
         autoShow: root.autoShow
+        statusItems: root.statusItems
         tooltips: root.tooltips
         voiceActive: root.voiceActive
         voiceMinimal: root.voiceMinimal
         voiceAvailable: root.voiceAvailable
         bgOpacity: root.bgOpacity
         keyOpacity: root.keyOpacity
+        borderWidth: root.borderWidth
         specialKeyStyle: root.specialKeyStyle
         winKeyStyle: root.winKeyStyle
         winKeyCustomIcon: root.winKeyCustomIcon
@@ -239,6 +256,8 @@ PanelWindow {
         dockFill: root.dockFill
         actionList: root.actionList
         fcitxCandidates: root.fcitxCandidates
+        fcitxCandidateComments: root.fcitxCandidateComments
+        longPressNote: root.longPressNote
         fcitxImKeyboard: root.fcitxImKeyboard
         fcitxHasMore: root.fcitxHasMore
         fcitxImIcon: root.fcitxImIcon
@@ -265,6 +284,9 @@ PanelWindow {
         }
         onImSelected: (name, ascii) => {
             return root.imSelected(name, ascii);
+        }
+        onActivateStatusRequested: (name) => {
+            return root.activateStatusRequested(name);
         }
         onOrderChanged: (list) => {
             return root.orderChanged(list);

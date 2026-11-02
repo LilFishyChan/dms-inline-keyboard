@@ -6,8 +6,8 @@ import Quickshell.Io
 import "data.js" as Data
 import "keyroute.js" as KeyRoute
 import "modifiers.js" as Modifiers
-import qs.Services
 import qs.Common
+import qs.Services
 
 Item {
     id: router
@@ -175,37 +175,6 @@ Item {
             router.capsState = 2;
         else if (!capsProbe.running)
             capsProbe.running = true;
-
-    }
-
-    Process {
-        id: capsProbe
-
-        command: ["sh", "-c", "cat /sys/class/leds/*::capslock/brightness 2>/dev/null | head -1"]
-        running: false
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const raw = text.trim();
-                if (raw === "")
-                    return ;
-
-                const v = parseInt(raw, 10);
-                if (!isNaN(v))
-                    router.capsState = v > 0 ? 2 : 0;
-
-            }
-        }
-
-    }
-
-    Connections {
-        target: typeof DMSService !== "undefined" ? DMSService : null
-
-        function onCapsLockStateChanged() {
-            router.syncSystemCaps();
-        }
-
     }
 
     // 兼容旧调用点
@@ -249,6 +218,7 @@ Item {
             // Caps 是系统的锁定键：本地翻完还要把真键发出去，系统并不知道我们这份状态
             if (modifier === "caps")
                 injectKey(58, "Caps Lock", "key", false);
+
             return ;
         }
         if (k === "space")
@@ -320,13 +290,13 @@ Item {
     function notifyUnimplemented() {
         if (typeof ToastService === "undefined" || !ToastService)
             return ;
+
         // 长按重复时每 60ms 一次，没有节流会刷满屏幕
         const now = Date.now();
         if (now - router.lastToastAt < 3000)
             return ;
 
         router.lastToastAt = now;
-
         ToastService.showInfo(I18n.trFor("inlineKeyboard", "ydotoold is not running"));
     }
 
@@ -343,9 +313,11 @@ Item {
 
     function runCommand(cmd) {
         if (ydotoolProc.running) {
-            if (router.pendingCommands.length >= 32)
-                router.pendingCommands.shift();
-
+            // 丢最新的一条而不是最早的：旧的已经在路上，删掉最早那条会让先敲的字消失、后面的照常出现
+            if (router.pendingCommands.length >= 32) {
+                console.warn("inlineKeyboard: 按键队列已满，丢弃最新一条");
+                return ;
+            }
             // 必须写 router：root 会解析到外层 daemon 的队列，键会排错队甚至注进别的窗口
             router.pendingCommands.push(cmd);
             return ;
@@ -372,6 +344,35 @@ Item {
     }
 
     Process {
+        id: capsProbe
+
+        command: ["sh", "-c", "cat /sys/class/leds/*::capslock/brightness 2>/dev/null | head -1"]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const raw = text.trim();
+                if (raw === "")
+                    return ;
+
+                const v = parseInt(raw, 10);
+                if (!isNaN(v))
+                    router.capsState = v > 0 ? 2 : 0;
+
+            }
+        }
+
+    }
+
+    Connections {
+        function onCapsLockStateChanged() {
+            router.syncSystemCaps();
+        }
+
+        target: typeof DMSService !== "undefined" ? DMSService : null
+    }
+
+    Process {
         id: ydotoolProc
 
         command: ["true"]
@@ -381,13 +382,11 @@ Item {
                 router.probeYdotoold();
             else
                 router.ydotooldUp = true;
-
             // 队列里还有就接着跑
             if (router.pendingCommands.length > 0) {
                 ydotoolProc.command = router.pendingCommands.shift();
                 ydotoolProc.running = true;
             }
-
         }
     }
 

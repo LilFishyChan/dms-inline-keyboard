@@ -24,7 +24,9 @@ function layoutCandidates(list, measure, opts) {
     for (let n = 0; n < src.length; n++) {
         const item = src[n] || {}
         const text = item.t !== undefined ? String(item.t) : String(item)
-        const adv = measure ? num(measure(text)) : 0
+        // 注释跟着候选一起量：不加这段，分到的格子放不下小字
+        const note = item.c !== undefined && item.c !== null ? String(item.c) : ""
+        const adv = measure ? num(measure(note === "" ? text : text + " " + note)) : 0
         const w = Math.min(Math.ceil(adv + pad), availW)
 
         if (x > 0 && x + w > availW) {
@@ -41,6 +43,8 @@ function layoutCandidates(list, measure, opts) {
             x: x,
             w: w,
             t: text,
+            // 小字跟着格子走，列表页要靠它渲染
+            c: note,
             sep: true,
             i: item.i !== undefined ? item.i : n
         }

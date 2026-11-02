@@ -1,8 +1,8 @@
-import "motion.js" as Motion
-import "alpha.js" as Alpha
 // Inline Keyboard 顶部候选条
 // 布局规则（和主键盘共用同一套度量）：
 import QtQuick
+import "alpha.js" as Alpha
+import "motion.js" as Motion
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Widgets
@@ -43,18 +43,20 @@ Item {
         return true;
     }
 
+    // 切换时整条淡入淡出
+    opacity: controller.showCandBar ? 1 : 0
+    z: 20
+
     // 尺寸与 visible 由父级的 anchors.fill 决定；读 height 会被它覆盖，entered 只能跟开关状态复位
     Connections {
         function onShowCandBarChanged() {
             if (candArea.controller && !candArea.controller.showCandBar)
                 candArea.entered = false;
+
         }
 
         target: candArea.controller
     }
-    // 切换时整条淡入淡出
-    opacity: controller.showCandBar ? 1 : 0
-    z: 20
 
     Rectangle {
         id: panel
@@ -85,7 +87,8 @@ Item {
                     readonly property real firstMaxW: candArea.width * 2 / 3
                     // 每项左右的内边距：由卡片统一给（量容量和画宽度必须同源）
                     readonly property real pad: candArea.controller && candArea.controller.candItemPad !== undefined ? candArea.controller.candItemPad : Math.round(candArea.areaH * 0.8)
-                    readonly property real contentW: label.implicitWidth + pad
+                    // noteGap 和 noteText 都在 note 里面，得带前缀取，否则 undefined 会让整条算出 NaN 再退回旧值
+                    readonly property real contentW: label.implicitWidth + (note.noteText !== "" ? note.noteGap + note.implicitWidth : 0) + pad
                     readonly property real capW: isFirst ? Math.min(contentW, firstMaxW) : contentW
 
                     // 行尾剩余的宽度按项数平摊，和列表一样把整行铺满
@@ -131,8 +134,15 @@ Item {
                                 capsule.animH = candArea.controller.quickH;
                                 candArea.entered = true;
                                 Qt.callLater(function() {
+                                    // delegate 可能已经重建，胶囊跟着销毁了
+                                    if (!capsule)
+                                        return ;
+
                                     capsule.snapping = false;
                                     Qt.callLater(function() {
+                                        if (!capsule)
+                                            return ;
+
                                         capsule.animW = capsule.targetW;
                                         capsule.animH = capsule.targetH;
                                     });
@@ -140,7 +150,9 @@ Item {
                             } else {
                                 // 重建时从上一次宽度接上；必须延后一帧，初始化期间 Behavior 不拦
                                 Qt.callLater(function() {
-                                    capsule.animW = capsule.targetW;
+                                    if (capsule)
+                                        capsule.animW = capsule.targetW;
+
                                 });
                             }
                         }
@@ -154,6 +166,7 @@ Item {
                         // 打字时跟着滑
                         Behavior on animW {
                             enabled: controller ? controller.animationsEnabled : true
+
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.dur(Motion.shift)
                                 easing.type: Easing.OutCubic
@@ -163,6 +176,7 @@ Item {
 
                         Behavior on animH {
                             enabled: controller ? controller.animationsEnabled : true
+
                             NumberAnimation {
                                 duration: capsule.snapping ? 0 : Motion.dur(Motion.shift)
                                 easing.type: Easing.OutCubic
@@ -176,7 +190,8 @@ Item {
                         id: label
 
                         // 不能用 anchors.centerIn：锚点会反过来设置 width，和下面的绑定打架，elide 就按错的值判断。
-                        x: Math.round((parent.width - width) / 2)
+                        // label + gap + note 作为一组居中：减掉注释占的那一段再对半
+                        x: Math.round((parent.width - width - (note.noteText !== "" ? note.noteGap + note.noteW : 0)) / 2)
                         y: Math.round((parent.height - height) / 2)
                         // 只在超出上限时才限制宽度，正常词按内容排。
                         // ceil 给 1px 余量：capW - pad 是浮点，和 implicitWidth
@@ -195,14 +210,54 @@ Item {
                         font.weight: isFirst ? Font.DemiBold : Font.Normal
                     }
 
+                    // 候选词后面的小字（rime 的拼音），比正文小一号、颜色淡一点
+                    StyledText {
+                        id: note
+
+                        readonly property real noteGap: Math.round(candArea.candFontSize * candArea.controller.candNoteGapRatio)
+                        // label 算居中位置时要先知道注释占多宽
+                        readonly property real noteW: noteText === "" ? 0 : Math.min(Math.ceil(implicitWidth) + 1, Math.max(0, Math.ceil(capW - pad - label.implicitWidth - noteGap) + 1))
+                        readonly property string noteText: {
+                            const entry = candArea.pool[index];
+                            if (entry === undefined || entry === null)
+                                return "";
+
+                            return entry.c !== undefined && entry.c !== null ? String(entry.c) : "";
+                        }
+
+                        visible: noteText !== ""
+                        // 读屏只念一遍：注释是候选的附属信息，不单独朗读
+                        Accessible.ignored: true
+                        x: label.x + label.width + noteGap
+                        // 和 label 用同一个高度基准，胶囊高度动画时不会错位
+                        y: Math.round((parent.height - height) / 2)
+                        text: noteText
+                        elide: Text.ElideRight
+                        width: noteW
+                        color: Theme.withAlpha(candArea.controller.fg, Alpha.Medium)
+                        font.pixelSize: Math.round(candArea.candFontSize * candArea.controller.candNoteScale)
+                    }
+
                     StateLayer {
                         id: mouse
 
                         // StateLayer 自带 hover/pressed 状态层和涟漪，不用自己判断 containsMouse
                         anchors.fill: parent
                         stateColor: Theme.onSurface
+                        // 读屏念「候选词 注释」，注释本身标了 ignored 不会重复
+                        Accessible.role: Accessible.Button
+                        Accessible.name: label.text + (note.noteText !== "" ? " " + note.noteText : "")
                         // 显式引用胶囊：StateLayer 初始化时 parent 还是 null，取 parent.radius 会拿到 undefined
                         cornerRadius: capsule.radius
+                        onPressAndHold: {
+                            // 长按优先把注释（拼音）上屏；没有注释或开关关着就退回正常选词
+                            const entry = candArea.pool[index] || {
+                            };
+                            if (candArea.controller.commitCandidateNote(entry))
+                                return ;
+
+                            candArea.controller.selectCandidate(entry.i !== undefined ? entry.i : index);
+                        }
                         onClicked: {
                             // 用原始全局下标选词：显示顺序和 addon 下标不是一回事
                             const item = candArea.pool[index] || {
@@ -240,6 +295,10 @@ Item {
             DActionButton {
                 id: expandButton
 
+                function tapAt() {
+                    candArea.controller.toggleCandList();
+                }
+
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 buttonSize: Math.round(candArea.controller.quickH)
@@ -250,11 +309,6 @@ Item {
                 iconColor: candArea.controller.candListOpen ? Theme.primary : Theme.withAlpha(candArea.controller.fg, Alpha.Strong)
                 backgroundColor: Theme.chipSurface
                 stateColor: Theme.primary
-
-                function tapAt() {
-                    candArea.controller.toggleCandList();
-                }
-
                 onClicked: tapAt()
             }
 

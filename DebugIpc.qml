@@ -88,10 +88,9 @@ Item {
 
         if (!key)
             return "no-key";
+
         // 白名单：只放设置页真实存在的标量项。动作表、队列、运行时位置都不属于「设置项」
-        const writable = ["alwaysShowPreedit", "avoidWindows", "bgOpacity", "debugMode", "defaultFloating",
-                          "dockFillWidth", "escSwap", "keyOpacity", "keyboardHeight", "keyboardWidth",
-                          "modifierMode", "repeatInterval", "specialKeyStyle", "winKeyCustomIcon", "winKeyStyle"];
+        const writable = ["alwaysShowPreedit", "autoShow", "avoidWindows", "bgOpacity", "blockTtySwitch", "borderWidth", "debugMode", "defaultFloating", "dockFillWidth", "escSwap", "keyOpacity", "keyboardHeight", "keyboardWidth", "longPressNote", "modifierMode", "repeatInterval", "specialKeyStyle", "tooltips", "winKeyCustomIcon", "winKeyStyle"];
         if (!writable.includes(key))
             return "blocked-key";
 
@@ -166,13 +165,25 @@ Item {
         if (!controller.devMode)
             return "dev mode off";
 
-        const text = String(csv || "");
-        controller.debugCandItems = text === "" ? [] : text.split(",").map((s) => {
+        // 和 data.js 的上限一致：条数和单条长度都封顶，免得调试注入把模型撑爆
+        const parts = String(csv || "").split(",").map((s) => {
             return s.trim();
         }).filter((s) => {
             return s !== "";
-        });
-        return controller.debugCandItems.length + " items";
+        }).slice(0, 64);
+        // 「词|注释」两段式：第二段是候选后面的小字，没有就留空
+        const items = [];
+        const notes = [];
+        for (let i = 0; i < parts.length; i++) {
+            const seg = parts[i].split("|");
+            items.push(String(seg[0] || "").slice(0, 64));
+            notes.push(String(seg.length > 1 ? seg[1] : "").slice(0, 64));
+        }
+        controller.debugCandItems = items;
+        controller.debugCandComments = notes;
+        return controller.debugCandItems.length + " items, notes=" + controller.debugCandComments.filter((x) => {
+            return x !== "";
+        }).length;
     }
 
     // dms ipc call inlineKeyboard debugCandList   切换候选列表页

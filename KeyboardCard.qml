@@ -1,14 +1,14 @@
 // Inline Keyboard 的键盘卡片本体：顶部快捷栏 + 右上角动作槽、按键区（page1/page2）、表情页、透明度面板和功能列表。
 
-import "motion.js" as Motion
-import "alpha.js" as Alpha
 import QtQuick
 import Quickshell.Io
 import "actions.js" as Actions
+import "alpha.js" as Alpha
 import "data.js" as Data
 import "layouts/phone.js" as Layout
 import "layouts/resize.js" as Resize
 import "modifiers.js" as Modifiers
+import "motion.js" as Motion
 import qs.Common
 import qs.DCommon.Widgets
 
@@ -61,11 +61,15 @@ Rectangle {
     // 停靠模式下是否避让键盘：对应动作的"激活"状态
     property bool avoidWindows: true
     property bool autoShow: false
+    // 状态区开关，从 daemon 一路传下来
+    property var statusItems: []
     // 当前是否浮动窗口（浮窗下"避让窗口"没有意义 → 禁用态）
     property bool isFloating: false
     // 透明度：由插件设置决定（0.1 ~ 1.0），不跟 DMS 主题走
     property real bgOpacity: 1
     property real keyOpacity: 1
+    // 按键和卡片共用的描边粗细（px），0 = 不画
+    property real borderWidth: 0
     // 进入调整面板前的值，"取消"时恢复
     property real prevBgOpacity: 1
     property real prevKeyOpacity: 1
@@ -150,20 +154,6 @@ Rectangle {
     property var imList: []
     // 给输入法面板用：带 text / current 的加工后列表（imList 是 fcitx 原始列表）
     property var imRows: []
-
-    // 长按选择器点了一行：分派规则和地球键单击一致（纯键盘布局直接切，拼音类要校正中英文）
-    // 语音行里的垃圾桶：主键盘里 controller 是这张卡片，daemon 那边的实现在窗口转发之后
-    function discardVoiceRecording() {
-        root.discardVoiceRequested();
-    }
-
-    function selectIm(name) {
-        root.imSelected(name, null);
-    }
-
-    function selectImMode(name, wantAscii) {
-        root.imSelected(name, wantAscii);
-    }
     readonly property var rows: {
         const base = Layout.pageRows(page);
         return root.escSwap ? root.swapEscTilde(base) : base;
@@ -182,8 +172,12 @@ Rectangle {
     property var actionList: []
     // fcitx5 候选（daemon 从 inline-keyboard-status.json 读入）
     property var fcitxCandidates: []
+    property var fcitxCandidateComments: []
+    // 长按候选词上屏注释（由设置项控制）
+    property bool longPressNote: true
     // 调试注入的假候选（dms ipc call inlineKeyboard debugCand "一,二,三"）。
     property var debugCandItems: []
+    property var debugCandComments: []
     // 候选列表页是否展开。展开时键区让位（真换页，不是盖一层），否则下面的按键还会被点到。
     property bool candListOpen: false
     // 候选面板引用（调试用）
@@ -236,6 +230,9 @@ Rectangle {
 
         return root.fcitxModel;
     }
+    // 注释小字的排版比例：CandidateBar 画的时候按这两个值排，容量也得按它们量
+    readonly property real candNoteScale: 0.82
+    readonly property real candNoteGapRatio: 0.35
     // 候选栏能装下 candListModel 的前几项。
     // 剩下的进列表页，两边不重复。所以容量必须按同一份数据算，否则会同时显示或同时漏掉一个。
     property int candBarCount: 0
@@ -347,6 +344,8 @@ Rectangle {
     signal imCycleRequested()
     // ascii 为 null 表示纯键盘布局（没有中英文子模式），直接切输入法
     signal imSelected(string name, var ascii)
+    // 状态区开关被点了，name 对应 addon 侧 action 的名字
+    signal activateStatusRequested(string name)
     signal resizeCommitRequested()
     // 松手落盘时用：键盘尺寸变成新值后，卡片位置要补偿多少，才能让「拖的那条边」的对侧保持不动。拖动过程中不移动键盘。
     signal resizeOriginShift(real dx, real dy)
@@ -376,6 +375,39 @@ Rectangle {
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
     signal dragMoved(real dx, real dy)
+
+    // 长按选择器点了一行：分派规则和地球键单击一致（纯键盘布局直接切，拼音类要校正中英文）
+    // 语音行里的垃圾桶：主键盘里 controller 是这张卡片，daemon 那边的实现在窗口转发之后
+    function discardVoiceRecording() {
+        root.discardVoiceRequested();
+    }
+
+    // 长按候选词：有注释就上屏注释，没有就返回 false 让调用方照常选词
+    function commitCandidateNote(item) {
+        if (!root.longPressNote || !item)
+            return false;
+
+        const note = item.c !== undefined && item.c !== null ? String(item.c) : "";
+        if (note === "")
+            return false;
+
+        root.textCommitRequested(note);
+        return true;
+    }
+
+    function selectIm(name) {
+        root.imSelected(name, null);
+    }
+
+    function selectImMode(name, wantAscii) {
+        root.imSelected(name, wantAscii);
+    }
+
+    function activateStatusItem(item) {
+        if (item && item.name)
+            root.activateStatusRequested(item.name);
+
+    }
 
     function pointerTapEmojiSegment(index) {
         return emojiPanel ? emojiPanel.pointerTapSegment(index) : false;
@@ -764,7 +796,8 @@ Rectangle {
         let n = 0;
         for (let i = 0; i < list.length; i++) {
             const t = list[i] && list[i].t !== undefined ? String(list[i].t) : String(list[i] || "");
-            candMeasure.text = t;
+            const note = list[i] && list[i].c ? String(list[i].c) : "";
+            candMeasure.text = note === "" ? t : t + " " + note;
             let w = candMeasure.advanceWidth + root.candItemPad + root.gap;
             if (i === 0 && w > firstMax)
                 w = firstMax;
@@ -823,64 +856,64 @@ Rectangle {
             return term;
 
         switch (term) {
-    case "Undo":
-        return I18n.trFor("inlineKeyboard", "Undo");
-    case "Redo":
-        return I18n.trFor("inlineKeyboard", "Redo");
-    case "Settings":
-        return I18n.trFor("inlineKeyboard", "Settings");
-    case "Float":
-        return I18n.trFor("inlineKeyboard", "Float");
-    case "Size":
-        return I18n.trFor("inlineKeyboard", "Size");
-    case "Opacity":
-        return I18n.trFor("inlineKeyboard", "Opacity");
-    case "Next input method":
-        return I18n.trFor("inlineKeyboard", "Next input method");
-    case "Clipboard":
-        return I18n.trFor("inlineKeyboard", "Clipboard");
-    case "Avoid windows":
-        return I18n.trFor("inlineKeyboard", "Avoid windows");
-    case "Voice input":
-        return I18n.trFor("inlineKeyboard", "Voice input");
-    case "Minimize":
-        return I18n.trFor("inlineKeyboard", "Minimize");
-    case "Auto show":
-        return I18n.trFor("inlineKeyboard", "Auto show");
-    case "Smileys & Emotion":
-        return I18n.trFor("inlineKeyboard", "Smileys & Emotion");
-    case "People & Body":
-        return I18n.trFor("inlineKeyboard", "People & Body");
-    case "Animals & Nature":
-        return I18n.trFor("inlineKeyboard", "Animals & Nature");
-    case "Food & Drink":
-        return I18n.trFor("inlineKeyboard", "Food & Drink");
-    case "Travel & Places":
-        return I18n.trFor("inlineKeyboard", "Travel & Places");
-    case "Activities":
-        return I18n.trFor("inlineKeyboard", "Activities");
-    case "Objects":
-        return I18n.trFor("inlineKeyboard", "Objects");
-    case "Symbols":
-        return I18n.trFor("inlineKeyboard", "Symbols");
-    case "Flags":
-        return I18n.trFor("inlineKeyboard", "Flags");
-    case "Math":
-        return I18n.trFor("inlineKeyboard", "Math");
-    case "Punctuation":
-        return I18n.trFor("inlineKeyboard", "Punctuation");
-    case "Arrows":
-        return I18n.trFor("inlineKeyboard", "Arrows");
-    case "Currency":
-        return I18n.trFor("inlineKeyboard", "Currency");
-    case "Shapes":
-        return I18n.trFor("inlineKeyboard", "Shapes");
-    case "Box drawing":
-        return I18n.trFor("inlineKeyboard", "Box drawing");
-    case "Numbers":
-        return I18n.trFor("inlineKeyboard", "Numbers");
-    case "Misc":
-        return I18n.trFor("inlineKeyboard", "Misc");
+        case "Undo":
+            return I18n.trFor("inlineKeyboard", "Undo");
+        case "Redo":
+            return I18n.trFor("inlineKeyboard", "Redo");
+        case "Settings":
+            return I18n.trFor("inlineKeyboard", "Settings");
+        case "Float":
+            return I18n.trFor("inlineKeyboard", "Float");
+        case "Size":
+            return I18n.trFor("inlineKeyboard", "Size");
+        case "Opacity":
+            return I18n.trFor("inlineKeyboard", "Opacity");
+        case "Next input method":
+            return I18n.trFor("inlineKeyboard", "Next input method");
+        case "Clipboard":
+            return I18n.trFor("inlineKeyboard", "Clipboard");
+        case "Avoid windows":
+            return I18n.trFor("inlineKeyboard", "Avoid windows");
+        case "Voice input":
+            return I18n.trFor("inlineKeyboard", "Voice input");
+        case "Minimize":
+            return I18n.trFor("inlineKeyboard", "Minimize");
+        case "Auto show":
+            return I18n.trFor("inlineKeyboard", "Auto show");
+        case "Smileys & Emotion":
+            return I18n.trFor("inlineKeyboard", "Smileys & Emotion");
+        case "People & Body":
+            return I18n.trFor("inlineKeyboard", "People & Body");
+        case "Animals & Nature":
+            return I18n.trFor("inlineKeyboard", "Animals & Nature");
+        case "Food & Drink":
+            return I18n.trFor("inlineKeyboard", "Food & Drink");
+        case "Travel & Places":
+            return I18n.trFor("inlineKeyboard", "Travel & Places");
+        case "Activities":
+            return I18n.trFor("inlineKeyboard", "Activities");
+        case "Objects":
+            return I18n.trFor("inlineKeyboard", "Objects");
+        case "Symbols":
+            return I18n.trFor("inlineKeyboard", "Symbols");
+        case "Flags":
+            return I18n.trFor("inlineKeyboard", "Flags");
+        case "Math":
+            return I18n.trFor("inlineKeyboard", "Math");
+        case "Punctuation":
+            return I18n.trFor("inlineKeyboard", "Punctuation");
+        case "Arrows":
+            return I18n.trFor("inlineKeyboard", "Arrows");
+        case "Currency":
+            return I18n.trFor("inlineKeyboard", "Currency");
+        case "Shapes":
+            return I18n.trFor("inlineKeyboard", "Shapes");
+        case "Box drawing":
+            return I18n.trFor("inlineKeyboard", "Box drawing");
+        case "Numbers":
+            return I18n.trFor("inlineKeyboard", "Numbers");
+        case "Misc":
+            return I18n.trFor("inlineKeyboard", "Misc");
         default:
             return I18n.trFor("inlineKeyboard", term);
         }
@@ -895,6 +928,31 @@ Rectangle {
     function modifierStateFor(keyData) {
         const name = Modifiers.modifierNameFor(keyData);
         return name === "" ? 0 : (root.modifierStates[name] || 0);
+    }
+
+    // 候选和注释是两次独立赋值，必须一起建模型：只跟 candidates 的话注释永远慢一拍，首帧是空
+    function rebuildDebugCandModel() {
+        debugCandModel = root.debugCandItems.map((t, n) => {
+            const note = root.debugCandComments[n];
+            return ({
+                "i": n,
+                "t": String(t),
+                "c": note === undefined || note === null ? "" : String(note)
+            });
+        });
+        root.recomputeCandBar();
+    }
+
+    function rebuildFcitxModel() {
+        fcitxModel = root.fcitxCandidates.map((t, n) => {
+            const note = root.fcitxCandidateComments[n];
+            return ({
+                "i": n,
+                "t": String(t),
+                "c": note === undefined || note === null ? "" : String(note)
+            });
+        });
+        root.recomputeCandBar();
     }
 
     opacity: hostVisible ? 1 : 0
@@ -914,26 +972,13 @@ Rectangle {
         // 普通打字：走 800ms，合并连续的按键
         candReloadTimer.restart();
     }
-    onDebugCandItemsChanged: {
-        debugCandModel = root.debugCandItems.map((t, n) => {
-            return ({
-                "i": n,
-                "t": String(t)
-            });
-        });
-        root.recomputeCandBar();
-    }
+    onDebugCandItemsChanged: root.rebuildDebugCandModel()
+    onDebugCandCommentsChanged: root.rebuildDebugCandModel()
     onFcitxCandidatesChanged: {
-        fcitxModel = root.fcitxCandidates.map((t, n) => {
-            return ({
-                "i": n,
-                "t": String(t)
-            });
-        });
-        // 候选栏的数据源就是 fcitxModel，它一变就要重算容量 + 重排。
-        root.recomputeCandBar();
+        root.rebuildFcitxModel();
         root.candDataSeq++;
     }
+    onFcitxCandidateCommentsChanged: root.rebuildFcitxModel()
     onWidthChanged: recomputeCandBar()
     onUnitChanged: recomputeCandBar()
     onGapChanged: recomputeCandBar()
@@ -965,8 +1010,9 @@ Rectangle {
     radius: Theme.windowRadius
     // 卡片底跟 DMS 设置页同色（hostSurface），透明度仍由插件设置控制
     color: Theme.withAlpha(Theme.hostSurface, bgOpacity)
-    border.width: Theme.layerOutlineWidth
-    border.color: Theme.outlineMedium
+    border.width: root.borderWidth
+    // 边框跟背景一起淡出，否则背景调透明后还留一圈实色描边
+    border.color: Theme.withAlpha(Theme.primary, bgOpacity)
 
     // 选词窗口：600ms 后恢复正常（覆盖 addon 回包 + 一次状态推送）
     Timer {
@@ -1084,6 +1130,7 @@ Rectangle {
                 // 和分类栏 / 候选栏交叉淡入淡出，时长必须一致
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1107,6 +1154,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1138,6 +1186,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1178,6 +1227,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1211,6 +1261,7 @@ Rectangle {
 
                     Behavior on opacity {
                         enabled: root.animationsEnabled
+
                         NumberAnimation {
                             duration: Motion.dur(Motion.panel)
                             easing.type: Easing.OutCubic
@@ -1301,6 +1352,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1323,6 +1375,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1345,6 +1398,7 @@ Rectangle {
 
                 Behavior on opacity {
                     enabled: root.animationsEnabled
+
                     NumberAnimation {
                         duration: Motion.dur(Motion.panel)
                         easing.type: Easing.OutCubic
@@ -1607,7 +1661,6 @@ Rectangle {
                 iconColor: root.dockFill ? Theme.onPrimary : Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: root.dockFill ? Theme.primary : Theme.chipSurface
                 stateColor: root.dockFill ? Theme.onPrimary : Theme.primary
-
                 onClicked: root.resizeFillToggleRequested()
             }
 
@@ -1619,7 +1672,6 @@ Rectangle {
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
                 stateColor: Theme.withAlpha(root.fg, Alpha.Bright)
-
                 onClicked: root.resizeResetRequested()
             }
 
@@ -1631,7 +1683,6 @@ Rectangle {
                 iconColor: Theme.withAlpha(root.fg, Alpha.Bright)
                 backgroundColor: Theme.chipSurface
                 stateColor: Theme.withAlpha(root.fg, Alpha.Bright)
-
                 onClicked: root.resizeCancelRequested()
             }
 
@@ -1643,7 +1694,6 @@ Rectangle {
                 iconColor: Theme.onPrimary
                 backgroundColor: Theme.primary
                 stateColor: Theme.onPrimary
-
                 onClicked: root.resizeCloseRequested()
             }
 
@@ -1651,6 +1701,7 @@ Rectangle {
 
         Behavior on opacity {
             enabled: root.animationsEnabled
+
             NumberAnimation {
                 duration: Motion.dur(Motion.panel)
                 easing.type: Easing.OutCubic
@@ -1662,6 +1713,7 @@ Rectangle {
 
     Behavior on opacity {
         enabled: root.animationsEnabled
+
         NumberAnimation {
             duration: Motion.dur(Motion.fade)
             easing.type: Easing.OutCubic

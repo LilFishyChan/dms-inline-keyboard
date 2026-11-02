@@ -20,13 +20,26 @@ function parseStatus(raw, prev) {
         return keep;
     }
 
-    const items = Array.isArray(d.items) ? d.items.filter(
-        x => typeof x === "string" && x.length > 0)
-        .slice(0, MAX_ITEMS).map(x => x.slice(0, MAX_TEXT)) : [];
+    // 注释和候选词一一对应，必须按原始下标一起取；空候选被跳过时注释跟着跳过，不能各自 filter
+    const items = [];
+    const comments = [];
+    const rawItems = Array.isArray(d.items) ? d.items : [];
+    const rawComments = Array.isArray(d.comments) ? d.comments : [];
+    for (let i = 0; i < rawItems.length && items.length < MAX_ITEMS; i++) {
+        const word = rawItems[i];
+        if (typeof word !== "string" || word.length === 0)
+            continue;
+
+        items.push(word.slice(0, MAX_TEXT));
+        const note = rawComments[i];
+        comments.push(typeof note === "string" ? note.slice(0, MAX_TEXT) : "");
+    }
 
     return {
         // 候选词本身
         items: items,
+        // 每项后面的小字（rime 的拼音），和 items 同下标
+        comments: comments,
         preedit: typeof d.preedit === "string" ? d.preedit.slice(0, MAX_TEXT) : "",
         visible: !!d.visible,
         // 纯键盘布局（keyboard-us 这类）没有候选能力
@@ -52,6 +65,7 @@ function parseStatus(raw, prev) {
 function cloneStatus(s) {
     return {
         items: Array.isArray(s.items) ? s.items.slice() : [],
+        comments: Array.isArray(s.comments) ? s.comments.slice() : [],
         preedit: s.preedit || "",
         visible: !!s.visible,
         keyboard: !!s.keyboard,
@@ -71,7 +85,7 @@ function cloneStatus(s) {
 
 function emptyStatus() {
     return {
-        items: [], preedit: "", visible: false, keyboard: false,
+        items: [], comments: [], preedit: "", visible: false, keyboard: false,
         hasMore: false,
         // ui/self/embedded 必须在这里出现：cloneStatus 的白名单会照着补，缺了就会在解析失败时清零
         ui: "", self: "", embedded: false,
@@ -86,6 +100,47 @@ function cloneIm(x) {
         name: x.name, title: x.title, label: x.label,
         icon: x.icon, keyboard: !!x.keyboard,
     };
+}
+
+// 状态区开关（addon 的 status: 帧），递归展开子菜单；字段名在 addon 侧压成一个字母，这里换回可读名字
+function normalizeStatus(list) {
+    const out = [];
+    if (!Array.isArray(list))
+        return out;
+
+    for (const it of list) {
+        if (!it || typeof it.n !== "string")
+            continue;
+
+        const row = {
+            "name": it.n,
+            "text": typeof it.t === "string" ? it.t.slice(0, MAX_TEXT) : "",
+            "icon": typeof it.i === "string" ? it.i : "",
+            "checked": it.c === 1 || it.c === true,
+            "separator": it.s === 1 || it.s === true,
+            "children": normalizeStatus(it.k)
+        };
+        // 没有文字、没有子菜单、也不是分隔线 —— 画出来就是一行空白，丢掉
+        if (!row.separator && row.text === "" && row.children.length === 0)
+            continue;
+
+        out.push(row);
+    }
+    return out;
+}
+
+function parseStatusItems(raw, prev) {
+    const keep = Array.isArray(prev) ? prev : [];
+    let d;
+    try {
+        d = JSON.parse(raw);
+    } catch (e) {
+        return keep;
+    }
+    if (!Array.isArray(d))
+        return keep;
+
+    return normalizeStatus(d);
 }
 
 function parseImList(raw, prev) {
@@ -247,6 +302,7 @@ const __exports = {
     cloneStatus,
     parseStatus,
     parseImList,
+    parseStatusItems,
     isAsciiMode,
     buildImRows,
     nextImRow,

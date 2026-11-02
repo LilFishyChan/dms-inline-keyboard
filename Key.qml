@@ -3,14 +3,16 @@
 
 import QtQuick
 import QtQuick.Effects
-import "layouts/specialKeys.js" as SpecialKeys
 import "alpha.js" as Alpha
+import "layouts/specialKeys.js" as SpecialKeys
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Widgets
 
 // 单个按键。宽度/高度都由 unit、keyH、gap 推出来，布局只负责给单位宽和跨行数。
 Item {
+    // 标签已经是移位后的符号，注入时不能再叠 Shift
+
     id: root
 
     required property var keyData
@@ -105,6 +107,7 @@ Item {
     readonly property string effectiveLabel: {
         if (hasShiftVariant)
             return keyData.shift.l;
+
         // 符号键的 Shift 变体（/ → ?）要直接发移位后的符号，交给输入法的键补不回 Shift
         if (hasShiftPair && shiftActive)
             return pairData.s;
@@ -128,7 +131,6 @@ Item {
         "c": effectiveCode,
         "w": keyData.w,
         "to": keyData.to,
-        // 标签已经是移位后的符号，注入时不能再叠 Shift
         "shifted": hasShiftPair && shiftActive
     })
     // 底行右三个图标键（菜单/表情/第二页）图标放大
@@ -159,6 +161,8 @@ Item {
     }
     readonly property color fg: Theme.surfaceText
     readonly property real activeBorderWidth: Theme.outlineWidthFocused
+    // 常态描边粗细，由设置项给（0 = 不画）。激活态仍用主题的聚焦描边
+    property real borderWidth: 0
     // 激活态描边宽度（px）
     readonly property real cornerRatio: 0.18
     // 键帽圆角相对键高
@@ -190,7 +194,7 @@ Item {
         radius: Math.min(Theme.cornerRadius, root.keyH * root.cornerRatio)
         // 底色见上面的 fillColor；激活态不改底色，靠下面这圈描边表示
         color: root.fillColor
-        border.width: root.activeLook ? root.activeBorderWidth : 0
+        border.width: root.activeLook ? root.activeBorderWidth : root.borderWidth
         border.color: Theme.primary
 
         DRipple {
