@@ -42,7 +42,8 @@ window.
 - Docked (bottom, reserves screen space) or floating (drag anywhere)
 - Drag the handle to move; drag an edge to resize — the size is remembered
 - Opacity panel for the panel and for individual keys; key repeat interval
-- Special-key labels as icon / short / full name; the Win key can use a custom icon
+- Special-key labels as icon / short / full name; the Win key can read Mod / Super / Win / ⌘
+  or use a custom icon
 - Minimise to a small floating bubble (position remembered); voice mode collapses
   the keyboard to a single capsule
 - Colours follow the active DMS theme

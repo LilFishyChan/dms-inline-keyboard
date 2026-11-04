@@ -99,6 +99,13 @@ test("special-keys: 未知 winLook 回落到 mod", () => {
     assert.equal(SK.resolve("Win", "full", "").text, "Mod");
 });
 
+test("special-keys: win 形态是 Win 文字，不是符号也不是图标", () => {
+    const got = SK.resolve("Win", "full", "win", "");
+    assert.equal(got.icon, "", "纯文字形态，不挂图标");
+    assert.equal(got.text, "Win");
+    assert.equal(SK.normalizeWinLook("win"), "win", "新值不能被归一化掉");
+});
+
 test("special-keys: isSpecialKey 只认表里的键和 Win", () => {
     assert.equal(SK.isSpecialKey("Backspace"), true);
     assert.equal(SK.isSpecialKey("Win"), true);

@@ -476,8 +476,8 @@ PluginSettings {
             settingKey: "winKeyStyle"
             pluginRoot: root
             defaultValue: "mod"
-            values: ["mod", "super", "system", "custom"]
-            labels: ["Mod", "Super", "⌘", I18n.trFor("inlineKeyboard", "Custom icon")]
+            values: ["mod", "super", "win", "system", "custom"]
+            labels: ["Mod", "Super", "Win", "⌘", I18n.trFor("inlineKeyboard", "Custom icon")]
             text: I18n.trFor("inlineKeyboard", "Win key label")
             description: I18n.trFor("inlineKeyboard", "This key sends Super. Show it as text or an icon.")
         }

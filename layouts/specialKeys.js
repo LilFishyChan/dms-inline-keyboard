@@ -32,6 +32,9 @@ const SPECIAL_KEYS = {
 const WIN_LOOKS = {
     "mod":    { icon: "",                     text: "Mod" },
     "super":  { icon: "",                     text: "Super" },
+    // 直接写 "Win"：Windows 用户认这个词，和 Mod / Super 同一类纯文字形态。
+    // 不用 ⊞ 之类的字符 —— 那些是「符号」，不是用户想要的词。
+    "win":    { icon: "",                     text: "Win" },
     "system": { icon: "keyboard_command_key", text: "" },
     // 自定义：图标名由设置项 winKeyCustomIcon 提供
     "custom": { icon: "",                     text: "" },
@@ -75,7 +78,7 @@ function resolve(label, style, winLook, winCustomIcon) {
 
 // 设置项可选值（设置页和校验共用，避免两处各写一份字符串）
 const STYLES = ["icon", "short", "full"]
-const WIN_LOOK_KEYS = ["mod", "super", "system", "custom"]
+const WIN_LOOK_KEYS = ["mod", "super", "win", "system", "custom"]
 
 function normalizeStyle(style) {
     return STYLES.indexOf(style) >= 0 ? style : "full"
