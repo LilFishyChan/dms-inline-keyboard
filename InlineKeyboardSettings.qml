@@ -61,6 +61,9 @@ PluginSettings {
     // 数组提到 root 层：写在下拉行里再用卡片 id 引用会取到 undefined
     readonly property var layoutValues: ["phone", "kb75"]
     readonly property var layoutLabels: [I18n.trFor("inlineKeyboard", "Compact (two pages)"), I18n.trFor("inlineKeyboard", "75% (single page)")]
+    // 布局的镜像值：loadValue() 是函数调用、QML 追不到依赖，
+    // 但 escSwap 那行要按当前布局决定自己可不可用，需要一个能触发重算的属性
+    property string layoutValue: "phone"
     // DDropdown 初始化时也会发一次 valueChanged（带默认值），这时不能写盘
     // loadValue() 是函数调用，直接绑到 checked / visible 上不会随点击重算，这里各留一份镜像
     // 自定义图标那一组的显示开关：下拉是封装组件，拿不到它的回调，这里订阅读一次
@@ -74,6 +77,7 @@ PluginSettings {
         root.borderWidth = root.loadValue("borderWidth", 0);
         root.winKeyStyleValue = root.loadValue("winKeyStyle", "mod");
         root.winIconValue = root.loadValue("winKeyCustomIcon", "");
+        root.layoutValue = root.loadValue("layout", "phone");
         // 动作表在 SettingsGroup 里深两层，PluginSettings 的 reloadChildValues 够不到它
         if (actionList)
             actionList.loadValue();
@@ -501,7 +505,10 @@ PluginSettings {
         SettingsRow {
             title: I18n.trFor("inlineKeyboard", "Icon")
 
-            Row {
+            // 走 body 槽而不是默认槽：SettingsRow 的默认槽是右侧的 trailing，
+            // 宽度跟着内容走，`Row { width: parent.width }` 放进去会算成 0，
+            // 整块控件被压没 —— 表现就是「标题下面一张空卡片」
+            body: Row {
                 width: parent.width
                 spacing: Theme.spacingS
 
@@ -599,8 +606,11 @@ PluginSettings {
             settingKey: "escSwap"
             pluginRoot: root
             defaultValue: false
+            // 75% 布局的 F 区第一个键本来就是 Esc，这项在那边不适用：
+            // 灰掉但留着，用户切回紧凑布局时才知道开关还在
+            enabled: root.layoutValue !== "kb75"
             text: I18n.trFor("inlineKeyboard", "Esc on the top-left key")
-            description: I18n.trFor("inlineKeyboard", "Swap the `~ key with Esc. Fn layer keeps the other one.")
+            description: root.layoutValue === "kb75" ? I18n.trFor("inlineKeyboard", "Not applicable to the 75% layout — its first key is already Esc.") : I18n.trFor("inlineKeyboard", "Swap the `~ key with Esc. Fn layer keeps the other one.")
         }
 
     }

@@ -269,6 +269,9 @@
     "No candidates": {
         "No candidates": "没有候选词"
     },
+    "Not applicable to the 75% layout — its first key is already Esc.": {
+        "Not applicable to the 75% layout — its first key is already Esc.": "75% 布局不适用 —— 它的第一个键本来就是 Esc。"
+    },
     "Numbers": {
         "Numbers": "序号"
     },
