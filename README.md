@@ -50,7 +50,7 @@ window.
 **Actions**
 
 - Functions page with 12 built-in actions (undo, redo, settings, float, size,
-  opacity, next input method, clipboard, emoji, avoid windows, voice, minimise) plus your
+  opacity, next input method, clipboard, emoji & symbols, avoid windows, voice, minimise) plus your
   own `sh -c` commands
 - Drag to reorder; drag an action into the quick bar or the corner slot
 - Four tap behaviours for Shift / Ctrl / Alt / Win

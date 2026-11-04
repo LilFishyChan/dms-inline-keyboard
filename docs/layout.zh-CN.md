@@ -52,8 +52,8 @@ Ctrl/Win/Alt/空格/Fn/菜单/表情/第二页），`page2` 是 F 区 + 导航 +
 
 `kb75.js` 对应 QMK 的 `LAYOUT_75_ansi` 键序：F 区 16 键满行（Esc + F1–F12 + PrtSc/Pause/Del）、
 右侧一列 Home/PgUp/PgDn/End、底行右端 ↑↓←→。**没有 page2、没有表情键、没有换页键**，
-底行 16 单位正好被 `Ctrl Win Alt 空格(6.75) Alt Ctrl ←↓→` 排满；表情从内置动作进
-（`actions.js` 的 `emoji`）。Fn 键先在 kb75 里留空位：把空格缩到 6.25、在 Alt 与 Ctrl 之间
+底行 16 单位正好被 `Ctrl Win Alt 空格(5.75) Alt 菜单(1) Ctrl ←↓→` 排满（菜单键照物理键盘
+放在右 Alt 与右 Ctrl 之间）；表情和符号从内置动作进（`actions.js` 的 `emoji`）。Fn 键先在 kb75 里留空位：把空格缩到 6.25、在 Alt 与 Ctrl 之间
 插一个 1 单位的 `{k: "fn", l: "Fn", w: 1}` 就填满了。
 
 两个模块的接口一致（`rowUnits` / `pageRows()` / `layoutFlat()`），QML 侧 import 两个别名、

@@ -60,8 +60,10 @@ numpad (15 columns, with empty columns in between as separators). Keys spanning 
 
 `kb75.js` follows QMK's `LAYOUT_75_ansi` key order: a full 16-key F row (Esc + F1–F12 + PrtSc/Pause/Del),
 a right-hand column Home/PgUp/PgDn/End, and ↑↓←→ at the end of the bottom row. It has **no page2,
-no emoji key and no page-switch key**; the bottom row is exactly `Ctrl Win Alt Space(6.75) Alt Ctrl ←↓→`.
-Emoji is reached through the built-in action instead (`emoji` in `actions.js`). The Fn key is left as
+no emoji key and no page-switch key**; the bottom row is exactly
+`Ctrl Win Alt Space(5.75) Alt Menu(1) Ctrl ←↓→` (the menu key sits between right Alt and right Ctrl,
+like a physical board). Emoji and symbols are reached through the built-in action instead
+(`emoji` in `actions.js`). The Fn key is left as
 a planned slot: shrink Space to 6.25 and insert `{k: "fn", l: "Fn", w: 1}` between Alt and Ctrl.
 
 Both modules expose the same surface (`rowUnits` / `pageRows()` / `layoutFlat()`); QML imports both
