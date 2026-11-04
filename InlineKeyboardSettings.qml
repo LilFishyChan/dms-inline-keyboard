@@ -206,8 +206,8 @@ PluginSettings {
             return I18n.trFor("inlineKeyboard", "Next input method");
         case "Clipboard":
             return I18n.trFor("inlineKeyboard", "Clipboard");
-        case "Emoji":
-            return I18n.trFor("inlineKeyboard", "Emoji");
+        case "Emoji & symbols":
+            return I18n.trFor("inlineKeyboard", "Emoji & symbols");
         case "Avoid windows":
             return I18n.trFor("inlineKeyboard", "Avoid windows");
         case "Voice input":

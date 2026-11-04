@@ -386,7 +386,7 @@ function defaultActions() {
         { id: "clipboard", label: "Clipboard", icon: "content_paste", kind: "builtin" },
         // 表情页原本只能靠底行那个 ☺ 键进，做成动作后快捷栏 / 动作列表也能调用；
         // 底行那颗键保留不变（同一个入口两种走法）
-        { id: "emoji", label: "Emoji", icon: "mood", kind: "builtin" },
+        { id: "emoji", label: "Emoji & symbols", icon: "mood", kind: "builtin" },
         { id: "avoid", label: "Avoid windows", icon: "unfold_more", kind: "builtin" },
         { id: "mic", label: "Voice input", icon: "mic", kind: "builtin" },
         { id: "minimize", label: "Minimize", icon: "keyboard_hide", kind: "builtin" },
@@ -561,6 +561,25 @@ function mergeNewBuiltins(saved, defaults) {
             })
             present[d.id] = true
         }
+    }
+    // 内置动作的显示名 / 图标以默认表为准：改了名字不必再写一次性迁移，
+    // 用户的排序、hidden、自定义命令都不动
+    const defById = {}
+    for (let i = 0; i < defs.length; i++) {
+        if (defs[i] && defs[i].id)
+            defById[defs[i].id] = defs[i]
+    }
+    for (let i = 0; i < list.length; i++) {
+        const a = list[i]
+        if (!a || a.builtin !== true || !a.id)
+            continue
+        const d = defById[a.id]
+        if (!d)
+            continue
+        if (a.label !== (d.label || d.id))
+            a.label = d.label || d.id
+        if (a.icon !== (d.icon || ""))
+            a.icon = d.icon || ""
     }
     return list
 }

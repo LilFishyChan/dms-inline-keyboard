@@ -644,12 +644,30 @@ test("mergeNewBuiltins: 补上老配置缺失的内置动作，已有项顺序�
     const merged = mergeNewBuiltins(saved, defaultActions());
     // 原有项仍在第一个，引用顺序不变
     assert.equal(merged[0].id, "float");
-    assert.equal(merged[0].label, "浮动", "不能覆盖用户改过的名字");
+    // 内置动作的名字以默认表为准（设置页不给改内置动作的名字，只能隐藏），
+    // 所以这里必须是默认表里的 "Float"，不能停在手改过的 "浮动"
+    assert.equal(merged[0].label, "Float", "内置动作的显示名跟着默认表走");
     // 默认表里每个 id 都在结果中，且只出现一次
     const ids = merged.map(a => a.id);
     assert.equal(new Set(ids).size, ids.length, "不能重复");
     for (const d of defaultActions())
         assert.ok(ids.includes(d.id), "缺了 " + d.id);
+});
+
+test("mergeNewBuiltins: 内置动作改过名字后同步成默认表的名字", () => {
+    const saved = [{ id: "emoji", label: "Emoji", icon: "mood", hidden: false, builtin: true, kind: "builtin", cmd: "" }];
+    const merged = mergeNewBuiltins(saved, defaultActions());
+    const emoji = merged.find(a => a.id === "emoji");
+    assert.equal(emoji.label, "Emoji & symbols", "改名前存的 label 要跟上");
+    assert.equal(emoji.hidden, false, "hidden 是用户的，不能动");
+});
+
+test("mergeNewBuiltins: 用户自定义动作的名字不会被动", () => {
+    const saved = [{ id: "mine", label: "我的动作", icon: "label", hidden: false, builtin: false, kind: "cmd", cmd: "true" }];
+    const merged = mergeNewBuiltins(saved, defaultActions());
+    const mine = merged.find(a => a.id === "mine");
+    assert.equal(mine.label, "我的动作");
+    assert.equal(mine.icon, "label");
 });
 
 test("mergeNewBuiltins: 新补的动作默认 hidden，不进功能页", () => {
