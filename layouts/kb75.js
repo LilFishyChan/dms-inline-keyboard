@@ -73,14 +73,17 @@ var rows = {
             {k: "key", l: "↑", c: 103},
             {k: "key", l: "End", c: 107}
         ],
-        // 底行：Ctrl Win Alt 空格 Alt Ctrl + 方向键（16 单位正好排满）
+        // 底行：Ctrl Win Alt 空格 Alt 菜单 Ctrl + 方向键（16 单位正好排满）
         // 没有表情键、没有换页键；Fn 以后再插
         [
             {k: "key", l: "Ctrl", c: 29, w: 1.25},
             {k: "key", l: "Win", c: 125, w: 1.25},
             {k: "key", l: "Alt", c: 56, w: 1.25},
-            {k: "space", l: "", w: 6.75},
+            {k: "space", l: "", w: 5.75},
             {k: "key", l: "Alt", c: 56, w: 1.25},
+            // 菜单位置照物理键盘：右 Alt 和右 Ctrl 之间；
+            // 空格从 6.75 收到 5.75 才腾得出来
+            {k: "key", l: "", c: 127, w: 1, icon: "icons/context-menu.svg"},
             {k: "key", l: "Ctrl", c: 29, w: 1.25},
             {k: "key", l: "←", c: 105},
             {k: "key", l: "↓", c: 108},
