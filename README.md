@@ -26,8 +26,10 @@ window.
 
 **Typing**
 
-- Phone-style layout: two key pages plus an Fn layer (F1–F12, numpad, arrows,
+- Compact layout (default): two key pages plus an Fn layer (F1–F12, numpad, arrows,
   editing keys)
+- A 75% layout is also available: 16 units × 6 rows on one page, with the F row,
+  nav column and arrows always visible (Settings → Appearance)
 - Candidates, preedit and input-method state are drawn **inside** the keyboard —
   no separate popup window; long preedit elides from the front
 - Paged, scrollable candidate list; clipboard action; a globe key that cycles
@@ -47,8 +49,8 @@ window.
 
 **Actions**
 
-- Functions page with 11 built-in actions (undo, redo, settings, float, size,
-  opacity, next input method, clipboard, avoid windows, voice, minimise) plus your
+- Functions page with 12 built-in actions (undo, redo, settings, float, size,
+  opacity, next input method, clipboard, emoji, avoid windows, voice, minimise) plus your
   own `sh -c` commands
 - Drag to reorder; drag an action into the quick bar or the corner slot
 - Four tap behaviours for Shift / Ctrl / Alt / Win

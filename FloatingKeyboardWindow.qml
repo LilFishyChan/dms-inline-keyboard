@@ -42,6 +42,8 @@ PanelWindow {
     property real resizeH: 444
     property real baseKbWidth: 1050
     property real baseKbHeight: 444
+    // 当前键盘布局（daemon 按设置传进来）：phone / kb75
+    property string layoutId: "phone"
     property bool dockFill: true
     property var actionList: []
     property var fcitxCandidates: []
@@ -168,6 +170,7 @@ PanelWindow {
     KeyboardMetrics {
         id: metrics
 
+        layoutId: root.layoutId
         kbWidth: root.kbWidth
         kbHeight: root.kbHeight
         showCandBar: root.showCandBar
@@ -186,6 +189,7 @@ PanelWindow {
     KeyboardCard {
         id: card
 
+        layoutId: root.layoutId
         onOpacityAdjusted: (bg, key) => {
             return root.opacityAdjusted(bg, key);
         }

@@ -1,4 +1,7 @@
 {
+    "75% (single page)": {
+        "75% (single page)": "75%（单页）"
+    },
     "Action slot": {
         "Action slot": "动作槽"
     },
@@ -88,6 +91,12 @@
     },
     "Command": {
         "Command": "命令"
+    },
+    "Compact (two pages)": {
+        "Compact (two pages)": "紧凑（两页）"
+    },
+    "Compact: 15 units per row, two pages. 75%: 16 units, one page with the F row, the nav column and the arrow keys always visible.": {
+        "Compact: 15 units per row, two pages. 75%: 16 units, one page with the F row, the nav column and the arrow keys always visible.": "紧凑：每行 15 单位、共两页。75%：每行 16 单位、单页，F 区 / 导航列 / 方向键始终可见。"
     },
     "Confirm": {
         "Confirm": "确定"
@@ -220,6 +229,9 @@
     },
     "Key repeat interval": {
         "Key repeat interval": "按键重复间隔"
+    },
+    "Keyboard layout": {
+        "Keyboard layout": "键盘布局"
     },
     "Keyboard page": {
         "Keyboard page": "键盘页"

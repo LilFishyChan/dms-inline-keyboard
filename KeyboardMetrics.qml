@@ -3,16 +3,22 @@
 // 所有输入都是名义值：不能用 card.width / card.height 反算，否则会形成
 // 「窗口尺寸 ← 卡片尺寸 ← 窗口尺寸」的正反馈，浮动窗口一拖就被压窄。
 import QtQuick
-import "layouts/phone.js" as Layout
+import "layouts/phone.js" as LayoutPhone
+import "layouts/kb75.js" as Layout75
 
 QtObject {
     id: root
+
+    // 当前键盘布局：phone = 15 单位 × 5 行（两页）/ kb75 = 16 单位 × 6 行（单页）
+    // QML 的 import 是静态的，选不了模块，只能两个都进来再按 id 取
+    property string layoutId: "phone"
+    readonly property var layoutModule: root.layoutId === "kb75" ? Layout75 : LayoutPhone
 
     // 顶部快捷条高度 / 底部把手高度，都按键高取比例
     readonly property real quickBarRatio: 0.78
     // 把手高度 = 键高的 0.75（原 0.5，加了一半）
     readonly property real handleRatio: 0.75
-    readonly property int keyRowCount: Layout.pageRows("page1").length
+    readonly property int keyRowCount: root.layoutModule.pageRows("page1").length
     // 840 宽时 uiScale = 1，下面 base 值就是原值；键盘拖小/放大时等比跟着变。
     // 不缩放的话，candH 44 在 222 高的键盘上要占 20%（正常只有 10%），gap 6×6 个间隙在 525 宽上也要吃掉 7%。
     readonly property real designW: 840
@@ -42,7 +48,7 @@ QtObject {
     property bool fillWidth: false
     readonly property real cardW: root.fillWidth ? root.screenW : Math.min(root.kbWidth, root.screenW - 24)
     // 一行 = rowUnits 个单元 + (rowUnits-1) 个间距 + 两侧内边距
-    readonly property real unit: (cardW - pad * 2 - (Layout.rowUnits - 1) * gap) / Layout.rowUnits
+    readonly property real unit: (cardW - pad * 2 - (root.layoutModule.rowUnits - 1) * gap) / root.layoutModule.rowUnits
     readonly property real quickH: Math.round(keyH * quickBarRatio)
     // cardHeight = pad + topH + gap + rows*keyH + (rows-1)*gap + handleH
     // topH = max(quickH, candH)；cardHeight 直接解，避免与 keyH / handleH 循环依赖

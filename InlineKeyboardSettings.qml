@@ -57,6 +57,10 @@ PluginSettings {
     readonly property var modifierModeLabels: [I18n.trFor("inlineKeyboard", "Active while held"), I18n.trFor("inlineKeyboard", "Tap to activate; any key clears it"), I18n.trFor("inlineKeyboard", "Tap to lock (tap again to unlock)"), I18n.trFor("inlineKeyboard", "Tap to toggle, double-tap to lock")]
     readonly property var specialStyleValues: ["icon", "short", "full"]
     readonly property var specialStyleLabels: [I18n.trFor("inlineKeyboard", "Icon"), I18n.trFor("inlineKeyboard", "Short"), I18n.trFor("inlineKeyboard", "Full name")]
+    // 键盘布局：phone = 紧凑 15 单位 × 5 行（两页）/ kb75 = 75% 配列 16 单位 × 6 行（单页）
+    // 数组提到 root 层：写在下拉行里再用卡片 id 引用会取到 undefined
+    readonly property var layoutValues: ["phone", "kb75"]
+    readonly property var layoutLabels: [I18n.trFor("inlineKeyboard", "Compact (two pages)"), I18n.trFor("inlineKeyboard", "75% (single page)")]
     // DDropdown 初始化时也会发一次 valueChanged（带默认值），这时不能写盘
     // loadValue() 是函数调用，直接绑到 checked / visible 上不会随点击重算，这里各留一份镜像
     // 自定义图标那一组的显示开关：下拉是封装组件，拿不到它的回调，这里订阅读一次
@@ -202,6 +206,8 @@ PluginSettings {
             return I18n.trFor("inlineKeyboard", "Next input method");
         case "Clipboard":
             return I18n.trFor("inlineKeyboard", "Clipboard");
+        case "Emoji":
+            return I18n.trFor("inlineKeyboard", "Emoji");
         case "Avoid windows":
             return I18n.trFor("inlineKeyboard", "Avoid windows");
         case "Voice input":
@@ -425,6 +431,17 @@ PluginSettings {
     SettingsGroup {
         width: parent.width
         slotColor: SettingsMetrics.paneColor
+
+        // 键盘布局。换布局改了行数和列数，daemon 会顺带把名义尺寸切成对应布局的默认值
+        PluginSettingDropdownRow {
+            settingKey: "layout"
+            pluginRoot: root
+            defaultValue: "phone"
+            values: root.layoutValues
+            labels: root.layoutLabels
+            text: I18n.trFor("inlineKeyboard", "Keyboard layout")
+            description: I18n.trFor("inlineKeyboard", "Compact: 15 units per row, two pages. 75%: 16 units, one page with the F row, the nav column and the arrow keys always visible.")
+        }
 
         PluginSettingRow {
             settingKey: "alwaysShowPreedit"

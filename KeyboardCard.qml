@@ -5,7 +5,8 @@ import Quickshell.Io
 import "actions.js" as Actions
 import "alpha.js" as Alpha
 import "data.js" as Data
-import "layouts/phone.js" as Layout
+import "layouts/phone.js" as LayoutPhone
+import "layouts/kb75.js" as Layout75
 import "layouts/resize.js" as Resize
 import "modifiers.js" as Modifiers
 import "motion.js" as Motion
@@ -21,6 +22,10 @@ Rectangle {
 
     // 打开时淡入：只动 opacity，不动几何（layer-shell 改尺寸会抖）
     readonly property bool hostVisible: root.Window.window ? root.Window.window.visible : true
+    // 当前布局（daemon 按设置传进来）：phone = 15u×5 行两页 / kb75 = 16u×6 行单页
+    // QML 的 import 是静态的，两个模块都进来再按 id 取
+    property string layoutId: "phone"
+    readonly property var layoutModule: root.layoutId === "kb75" ? Layout75 : LayoutPhone
     // 尺寸（由窗口按屏幕宽度/用户设置算好后传进来）
     property real unit: 63
     property real keyH: 64
@@ -155,12 +160,13 @@ Rectangle {
     // 给输入法面板用：带 text / current 的加工后列表（imList 是 fcitx 原始列表）
     property var imRows: []
     readonly property var rows: {
-        const base = Layout.pageRows(page);
-        return root.escSwap ? root.swapEscTilde(base) : base;
+        const base = root.layoutModule.pageRows(page);
+        // 75% 布局的 F 区第一个键本来就是 Esc，左上那个 ` 再对调就成两个 Esc 了
+        return (root.escSwap && root.layoutId !== "kb75") ? root.swapEscTilde(base) : base;
     }
     // 当前页摊平后的键位列表：spaceEntry 与 Repeater 共用一份，避免每次算两遍
     // 走 root.rows：escSwap 在那一层做的替换必须传下去，否则键位还是原始布局
-    readonly property var flatKeys: Layout.layoutFlat(page, root.rows)
+    readonly property var flatKeys: root.layoutModule.layoutFlat(page, root.rows)
     // 候选 / 快捷条：候选来自 fcitx5 addon（inline-keyboard-status.json），没有候选时显示快捷键
     readonly property var candidates: root.fcitxCandidates
     readonly property string preedit: root.fcitxPreedit
@@ -191,7 +197,7 @@ Rectangle {
     // 「刚选过词」窗口：选词是明确动作，列表页此时也不会再打字，所以这段时间里候选变化要立刻处理，不能走 800ms 的打字 debounce。
     property bool recentSelect: false
     // 主键区行数，候选列表页的滚动区高度按它算
-    readonly property int keyRowCount: Layout.pageRows("page1").length
+    readonly property int keyRowCount: root.layoutModule.pageRows("page1").length
     // 特殊键的表现形式（见 layouts/specialKeys.js）
     property string specialKeyStyle: "full"
     property string winKeyStyle: "mod"
@@ -334,7 +340,7 @@ Rectangle {
     readonly property string pluginId: "inlineKeyboard"
     // 卡片高度**固定**：一律按主键区的行数算。
     // 不能用 rows.length —— 那是「当前页」的行数，切到表情页（0 行）、功能列表页都会算错高度。
-    readonly property int layoutRowCount: Layout.pageRows("page1").length
+    readonly property int layoutRowCount: root.layoutModule.pageRows("page1").length
 
     signal quickBarChanged(var list)
     // 透明度面板改值只落在卡片上（绑定被打断），要往上抛给 daemon 才能保存
@@ -872,6 +878,8 @@ Rectangle {
             return I18n.trFor("inlineKeyboard", "Next input method");
         case "Clipboard":
             return I18n.trFor("inlineKeyboard", "Clipboard");
+        case "Emoji":
+            return I18n.trFor("inlineKeyboard", "Emoji");
         case "Avoid windows":
             return I18n.trFor("inlineKeyboard", "Avoid windows");
         case "Voice input":
@@ -1004,7 +1012,7 @@ Rectangle {
             autoCollapseTimer.restart();
 
     }
-    width: unit * Layout.rowUnits + gap * (Layout.rowUnits - 1) + pad * 2
+    width: unit * root.layoutModule.rowUnits + gap * (root.layoutModule.rowUnits - 1) + pad * 2
     // 和 Column 的结构逐项对齐，一项都不能少：这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
     height: pad + Math.max(quickH, candH) + gap + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap + handleH
     radius: Theme.windowRadius

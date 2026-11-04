@@ -34,6 +34,8 @@ PanelWindow {
     property real resizeH: 444
     property real baseKbWidth: 1050
     property real baseKbHeight: 444
+    // 当前键盘布局（daemon 按设置传进来）：phone / kb75
+    property string layoutId: "phone"
     // 停靠时是否横向铺满屏幕
     property bool dockFill: true
     property var actionList: []
@@ -137,6 +139,7 @@ PanelWindow {
     KeyboardMetrics {
         id: metrics
 
+        layoutId: root.layoutId
         kbWidth: root.kbWidth
         kbHeight: root.kbHeight
         showCandBar: root.showCandBar
@@ -157,6 +160,7 @@ PanelWindow {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
+        layoutId: root.layoutId
         unit: metrics.unit
         keyH: metrics.keyH
         gap: metrics.gap

@@ -26,26 +26,47 @@ write a second copy inside a window):
 
 ```text
 cardW  = min(kbWidth, screenW - 24)
-unit   = (cardW - 2*pad - (15-1)*gap) / 15          // 15 units per row
+unit   = (cardW - 2*pad - (rowUnits-1)*gap) / rowUnits   // rowUnits comes from the layout: 15 / 16
 kbHeight = 2*pad + 0.78*keyH + gap
          + rows*keyH + (rows-1)*gap
-         + 0.5*keyH                                  // quick strip 0.78 / handle 0.5 key height
+         + 0.75*keyH                                 // quick strip 0.78 / handle 0.75 key height
 keyH   = solved from the equation above (Math.max(28, …))
 ```
 
-- Default nominal size `kbWidth = 1050`, `kbHeight = 444` (`baseKbWidth`/`baseKbHeight` in
-  `InlineKeyboardDaemon.qml`), multiplied by the scale setting (50–100%).
+- The nominal size follows the layout (`baseKbWidth`/`baseKbHeight` in `InlineKeyboardDaemon.qml`):
+  `phone` = 1050×444 (15 units × 5 rows), `kb75` = 1120×510 (16 units × 6 rows). Both values are
+  **solved backwards** so the two layouts end up with near-identical key sizes at nominal scale
+  (unit 63.4 vs 63.3, keyH 60.0 vs 60.0) — switching layouts must not shrink every key.
+- On a layout switch `applyLayoutSize()` solves the current key width/height out of the saved size and
+  re-derives it for the new row/column count, so a size the user dragged themselves survives.
 - Key width is computed from units: `w*unit + (w-1)*gap` — that way the bottom row with only 8
   keys still lines up with the right edge of the 15-key rows above it.
 - Never derive sizes from `card.width / card.height`: that is a window ← card ← window feedback
   loop, and the floating window shrinks by itself as soon as you drag it.
 
-## Key map (`layouts/phone.js`)
+## Key map (`layouts/phone.js` / `layouts/kb75.js`)
 
-`page1` is the main key area (number row with an Fn layer for Esc/F1–F12, three QWERTY rows, bottom
-row Ctrl/Win/Alt/Space/Fn/menu/emoji/page-2). `page2` is the F-key block + navigation + numpad
-(15 columns, with empty columns in between as separators). Keys spanning two rows use `rs: 2`
-(numpad `+` and Enter); `k: "spacer"` is a placeholder only and draws no key face.
+Two layouts, switched in Settings → Appearance → Keyboard layout, default `phone`:
+
+| id | units per row | rows | pages | notes |
+|---|---|---|---|---|
+| `phone` | 15 | 5 | page1 / page2 | number row carries an Fn layer; F keys and nav live in page2 |
+| `kb75` | 16 | 6 | page1 | 75%: F row, nav column and arrows always visible, single page |
+
+`phone.js` `page1` is the main key area (number row with an Fn layer for Esc/F1–F12, three QWERTY
+rows, bottom row Ctrl/Win/Alt/Space/Fn/menu/emoji/page-2). `page2` is the F-key block + navigation +
+numpad (15 columns, with empty columns in between as separators). Keys spanning two rows use
+`rs: 2` (numpad `+` and Enter); `k: "spacer"` is a placeholder only and draws no key face.
+
+`kb75.js` follows QMK's `LAYOUT_75_ansi` key order: a full 16-key F row (Esc + F1–F12 + PrtSc/Pause/Del),
+a right-hand column Home/PgUp/PgDn/End, and ↑↓←→ at the end of the bottom row. It has **no page2,
+no emoji key and no page-switch key**; the bottom row is exactly `Ctrl Win Alt Space(6.75) Alt Ctrl ←↓→`.
+Emoji is reached through the built-in action instead (`emoji` in `actions.js`). The Fn key is left as
+a planned slot: shrink Space to 6.25 and insert `{k: "fn", l: "Fn", w: 1}` between Alt and Ctrl.
+
+Both modules expose the same surface (`rowUnits` / `pageRows()` / `layoutFlat()`); QML imports both
+and picks one by `layoutId` (`layoutModule`) — imports are static in QML, a module cannot be chosen
+at runtime.
 
 
 ## Press feedback

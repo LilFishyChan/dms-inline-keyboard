@@ -30,10 +30,20 @@ PluginComponent {
     // 只提供只读诊断和模拟操作，不提供执行任意命令的能力。
     property bool debugModeSetting: PluginService.loadPluginData(root.pluginId, "debugMode", false)
     readonly property bool devMode: root.debugModeSetting || Quickshell.env("INLINE_KEYBOARD_DEV") === "1"
+    // 键盘布局：phone = 15 单位 × 5 行（两页）/ kb75 = 16 单位 × 6 行（单页）
+    // 普通属性 + 在 reloadSettings() 里回读，和 modifierMode / tooltips 这些设置项走同一条路：
+    // 靠「pluginData 绑定」更新的话，pluginData 不带通知时就会变成「保存了但不生效」
+    property string layoutId: "phone"
+    // 上次生效的布局。启动时盘上的 layout 可能已经被改过，
+    // 靠它判断要不要把尺寸从旧布局换算过来（启动那次赋值由 layoutCheckReady 挡住）
+    property string lastLayoutId: PluginService.loadPluginData(root.pluginId, "lastLayout", "")
+    // 启动期的 layoutId 初次求值不算切换，对完账才置 true
+    property bool layoutCheckReady: false
     // 键位页 id：page1 主键区 / page2 F 区 / emoji 表情 & 符号页
     // （卡片的 page 属性是绑定到这里的，任何地方都别直接给卡片赋值，否则绑定断掉）
     property string page: "page1"
-    readonly property var knownPages: ["page1", "page2", "emoji"]
+    // 75% 布局没有第二页：F 区、导航列、方向键都在 page1 上
+    readonly property var knownPages: root.layoutId === "kb75" ? ["page1", "emoji"] : ["page1", "page2", "emoji"]
     // keys = 正常键盘 / functions = 快捷功能列表（顶部四格按钮切换）
     property string mode: "keys"
     property bool editing: false
@@ -116,6 +126,12 @@ PluginComponent {
         },
         "clipboard": function() {
             root.runCommand(["dms", "ipc", "call", "clipboard", "toggle"]);
+        },
+        "emoji": function() {
+            // 表情页是 page 维度、不是 mode；主区可能还停在动作列表或透明度面板上，
+            // 不先切回 keys 的话 page 变了但看起来没反应
+            root.mode = "keys";
+            root.setPage("emoji");
         },
         "mic": function() {
             // 语音行占的是顶部那一行，先回主页面才看得到
@@ -216,8 +232,10 @@ PluginComponent {
     // Esc 与 \`~ 键对调（想要 Esc 在左上角的人用）
     readonly property bool escSwap: root.pluginData && root.pluginData.escSwap !== undefined ? root.pluginData.escSwap : false
     // 键盘名义尺寸（重置和下限都以它为基准）。窗口与卡片都按它推按键尺寸
-    readonly property real baseKbWidth: 1050
-    readonly property real baseKbHeight: 444
+    // 75% 多一行一列，按同样的键宽高反解出来是 1120×510：
+    // unit 63.38 / keyH 60.03，和 phone 的 63.33 / 60.03 差不到半个像素
+    readonly property real baseKbWidth: root.layoutId === "kb75" ? 1120 : 1050
+    readonly property real baseKbHeight: root.layoutId === "kb75" ? 510 : 444
     // 键盘实际尺寸：由「调整大小」拖出来并保存，默认是名义尺寸
     property real savedW: root.readNum("keyboardWidth", baseKbWidth, 200, 4000)
     property real savedH: root.readNum("keyboardHeight", baseKbHeight, 200, 4000)
@@ -286,6 +304,10 @@ PluginComponent {
                 return ;
             }
             if (keyData.to === "page1" || keyData.to === "page2") {
+                // 当前布局里没有这一页（75% 只有 page1）时直接忽略，
+                // 否则状态机会把 pageState 推上去、page 指到一个没有布局的页上
+                if (root.knownPages.indexOf(keyData.to) < 0)
+                    return ;
                 keyRouter.handleKey(keyData);
                 return ;
             }
@@ -676,6 +698,53 @@ PluginComponent {
         PluginService.savePluginData(root.pluginId, "keyboardHeight", h);
     }
 
+    // 把尺寸从 fromId 那套布局换算到当前布局（15u×5 行 ↔ 16u×6 行）：
+    // 行列数变了，沿用旧值会把键压扁或拉扁。不是换成另一套默认值，
+    // 而是按当前键宽高反解、再按新行列数算回去，用户拖过的尺寸也能保住。
+    function applyLayoutSize(fromId) {
+        if (!fromId || fromId === root.layoutId)
+            return ;
+
+        const fromKb75 = fromId === "kb75";
+        const fromUnits = fromKb75 ? 16 : 15;
+        const toUnits = fromKb75 ? 15 : 16;
+        const fromRows = fromKb75 ? 6 : 5;
+        const toRows = fromKb75 ? 5 : 6;
+
+        // 从盘上读尺寸，不用 root.savedW：layoutId 一变，baseKbWidth 跟着变，
+        // savedW 的 readNum 绑定会先重算成新布局的名义值，这时候拿它算等于没换算
+        const w0 = root.readNum("keyboardWidth", fromKb75 ? 1120 : 1050, 200, 4000);
+        const h0 = root.readNum("keyboardHeight", fromKb75 ? 510 : 444, 200, 4000);
+
+        // 和 KeyboardMetrics.qml 同一套常量
+        const gap = 6, pad = 8, quick = 0.78, handle = 0.75;
+        const unit = (w0 - pad * 2 - (fromUnits - 1) * gap) / fromUnits;
+        const cardHeight = h0 - pad - gap;
+        const keyH = (cardHeight - pad - gap - (fromRows - 1) * gap) / (fromRows + quick + handle);
+        if (!(unit > 0) || !(keyH > 0))
+            return ;
+
+        const w = Math.round(toUnits * unit + (toUnits - 1) * gap + pad * 2);
+        const h = Math.round(pad + Math.round(keyH * quick) + gap + toRows * keyH
+                             + (toRows - 1) * gap + keyH * handle + pad + gap);
+        if (Math.abs(w - w0) >= 1 || Math.abs(h - h0) >= 1)
+            root.persistSize(w, h);
+
+    }
+
+    onLayoutIdChanged: {
+        // 启动阶段 layoutId 初次求值也会发一次 changed，那不算「切换」：
+        // 那时 lastLayoutId 还没和盘上对过账，走这里会把上次布局覆盖掉
+        if (!root.layoutCheckReady)
+            return ;
+        root.applyLayoutSize(root.lastLayoutId);
+        root.lastLayoutId = root.layoutId;
+        PluginService.savePluginData(root.pluginId, "lastLayout", root.layoutId);
+        // 75% 没有 page2：停在第二页会回落成主键区，不如直接回第一页
+        if (root.knownPages.indexOf(root.page) < 0)
+            root.setPage("page1");
+    }
+
     function beginResize() {
         root.resizeOrigW = root.savedW;
         root.resizeOrigH = root.savedH;
@@ -779,6 +848,12 @@ PluginComponent {
             root.modifierMode = nextModifierMode;
             root.clearModifierStates();
         }
+        // 布局：改了行列数，切完要顺带把尺寸换算过去（onLayoutIdChanged 里做）
+        const nextLayout = PluginService.loadPluginData(root.pluginId, "layout", "phone");
+        const normalizedLayout = nextLayout === "kb75" ? "kb75" : "phone";
+        if (normalizedLayout !== root.layoutId)
+            root.layoutId = normalizedLayout;
+
     }
 
     // 读取与动作相关的三项设置（构造时与 reloadSettings 共用）
@@ -1003,6 +1078,22 @@ PluginComponent {
         root.open = PluginService.getGlobalVar(root.pluginId, "open", false);
         root.migrateBuiltinActions();
         root.migrateWinKeyStyle();
+        // layoutId 现在是自己维护的属性，启动时先按盘上取值
+        const savedLayout = PluginService.loadPluginData(root.pluginId, "layout", "phone");
+        root.layoutId = savedLayout === "kb75" ? "kb75" : "phone";
+        // 上面这次赋值会触发 onLayoutIdChanged，但 layoutCheckReady 还是 false，
+        // 换算统一放到 syncLayoutOnStart 里做：savedW/savedH 这会儿可能还没求值完，
+        // 读到 0 会让换算直接放弃，所以推迟一拍
+        Qt.callLater(root.syncLayoutOnStart);
+    }
+
+    // 启动时对齐一次布局尺寸：盘上记的上次布局跟现在不一样，说明是别处切过来的
+    function syncLayoutOnStart() {
+        root.applyLayoutSize(root.lastLayoutId);
+        root.lastLayoutId = root.layoutId;
+        PluginService.savePluginData(root.pluginId, "lastLayout", root.layoutId);
+        // 从这里往后 layoutId 的变化才是用户真的切了布局
+        root.layoutCheckReady = true;
     }
 
     // fcitx5 通信全部在这个桥里（socket 推送、状态解析、候选、输入法清单）
@@ -1053,6 +1144,12 @@ PluginComponent {
             if (root.page === "emoji")
                 return ;
 
+            // 当前布局没有第二页（75%）：状态的来源可能不是页面上的 page 键
+            // （调试 IPC、或从 phone 布局切过来时残留的 2），挡住并复位
+            if (keyRouter.pageState > 0 && root.knownPages.indexOf("page2") < 0) {
+                keyRouter.pageState = 0;
+                return ;
+            }
             root.page = keyRouter.pageState > 0 ? "page2" : "page1";
         }
 
@@ -1212,6 +1309,7 @@ PluginComponent {
             winKeyCustomIcon: root.winKeyCustomIcon
             resizeW: root.resizeW
             resizeH: root.resizeH
+            layoutId: root.layoutId
             baseKbWidth: root.baseKbWidth
             baseKbHeight: root.baseKbHeight
             onResizeCommitRequested: root.commitResize()
@@ -1334,6 +1432,7 @@ PluginComponent {
             winKeyCustomIcon: root.winKeyCustomIcon
             resizeW: root.resizeW
             resizeH: root.resizeH
+            layoutId: root.layoutId
             baseKbWidth: root.baseKbWidth
             baseKbHeight: root.baseKbHeight
             onResizeCommitRequested: root.commitResize()
@@ -1607,6 +1706,13 @@ PluginComponent {
             // daemon → 窗口 → 卡片这条链断一次，属性就传不到
             parts.push("cardWin=" + (root.activeCard ? (root.activeCard.winKeyStyle + "/" + (root.activeCard.winKeyCustomIcon || "-")) : "-"));
             parts.push("cardGeom=" + (root.activeCard ? (Math.round(root.activeCard.width) + "x" + Math.round(root.activeCard.height) + "@" + Math.round(root.activeCard.y) + " page=" + root.activeCard.page) : "-"));
+            // 布局实际生效的证据：行数 / 行宽单位数 / 单元宽都从卡片自己的布局模块取，
+            // 不能拿 daemon 上的 layoutId 反推（那样三个值永远自洽，查不出漏接线）
+            parts.push("layout=" + root.layoutId
+                       + " rows=" + (root.activeCard ? root.activeCard.keyRowCount : "-")
+                       + " units=" + (root.activeCard ? root.activeCard.layoutModule.rowUnits : "-")
+                       + " unit=" + (root.activeCard ? Math.round(root.activeCard.unit * 10) / 10 : "-")
+                       + " keyH=" + (root.activeCard ? Math.round(root.activeCard.keyH * 10) / 10 : "-"));
             parts.push("mods=" + root.stateSummary());
             parts.push("lastError=" + (root.lastError || "-"));
             return parts.join(" | ");
