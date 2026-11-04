@@ -249,6 +249,10 @@ PluginSettings {
 
             root.winKeyStyleValue = root.loadValue("winKeyStyle", "mod");
             root.winIconValue = root.loadValue("winKeyCustomIcon", "");
+            // 布局也要在这里回读（不是 reloadSettings）：写盘后触发的是这个信号，
+            // reloadSettings() 只在初始化 / pluginService 注入时跑。
+            // escSwap 那行的 enabled 绑的是 layoutValue，漏了这行就会「切回紧凑布局还是灰的」
+            root.layoutValue = root.loadValue("layout", "phone");
         }
 
         target: root.pluginService
