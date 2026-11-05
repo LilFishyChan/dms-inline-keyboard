@@ -14,6 +14,14 @@ import qs.Services
 Item {
     id: debugIpc
 
+    // 调试通道写设置也要过 settings_write：manifest 掉了权限时设置页会拒绝，
+    // 这里不能变成另一条能写的路
+    readonly property bool canWriteSettings: {
+        const info = PluginService.availablePlugins ? PluginService.availablePlugins[controller.pluginId] : null;
+        const perms = info ? info.permissions : null;
+        return !!perms && perms.indexOf("settings_write") !== -1;
+    }
+
     // 宿主 daemon：属性 / 函数全部从这里取
     property var controller: null
 
@@ -89,8 +97,11 @@ Item {
         if (!key)
             return "no-key";
 
+        if (!debugIpc.canWriteSettings)
+            return "no-permission";
+
         // 白名单：只放设置页真实存在的标量项。动作表、队列、运行时位置都不属于「设置项」
-        const writable = ["alwaysShowPreedit", "autoShow", "avoidWindows", "bgOpacity", "blockTtySwitch", "borderWidth", "debugMode", "defaultFloating", "dockFillWidth", "escSwap", "keyOpacity", "keyboardHeight", "keyboardWidth", "longPressNote", "modifierMode", "repeatInterval", "specialKeyStyle", "tooltips", "winKeyCustomIcon", "winKeyStyle"];
+        const writable = ["alwaysShowPreedit", "autoShow", "avoidWindows", "bgOpacity", "blockTtySwitch", "borderWidth", "debugMode", "defaultFloating", "dockFillWidth", "escSwap", "keyOpacity", "longPressNote", "modifierMode", "repeatInterval", "specialKeyStyle", "tooltips", "winKeyCustomIcon", "winKeyStyle"];
         if (!writable.includes(key))
             return "blocked-key";
 
@@ -422,6 +433,9 @@ Item {
     function debugSetOpacity(bg: int, key: int) : string {
         if (!controller.devMode)
             return "dev mode off";
+
+        if (!debugIpc.canWriteSettings)
+            return "no-permission";
 
         const b = Math.max(0, Math.min(100, bg));
         const k = Math.max(0, Math.min(100, key));

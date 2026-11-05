@@ -17,7 +17,11 @@ Item {
     readonly property real endBtn: Math.round(controller.handleH * 0.86)
     readonly property real endIcon: Math.round(controller.handleH * 0.5)
 
-    // 模拟使用流程：底部两个按钮（close = 关闭键盘 / lang = 地球键）
+    // 触控板页时右端按钮换身份：从「切输入法」变成「切回键盘」。
+    // 触控板页没有输入法可切，把地球键留在那儿只会误触。
+    readonly property bool touchpadMode: controller ? controller.page === "touchpad" : false
+
+    // 模拟使用流程：底部两个按钮（close = 关闭键盘 / lang = 地球键或切回键盘）
     function pointerTap(which) {
         if (which === "close") {
             hideBtn.tapAt();
@@ -91,6 +95,7 @@ Item {
     }
 
     // 右端：地球 —— 点击切换输入法。样式同左端。
+    // 触控板页时换成键盘图标，点击回到主键区（走 daemon 的 touchpad 动作，再点一次又会切回来）。
     DActionButton {
         id: langBtn
 
@@ -98,24 +103,31 @@ Item {
         anchors.rightMargin: controller.pad
         anchors.verticalCenter: parent.verticalCenter
         buttonSize: handleBar.endBtn
-        iconName: "language"
+        iconName: handleBar.touchpadMode ? "keyboard" : "language"
         iconSize: handleBar.endIcon
         iconColor: controller.fg
         backgroundColor: "transparent"
         stateColor: controller.fg
-        tooltipText: controller.tooltips ? I18n.trFor("inlineKeyboard", "Cycle input method") : ""
+        tooltipText: controller.tooltips ? (handleBar.touchpadMode ? I18n.trFor("inlineKeyboard", "Back to keyboard") : I18n.trFor("inlineKeyboard", "Cycle input method")) : ""
 
         // 长按开选择器，短按循环切换；按钮自己不带长按，按住计时器判定
         property bool longFired: false
 
         // 单击逻辑抽成函数：模拟点击和手指点走同一份
         function tapAt() {
+            if (handleBar.touchpadMode) {
+                controller.quickAction("touchpad");
+                return;
+            }
             controller.imCycleRequested();
         }
 
         onPressed: {
             longFired = false;
-            holdTimer.restart();
+            // 触控板页没有输入法清单，长按不要起计时器
+            if (!handleBar.touchpadMode)
+                holdTimer.restart();
+
         }
         onReleased: holdTimer.stop()
         onCanceled: {

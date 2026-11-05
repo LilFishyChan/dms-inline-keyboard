@@ -14,6 +14,7 @@ Item {
 
     // fcitx5 桥（由 daemon 注入）。直通要靠它发按键、读当前输入法类型。
     property var bridge: null
+    // 触控板后端的 socket（由 daemon 注入）。修饰键要同步到那个真实的键盘设备上。
     // Ctrl+Alt+F1..F12 会被内核当成 VT 切换，虚拟键盘上误触就是整个桌面跳走
     property bool blockTtySwitch: true
     // 键盘是否开着。关着的时候没必要每 3 秒起一次 sh 去探 ydotoold。
@@ -93,30 +94,64 @@ Item {
         return 0;
     }
 
+    // 状态变化 → 同步到真实的键盘设备。
+    // 修饰键在系统里必须是「按住不放」的：只有这样，触控板的点击、拖动，
+    // 以及任何应用看到的 key state 才和物理键盘一致。
+    // 只在「按下 ↔ 松开」的那一刻发事件；值 1↔2 之间（一次性转锁定）不发，
+    // 否则会重复按下、松开时只发一次 up，修饰键就卡住了。
+    function syncModifierKey(name, prev, next) {
+        const code = Modifiers.MODIFIER_KEYCODES[name];
+        if (!code)
+            return ;
+
+        const wasDown = prev > 0;
+        const isDown = next > 0;
+        if (wasDown === isDown)
+            return ;
+
+        // 修饰键和普通键走同一条 ydotool 路径，不再经过触控板后端
+        router.runKey(code, isDown ? 1 : 0);
+    }
+
+    // 收起键盘时用：把修饰键全部松开。
+    // 必须走 setState —— 直接赋值不会触发 syncModifierKey，系统里就会一直卡着
+    // 一个按住的 Super，之后所有点击都变成 Super+Click，直到注销。
+    // caps 不收：它是锁存状态，和「按住」不是一回事。
+    function releaseAllModifiers() {
+        const names = ["shift", "ctrl", "alt", "super"];
+        for (let i = 0; i < names.length; i++) {
+            if (router.stateOf(names[i]) > 0)
+                router.setState(names[i], 0);
+
+        }
+    }
+
     function setState(name, value) {
+        const prev = router.stateOf(name);
         switch (name) {
         case "shift":
             shiftState = value;
-            return ;
+            break;
         case "caps":
             capsState = value;
-            return ;
+            break;
         case "ctrl":
             ctrlState = value;
-            return ;
+            break;
         case "alt":
             altState = value;
-            return ;
+            break;
         case "super":
             superState = value;
-            return ;
+            break;
         case "fn":
             fnState = value;
-            return ;
+            break;
         case "page":
             pageState = value;
-            return ;
+            break;
         }
+        router.syncModifierKey(name, prev, value);
     }
 
     // 点一次修饰键：具体流转由 modifiers.js 按切换方式决定
@@ -135,15 +170,15 @@ Item {
         lastModifierTapAt = now;
     }
 
-    // 改切换方式时把残留状态清掉，避免「切到不锁定模式却还锁着」
+    // 改切换方式时把残留状态清掉，避免「切到不锁定模式却还锁着」。
+    // 必须走 setState：直接赋值不会触发 syncModifierKey，系统里的修饰键就会一直按着。
     function clearAllModifiers() {
-        shiftState = 0;
-        capsState = 0;
-        ctrlState = 0;
-        altState = 0;
-        superState = 0;
-        fnState = 0;
-        pageState = 0;
+        const names = ["shift", "caps", "ctrl", "alt", "super", "fn", "page"];
+        for (let i = 0; i < names.length; i++) {
+            if (router.stateOf(names[i]) !== 0)
+                router.setState(names[i], 0);
+
+        }
         lastModifierTapped = "";
         lastModifierTapAt = 0;
     }
@@ -183,14 +218,17 @@ Item {
     }
 
     function clearTransientModifiers() {
+        // 同样必须走 setState —— 这里是把「一次性」修饰键从 1 变 0 的地方，
+        // 直接赋值的话系统里那个修饰键永远不会松开，之后所有点击都带着它。
         const next = Modifiers.clearTransient(modifierStates);
-        shiftState = next.shift;
-        capsState = next.caps;
-        ctrlState = next.ctrl;
-        altState = next.alt;
-        superState = next.super;
-        fnState = next.fn || 0;
-        pageState = next.page || 0;
+        const names = ["shift", "caps", "ctrl", "alt", "super", "fn", "page"];
+        for (let i = 0; i < names.length; i++) {
+            const n = names[i];
+            const want = next[n] || 0;
+            if (router.stateOf(n) !== want)
+                router.setState(n, want);
+
+        }
     }
 
     // 调试用：状态打成一串，方便 IPC 自测
@@ -227,6 +265,133 @@ Item {
             injectKey(keyData.c, keyData.l, keyData.k, keyData.shifted === true);
         // 一次性修饰键用完复位（锁定态保留）
         clearTransientModifiers();
+    }
+
+    // 按下的普通键：code → 路由（fcitx / 注入）。松开时按这份记录决定要不要补 up。
+    property var heldKeys: ({})
+
+    // 决定一个键走输入法还是走真实按键。抽出来是因为按下和松开各要问一次。
+    function routeFor(sym, kind) {
+        const b = router.bridge;
+        if (!sym)
+            return KeyRoute.ROUTE.ydotool;
+
+        let route = KeyRoute.decideRoute(sym, kind, {
+            "available": b !== null && b !== undefined,
+            "preedit": b ? b.preedit : "",
+            "imKeyboard": b ? b.imKeyboard : false,
+            "isAsciiMode": b ? b.isAsciiMode : false,
+            "combo": router.hasComboModifier
+        });
+        // key:<sym>[:<mods>] 里冒号是分隔符：sym 本身是 : 会被 addon 截成空串
+        if (route === KeyRoute.ROUTE.fcitx && sym.indexOf(":") >= 0)
+            route = KeyRoute.ROUTE.ydotool;
+
+        return route;
+    }
+
+    // 按下发 down，松开发 up —— 和真实键盘同构。
+    // 长按重复交给系统（内核的 auto-repeat），不再自己定时间隔重发。
+    // 修饰键此时已经真实按在键盘设备上了，所以 down 不带修饰键序列。
+    function keyDown(keyData) {
+        if (!keyData)
+            return ;
+
+        const k = keyData.k;
+        if (k === "stub") {
+            router.notifyUnimplemented();
+            return ;
+        }
+        // 内核级的 VT 切换拦不住，只能不发
+        const label = keyData.fn && keyData.fn.l ? keyData.fn.l : (keyData.l || "");
+        if (router.blockTtySwitch && Modifiers.isTtySwitchCombo(label, ctrlState, altState, shiftState))
+            return ;
+
+        const code = k === "space" ? 57 : keyData.c;
+        if (!code)
+            return ;
+
+        const sym = k === "space" ? "space" : keyData.l;
+        let route = router.routeFor(sym, k);
+
+        if (route === KeyRoute.ROUTE.fcitx) {
+            const mods = (shiftState && keyData.shifted !== true) ? 1 : 0;
+            if (router.bridge && router.bridge.sendFcitx("key:" + sym + (mods ? ":" + mods : ""))) {
+                router.heldKeys[code] = KeyRoute.ROUTE.fcitx;
+                return ;
+            }
+            // 输入法没接上就回落注入
+            route = KeyRoute.ROUTE.ydotool;
+        }
+
+        // 按键注入只走 ydotool：down / up 分开发，按住才成立
+        // （长按连删、Shift+字母靠这个；触控板 helper 只管指针，不掺和键盘）
+        router.heldKeys[code] = KeyRoute.ROUTE.ydotool;
+        router.runKey(code, 1);
+    }
+
+    // 单个按键的按下 / 松开。走 ydotool 的 code:state 形式：
+    //   29:1 按下、29:0 松开（ydotool 没有独立 keydown/keyup 子命令）
+    function runKey(code, down) {
+        if (!code)
+            return ;
+
+        if (ydotooldUp === false) {
+            // 不锁死：ydotoold 可能刚起来，节流重探，探到 up 立刻恢复
+            const now = Date.now();
+            if (now - router.lastProbeAt > 3000) {
+                router.lastProbeAt = now;
+                router.probeYdotoold();
+            }
+            router.notifyUnimplemented("ydotoold is not running");
+            return ;
+        }
+        router.runCommand(["ydotool", "key", code + ":" + (down ? 1 : 0)]);
+    }
+
+    function keyUp(keyData) {
+        if (!keyData)
+            return ;
+
+        const k = keyData.k;
+        const code = k === "space" ? 57 : keyData.c;
+        if (!code)
+            return ;
+
+        const how = router.heldKeys[code];
+        delete router.heldKeys[code];
+
+        if (how === KeyRoute.ROUTE.fcitx || how === "fallback")
+            return ;
+
+        router.runKey(code, 0);
+
+        // 一次性修饰键在**松开之后**才复位：按下那一刻复位的话，
+        // 这次按键的 down 就已经没有修饰键了，Shift+a 会变成 a。
+        router.clearTransientModifiers();
+    }
+
+    // 长按重复：只对「走输入法直通」的键有意义。
+    // 走真键那条路的键是按着不放的，auto-repeat 由系统产生；
+    // 而 fcitx 的 key: 消息是一次性的，退格/Del 要连续删只能自己定时重发。
+    function keyRepeat(keyData) {
+        if (!keyData)
+            return ;
+
+        const k = keyData.k;
+        const code = k === "space" ? 57 : keyData.c;
+        if (!code)
+            return ;
+
+        // 没在按着、或者这个键走的是真键路径 —— 都不用我们管
+        if (router.heldKeys[code] !== KeyRoute.ROUTE.fcitx)
+            return ;
+
+        const sym = k === "space" ? "space" : keyData.l;
+        const mods = (shiftState && keyData.shifted !== true) ? 1 : 0;
+        if (router.bridge)
+            router.bridge.sendFcitx("key:" + sym + (mods ? ":" + mods : ""));
+
     }
 
     // 注入一个键：修饰键状态包成按下/松开序列，一次 ydotool 调用发完。

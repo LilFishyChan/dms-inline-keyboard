@@ -169,21 +169,29 @@ Item {
                 // 按下 / 松开 / 点击各自成一个函数：手势直接调用，模拟点击也调它们，两条路共用同一份逻辑（长按重复、修饰键状态、涟漪都不会漏）
                 function pressAt(px, py) {
                     keyItem.pressRipple(px, py);
-                    grid.c.modifierPressed(keyItem.keyData);
-                    // 可重复的键按下就出字，长按后由定时器接管
                     if (repeatable) {
-                        grid.c.keyPressed(keyItem.effectiveKeyData);
+                        // 普通键：只发 down。走真键的键由系统的 auto-repeat 负责；
+                        // 走输入法直通的键（退格/Del）系统不管，靠下面的定时器重发。
+                        grid.c.keyDown(keyItem.effectiveKeyData);
                         holdTimer.restart();
+                    } else {
+                        // 修饰键：改状态（状态变化会同步成真实的 KEY down）
+                        grid.c.modifierPressed(keyItem.keyData);
                     }
                 }
 
                 function releaseAt() {
-                    grid.c.modifierReleased(keyItem.keyData);
                     holdTimer.stop();
                     repeatTimer.stop();
+                    if (repeatable)
+                        grid.c.keyUp(keyItem.effectiveKeyData);
+                    else
+                        grid.c.modifierReleased(keyItem.keyData);
+
                 }
 
                 function clickAt() {
+                    // 无重复语义的键（换页等）仍然是「点一下」；修饰键的状态在按下时已经处理过
                     if (!repeatable)
                         grid.c.keyPressed(keyItem.effectiveKeyData);
 
@@ -203,10 +211,9 @@ Item {
 
             }
 
-            // Timer 不能挂在 TapHandler 下面：pointer handler 没有 default property，
-            // 子对象会被当成「给不存在的属性赋值」直接报错。放回 Key 这一层，
-            // 作用域仍然能看到 keyItem / grid.c，TapHandler 也能引用它们。
-            // 长按判定：按住超过 400ms 开始重复
+            // 长按重复：只对**走输入法直通**的键真的会重发（keyRepeat 内部按路由判断），
+            // 走真键的键 auto-repeat 由系统负责，这两个定时器等于空转。
+            // Timer 不能挂在 TapHandler 下面（pointer handler 没有 default property）。
             Timer {
                 id: holdTimer
 
@@ -215,13 +222,12 @@ Item {
                 onTriggered: repeatTimer.start()
             }
 
-            // 重复间隔由设置决定（ydotool 输出间隔）
             Timer {
                 id: repeatTimer
 
                 interval: Math.max(20, grid.c.repeatInterval || 60)
                 repeat: true
-                onTriggered: grid.c.keyPressed(keyItem.effectiveKeyData)
+                onTriggered: grid.c.keyRepeat(keyItem.effectiveKeyData)
             }
 
         }
