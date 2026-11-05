@@ -26,6 +26,8 @@ Item {
     property var candidates: [] // 候选词（空数组 = 没有候选）
     property var candidateComments: [] // 每项后面的小字（rime 的拼音），和 candidates 同下标
     property string preedit: "" // 拼音串
+    // 预编辑里的真实光标位置（字符串下标），方向键移动预编辑时它会变
+    property int preeditCursor: 0
     property bool panelVisible: false // addon 报告的可见性（不能叫 visible，Item 内建）
     property bool imKeyboard: false // 当前输入法是否纯键盘布局（无候选能力）
     property string imName: ""
@@ -171,6 +173,9 @@ Item {
         }
         if (preedit !== st.preedit)
             preedit = st.preedit;
+
+        if (preeditCursor !== st.cursor)
+            preeditCursor = st.cursor;
 
         if (itemsChanged || commentsChanged || (candidates.length > 0 && String(candidates[0]) !== prevFirst) || preedit !== prevPre)
             candRevision++;

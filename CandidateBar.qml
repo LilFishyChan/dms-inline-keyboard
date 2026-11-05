@@ -18,6 +18,16 @@ Item {
     // 预编辑由谁画：客户端在画就不重复显示（fcitx5 的 Composing text 模式）
     // 应用已把预编辑渲染进输入框时不重复显示
     readonly property bool hasPreedit: (controller.preedit || "") !== "" && !controller.fcitxPreeditEmbedded
+    // 预编辑光标在串里的下标：方向键移动预编辑时由 addon 报上来，越界一律夹到末尾
+    readonly property int preeditCursorAt: {
+        const text = controller ? (controller.preedit || "") : "";
+        const c = controller ? controller.preeditCursor : -1;
+        // -1 / 非数字 = 没拿到位置，按末尾画；0 是真的在开头
+        if (!Number.isFinite(c) || c < 0)
+            return text.length;
+
+        return Math.min(text.length, c);
+    }
     // 可见性由卡片按输入法行为算（有候选才显示）。
     // 这里**不能**再叠 preedit 条件：那会让候选栏整条消失。
     // 和主键盘一致的度量
@@ -323,22 +333,64 @@ Item {
         anchors.bottom: panel.top
         anchors.bottomMargin: Theme.spacingXS
         anchors.left: panel.left
-        width: preeditLabel.width + Theme.spacingXL - Theme.spacingXS
-        height: preeditLabel.height + Theme.spacingS
+        width: preeditRow.width + Theme.spacingXL - Theme.spacingXS
+        height: preeditRow.height + Theme.spacingS
         radius: Theme.cornerRadiusS
         color: Theme.withAlpha(Theme.hostSurface, controller.bgOpacity)
 
-        StyledText {
-            id: preeditLabel
+        Row {
+            id: preeditRow
 
             anchors.centerIn: parent
-            text: controller.preedit || ""
-            color: Theme.primary
-            // 和候选词同一个字号基准（键高的同一比例），两处不会随顶栏高度各自漂移
-            font.pixelSize: candArea.candFontSize
-            font.weight: Font.Medium
+            // 三段是同一句话，不能有字间距
+            spacing: 0
+
+            StyledText {
+                id: preeditLabel
+
+                text: (controller.preedit || "").slice(0, candArea.preeditCursorAt)
+                color: Theme.primary
+                // 和候选词同一个字号基准（键高的同一比例），两处不会随顶栏高度各自漂移
+                font.pixelSize: candArea.candFontSize
+                font.weight: Font.Medium
+            }
+
+            // 输入光标：停在 fcitx5 报来的真实位置（方向键能移动预编辑），和终端一致
+            Rectangle {
+                id: preeditCaret
+
+                // 对齐前一段文字而不是 Row：Row 的高度由子项算出，
+                // 拿它的 verticalCenter 会和自身高度互相依赖，位置会算歪
+                anchors.verticalCenter: preeditLabel.verticalCenter
+                width: Math.max(1, Math.round(candArea.candFontSize / 9))
+                // 用字号而不是 label.height：光标在串首时前一段是空串，高度会是 0
+                height: Math.round(candArea.candFontSize * 0.9)
+                radius: width / 2
+                color: Theme.primary
+                opacity: candArea.caretOn ? 1 : 0
+            }
+
+            StyledText {
+                id: preeditTail
+
+                text: (controller.preedit || "").slice(candArea.preeditCursorAt)
+                color: Theme.primary
+                font.pixelSize: candArea.candFontSize
+                font.weight: Font.Medium
+            }
+
         }
 
+    }
+
+    // 光标闪烁：只在预编辑可见时跑
+    property bool caretOn: true
+
+    Timer {
+        interval: 530
+        repeat: true
+        running: preeditBadge.visible && (controller ? controller.animationsEnabled : true)
+        onTriggered: candArea.caretOn = !candArea.caretOn
     }
 
     // 和快捷栏 / 分类栏用同一个时长，三者交叉淡入淡出才对得上

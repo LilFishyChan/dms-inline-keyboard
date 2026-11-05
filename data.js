@@ -7,6 +7,26 @@ const MAX_ITEMS = 64
 
 // 解析面板状态。
 // 解析失败（文件半写、还没生成、字段缺失）时**保留上一次的值**：
+// fcitx5 的 Text::cursor() 报的是 UTF-8 字节偏移，QML 字符串要按 UTF-16 下标切，
+// 这里换算一次。纯 ASCII 的拼音串下两者相等，中文预编辑才会差开。
+function byteOffsetToCharIndex(text, byteOffset) {
+    if (!Number.isFinite(byteOffset) || byteOffset <= 0)
+        return 0;
+
+    let bytes = 0;
+    let i = 0;
+    while (i < text.length) {
+        const code = text.codePointAt(i);
+        const size = code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+        if (bytes + size > byteOffset)
+            return i;
+
+        bytes += size;
+        i += code > 0xffff ? 2 : 1;
+    }
+    return text.length;
+}
+
 function parseStatus(raw, prev) {
     // 失败路径返回副本：直接返回 prev 会让调用方拿到同一个对象，后续一旦原地改字段，上次的状态就被污染了（单测抓到的真实问题）。
     const keep = prev ? cloneStatus(prev) : emptyStatus();
@@ -35,12 +55,17 @@ function parseStatus(raw, prev) {
         comments.push(typeof note === "string" ? note.slice(0, MAX_TEXT) : "");
     }
 
+    const preedit = typeof d.preedit === "string" ? d.preedit.slice(0, MAX_TEXT) : "";
+
     return {
         // 候选词本身
         items: items,
         // 每项后面的小字（rime 的拼音），和 items 同下标
         comments: comments,
-        preedit: typeof d.preedit === "string" ? d.preedit.slice(0, MAX_TEXT) : "",
+        preedit: preedit,
+        // 预编辑里的真实光标位置（已换算成字符串下标），画光标用。
+        // 缺失或负数（fcitx5 的「没设光标」）一律按末尾处理
+        cursor: (Number.isFinite(d.cursor) && d.cursor >= 0) ? byteOffsetToCharIndex(preedit, d.cursor) : preedit.length,
         visible: !!d.visible,
         // 纯键盘布局（keyboard-us 这类）没有候选能力
         keyboard: !!d.keyboard,
@@ -67,6 +92,7 @@ function cloneStatus(s) {
         items: Array.isArray(s.items) ? s.items.slice() : [],
         comments: Array.isArray(s.comments) ? s.comments.slice() : [],
         preedit: s.preedit || "",
+        cursor: Number.isFinite(s.cursor) ? s.cursor : 0,
         visible: !!s.visible,
         keyboard: !!s.keyboard,
         im: s.im || "",
@@ -85,7 +111,7 @@ function cloneStatus(s) {
 
 function emptyStatus() {
     return {
-        items: [], comments: [], preedit: "", visible: false, keyboard: false,
+        items: [], comments: [], preedit: "", cursor: 0, visible: false, keyboard: false,
         hasMore: false,
         // ui/self/embedded 必须在这里出现：cloneStatus 的白名单会照着补，缺了就会在解析失败时清零
         ui: "", self: "", embedded: false,
@@ -311,6 +337,7 @@ const __exports = {
     swapEscTilde,
     actionExists,
     quickBarIndexFor,
+    byteOffsetToCharIndex,
 };
 
 if (typeof module !== "undefined" && module.exports) {

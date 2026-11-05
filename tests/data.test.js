@@ -13,8 +13,7 @@ const path = require("node:path");
 const {
     emptyStatus, cloneStatus, parseStatus, parseImList, isAsciiMode,
     buildImRows, nextImRow, expandedCandidates, barCandidates,
-    swapEscTilde, actionExists, quickBarIndexFor,
-} = require("../data.js");
+    swapEscTilde, actionExists, quickBarIndexFor, byteOffsetToCharIndex } = require("../data.js");
 
 const fixture = name =>
     fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
@@ -390,4 +389,49 @@ test("parseStatus: 候选条数封顶 64，预编辑同样截断", () => {
     const st = parseStatus(JSON.stringify({ items: items, preedit: "x".repeat(200) }), null);
     assert.equal(st.items.length, 64);
     assert.equal(st.preedit.length, 64);
+});
+
+test("byteOffsetToCharIndex: ASCII 下字节和字符下标相等", () => {
+    assert.equal(byteOffsetToCharIndex("nihao", 0), 0);
+    assert.equal(byteOffsetToCharIndex("nihao", 3), 3);
+    assert.equal(byteOffsetToCharIndex("nihao", 5), 5);
+});
+
+test("byteOffsetToCharIndex: 中文按 3 字节换算", () => {
+    assert.equal(byteOffsetToCharIndex("你是", 3), 1);
+    assert.equal(byteOffsetToCharIndex("你是", 6), 2);
+    // 落在多字节字符中间时退到该字符起点
+    assert.equal(byteOffsetToCharIndex("你是", 4), 1);
+});
+
+test("byteOffsetToCharIndex: 越界或非法值夹到合法范围", () => {
+    assert.equal(byteOffsetToCharIndex("ab", 99), 2);
+    assert.equal(byteOffsetToCharIndex("ab", -1), 0);
+    assert.equal(byteOffsetToCharIndex("ab", NaN), 0);
+    assert.equal(byteOffsetToCharIndex("", 5), 0);
+});
+
+test("parseStatus: 解析 cursor 并换算成字符下标", () => {
+    const st = parseStatus(JSON.stringify({ preedit: "nihao", cursor: 2, items: ["你"] }), null);
+    assert.equal(st.preedit, "nihao");
+    assert.equal(st.cursor, 2);
+});
+
+test("parseStatus: 没有 cursor 字段时按末尾处理", () => {
+    // fcitx5 用 -1 表示「没设光标」，语义就是末尾；缺字段同理
+    const st = parseStatus(JSON.stringify({ preedit: "nihao", items: [] }), null);
+    assert.equal(st.cursor, 5);
+
+    const neg = parseStatus(JSON.stringify({ preedit: "nihao", cursor: -1 }), null);
+    assert.equal(neg.cursor, 5);
+});
+
+test("parseStatus: cursor 超过预编辑长度时夹到末尾", () => {
+    const st = parseStatus(JSON.stringify({ preedit: "ab", cursor: 999 }), null);
+    assert.equal(st.cursor, 2);
+});
+
+test("parseStatus: 中文预编辑的字节 cursor 换算成字符下标", () => {
+    const st = parseStatus(JSON.stringify({ preedit: "你是", cursor: 3 }), null);
+    assert.equal(st.cursor, 1);
 });
