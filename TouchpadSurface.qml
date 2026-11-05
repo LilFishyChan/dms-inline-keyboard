@@ -88,6 +88,13 @@ Item {
         geomTimer.restart();
     }
 
+    // 页面从隐藏变可见时补一次握手：Component.onCompleted 那会儿还在键盘页，
+    // visible 是 false，emitGeometry 的守卫会把首次握手挡掉
+    onVisibleChanged: {
+        if (root.visible)
+            root.reportGeometry();
+    }
+
     function emitGeometry() {
         // 隐藏的页面不握手：用户没进过触控板页，系统里不该多一个指针设备
         if (!root.visible)
