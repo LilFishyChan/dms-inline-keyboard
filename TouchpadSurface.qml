@@ -10,6 +10,7 @@
 import QtQuick
 import "alpha.js" as Alpha
 import qs.Common
+import qs.DCommon.Widgets
 
 Item {
     id: root
