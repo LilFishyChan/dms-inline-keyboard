@@ -38,6 +38,11 @@ PanelWindow {
     property string layoutId: "phone"
     // 停靠时是否横向铺满屏幕
     property bool dockFill: true
+    // 触控板后端是否可用（daemon 传进来）
+    property bool touchpadBackendUp: false
+    // daemon 句柄：触控板页的事件要直接转给 daemon（键盘自身的按键仍然走信号，
+    // 因为那条链路还有 fcitx5 路由要处理；触控板是纯转发，没必要多绕一层信号）
+    property var controller: null
     property var actionList: []
     // fcitx5 候选（由 daemon 从 inline-keyboard-status.json 读入）
     property var fcitxCandidates: []
@@ -56,6 +61,7 @@ PanelWindow {
     property string fcitxImLabel: ""
     property bool fcitxPreeditEmbedded: false
     property string fcitxPreedit: ""
+    property int fcitxPreeditCursor: -1
     property bool fcitxVisible: false
     property string slotActionId: "float"
     property var quickBarActions: []
@@ -104,6 +110,8 @@ PanelWindow {
     signal slotChanged(string actionId)
     signal keyboardClosed()
     signal keyPressed(var keyData)
+    signal keyDown(var keyData)
+    signal keyUp(var keyData)
     signal modifierPressed(var keyData)
     signal modifierReleased(var keyData)
     // 表情 / 符号页点上屏（转给 daemon）
@@ -227,10 +235,12 @@ PanelWindow {
         fcitxImLabel: root.fcitxImLabel
         fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
         fcitxPreedit: root.fcitxPreedit
+        fcitxPreeditCursor: root.fcitxPreeditCursor
         fcitxVisible: root.fcitxVisible
         slotActionId: root.slotActionId
         quickBarActions: root.quickBarActions
         isFloating: false
+        touchpadBackendUp: root.touchpadBackendUp
         imList: root.imList
         imRows: root.imRows
         onQuickBarChanged: (list) => {
@@ -260,6 +270,13 @@ PanelWindow {
         onKeyPressed: (keyData) => {
             return root.keyPressed(keyData);
         }
+        onKeyDown: (keyData) => {
+            return root.keyDown(keyData);
+        }
+        onKeyUp: (keyData) => {
+            return root.keyUp(keyData);
+        }
+        onKeyRepeat: (keyData) => root.controller ? root.controller.handleKeyRepeat(keyData) : null
         onModifierPressed: (keyData) => {
             return root.modifierPressed(keyData);
         }
@@ -270,6 +287,9 @@ PanelWindow {
             return root.textCommitRequested(text);
         }
         onAllCandidatesRequested: root.allCandidatesRequested()
+        // 触控板页：这一层只转发，socket 在 daemon 的 TouchpadBridge 里
+        onTouchpadLine: (text) => root.controller ? root.controller.touchpadLine(text) : null
+        onTouchpadGeometry: (w, h) => root.controller ? root.controller.touchpadGeometry(w, h) : null
     }
 
     // 输入区域：只盖住卡片本体 + 它上方的预编辑标签，其余部分穿透。

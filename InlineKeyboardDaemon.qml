@@ -21,6 +21,13 @@ PluginComponent {
     // 状态在窗口销毁后仍保留
     // 普通属性：绑定会被 globalVars 的变动重新求值，把 showKeyboard 里的赋值冲掉
     property bool open: false
+    // 触控板后端（可选的 uinput helper）是否可用。没后端时键盘照常用，
+    // 只是触控板页的手势区灰掉。真实探测（socket 握手）等 helper 落地再接，
+    // 现在先认环境变量，方便把界面先调出来。
+    readonly property bool touchpadBackendUp: touchpadBridge.up || root.forceTouchpadBackend
+    readonly property bool forceTouchpadBackend: Quickshell.env("INLINE_KEYBOARD_TOUCHPAD") === "1"
+    // 最近一次触控板协议行（diag 用，确认触摸真的走到这一层了）
+    property string touchpadLastEvent: ""
     property bool floating: PluginService.loadPluginData(root.pluginId, "defaultFloating", false)
     // 宿主按 "popoutService" in item 判断是否注入，不声明就永远拿不到
     property var popoutService: null
@@ -36,14 +43,26 @@ PluginComponent {
     property string layoutId: "phone"
     // 上次生效的布局。启动时盘上的 layout 可能已经被改过，
     // 靠它判断要不要把尺寸从旧布局换算过来（启动那次赋值由 layoutCheckReady 挡住）
-    property string lastLayoutId: PluginService.loadPluginData(root.pluginId, "lastLayout", "")
+    property string lastLayoutId: root.loadRuntime("lastLayout", "")
     // 启动期的 layoutId 初次求值不算切换，对完账才置 true
     property bool layoutCheckReady: false
     // 键位页 id：page1 主键区 / page2 F 区 / emoji 表情 & 符号页
     // （卡片的 page 属性是绑定到这里的，任何地方都别直接给卡片赋值，否则绑定断掉）
     property string page: "page1"
-    // 75% 布局没有第二页：F 区、导航列、方向键都在 page1 上
-    readonly property var knownPages: root.layoutId === "kb75" ? ["page1", "emoji"] : ["page1", "page2", "emoji"]
+    // 切页时同步触控板设备的生命周期：
+    //   离开触控板页 → bye（只销毁设备，socket 留着给键盘按键注入用）
+    //   回到触控板页 → 立刻补一次 hello，把设备建回来。
+    // 不能指望 TouchpadSurface 报尺寸来触发：切走再切回，手势区尺寸当然一样，
+    // setPanel 里「尺寸没变就不发」的短路会把 hello 吞掉，设备就再也回不来了。
+    onPageChanged: {
+        if (root.page === "touchpad")
+            touchpadBridge.sendHello();
+        else
+            touchpadBridge.send("bye");
+
+    }
+    // 75% 布局没有第二页：F 区、导航列、方向键都在 page1 上。触控板页两种布局都有。
+    readonly property var knownPages: (root.layoutId === "kb75" ? ["page1", "emoji"] : ["page1", "page2", "emoji"]).concat(["touchpad"])
     // keys = 正常键盘 / functions = 快捷功能列表（顶部四格按钮切换）
     property string mode: "keys"
     property bool editing: false
@@ -69,6 +88,8 @@ PluginComponent {
     readonly property alias fcitxCandidates: fcitxBridge.candidates
     readonly property alias fcitxCandidateComments: fcitxBridge.candidateComments
     readonly property alias fcitxPreedit: fcitxBridge.preedit
+    // 预编辑光标位置（字符串下标）：方向键移动预编辑时跟着变
+    readonly property alias fcitxPreeditCursor: fcitxBridge.preeditCursor
     readonly property alias fcitxVisible: fcitxBridge.panelVisible
     readonly property alias fcitxImKeyboard: fcitxBridge.imKeyboard
     readonly property alias fcitxImName: fcitxBridge.imName
@@ -133,6 +154,13 @@ PluginComponent {
             root.mode = "keys";
             root.setPage("emoji");
         },
+        "touchpad": function() {
+            // 触控板同样走 page 维度。再按一次回主键区，当成开关用。
+            // 后端没起时不拦着 —— 页面照样能打开，只是手势区灰掉，
+            // 用户可以据此判断是「没装 helper」还是「装了但没起来」。
+            root.mode = "keys";
+            root.setPage(root.page === "touchpad" ? "page1" : "touchpad");
+        },
         "mic": function() {
             // 语音行占的是顶部那一行，先回主页面才看得到
             root.mode = "keys";
@@ -188,7 +216,7 @@ PluginComponent {
     property bool longPressNote: PluginService.loadPluginData(root.pluginId, "longPressNote", false)
     // 和本插件配套的 addon 版本。addon 的 socket 协议变了就改这里，用户在键盘更新后
     // 会看到「输入法插件需要更新」，而不是遇到各种莫名其妙的不生效
-    readonly property string requiredAddonVersion: "0.1.1"
+    readonly property string requiredAddonVersion: "0.1.2"
     // 收到了版本且对不上才算不匹配；没收到（老 addon 不推）也按不匹配处理
     readonly property string addonVersionState: {
         const v = fcitxBridge ? fcitxBridge.addonVersion : "";
@@ -238,9 +266,11 @@ PluginComponent {
     // unit 63.38 / keyH 60.03，和 phone 的 63.33 / 60.03 差不到半个像素
     readonly property real baseKbWidth: root.layoutId === "kb75" ? 1120 : 1050
     readonly property real baseKbHeight: root.layoutId === "kb75" ? 510 : 444
-    // 键盘实际尺寸：由「调整大小」拖出来并保存，默认是名义尺寸
-    property real savedW: root.readNum("keyboardWidth", baseKbWidth, 200, 4000)
-    property real savedH: root.readNum("keyboardHeight", baseKbHeight, 200, 4000)
+    // 键盘实际尺寸：由「调整大小」拖出来并保存，默认是名义尺寸。
+    // 初值不绑 readNumRuntime：它和 persistSize 的赋值会互相触发（Binding loop for savedH），
+    // 所以改成启动时读一次，之后只由 persistSize 写。
+    property real savedW: root.baseKbWidth
+    property real savedH: root.baseKbHeight
     // 停靠时是否横向铺满屏幕（调整大小面板里可以切）
     property bool dockFill: PluginService.loadPluginData(root.pluginId, "dockFillWidth", true)
     readonly property real kbWidth: root.savedW
@@ -257,7 +287,9 @@ PluginComponent {
     readonly property bool keyboardVisible: root.voiceMinimal || root.minimized || (dockedLoader.item && dockedLoader.item.keyboardVisible) || (floatingLoader.item && floatingLoader.item.keyboardVisible)
     // 该不该连着 addon（连着它就会接管键盘内 UI）。
     // 只有最小化该断开：那时只剩一个圆按钮，屏幕上没有任何地方能显示
-    readonly property bool shouldConnect: !root.minimized
+    // 触控板页不显示候选也不画预编辑，就把输入法前端交还 classicui：
+    // 断开 addon 连接，addon 收到 EOF 会自己把 UI 还回去
+    readonly property bool shouldConnect: !root.minimized && root.page !== "touchpad"
     // 关闭后延迟销毁窗口；这期间又被打开过就不销毁
     readonly property var dockedLoaderItem: dockedLoader.item
     readonly property var floatingLoaderItem: floatingLoader.item
@@ -292,6 +324,19 @@ PluginComponent {
         keyRouter.injectKey(code, sym, kind);
     }
 
+    //* 触控板页的协议行：直接转给 helper。
+    // 格式由 TouchpadSurface 保证（"down <slot> <x> <y>" / "btn left 1" …），这里不解释。
+    function touchpadLine(text) {
+        root.touchpadLastEvent = text;
+        touchpadBridge.send(text);
+    }
+
+    //* 手势区尺寸变化。helper 侧的 ABS 范围在设备创建后改不了，
+    // 收到新的 hello 会销毁重建设备，所以只在尺寸真的变了的时候发。
+    function touchpadGeometry(w, h) {
+        touchpadBridge.setPanel(w, h);
+    }
+
     // 换页键（k = "page"）分三种：
     //   ① 表情页返回 —— 当前不在两页之内，直接跳，别让状态机循环
     //   ② 两页之间 —— 走 keyRouter 的修饰键状态机（单击切换 / 双击锁定）
@@ -299,7 +344,6 @@ PluginComponent {
     function handleKey(keyData) {
         if (!keyData)
             return ;
-
         // 截图键（PrtSc / KEY_SYSRQ = 99）：先把键盘收起来，否则截出来的图上
         // 会带着一整块键盘。键本身照常发出去 —— 用户可能给它绑了截图快捷键，
         // 收起来之后再发，合成器截屏时窗口已经开始销毁了
@@ -323,6 +367,27 @@ PluginComponent {
             return ;
         }
         keyRouter.handleKey(keyData);
+    }
+
+    //* 普通键的按下 / 松开：分两段发，长按重复交给系统。
+    // PrtSc 的「先收起键盘」在按下这一刻处理（和原来 handleKey 里的时机一致）。
+    function handleKeyDown(keyData) {
+        if (!keyData)
+            return ;
+
+        if (root.hideOnScreenshot && keyData.c === 99)
+            root.hideKeyboard();
+
+        keyRouter.keyDown(keyData);
+    }
+
+    function handleKeyUp(keyData) {
+        keyRouter.keyUp(keyData);
+    }
+
+    // 长按重复：只有走输入法直通的键需要（真键路径由系统 auto-repeat 负责）
+    function handleKeyRepeat(keyData) {
+        keyRouter.keyRepeat(keyData);
     }
 
     function modifierStateOf(name) {
@@ -546,6 +611,16 @@ PluginComponent {
         return legacy === null || legacy === undefined ? fallback : legacy;
     }
 
+    // 尺寸这类运行时数字：State 优先、缺失时按迁移规则回落 Settings，读回一律夹到合法范围
+    function readNumRuntime(key, fallback, min, max) {
+        const raw = root.loadRuntime(key, fallback);
+        if (typeof raw !== "number" && (typeof raw !== "string" || raw.trim() === ""))
+            return fallback;
+
+        const n = Number(raw);
+        return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+    }
+
     // VoiceBar 的两个按钮统一调 controller.voiceMicRequested() /
     // controller.voiceMinimalRequested()。主键盘里 controller 是卡片（信号），胶囊窗口里是 daemon，所以这里也要实现一份。
     function voiceMicRequested() {
@@ -625,6 +700,7 @@ PluginComponent {
         // 窗口已经销毁会 showKeyboard() 重建一整套窗口，紧接着又被下面
         root.minimized = true;
         root.stopVoice();
+        root.releaseInputState();
         root.destroyKeyboards();
     }
 
@@ -702,8 +778,9 @@ PluginComponent {
     function persistSize(w, h) {
         root.savedW = w;
         root.savedH = h;
-        PluginService.savePluginData(root.pluginId, "keyboardWidth", w);
-        PluginService.savePluginData(root.pluginId, "keyboardHeight", h);
+        // 窗口几何是运行时状态：写 Settings 会触发全插件 reloadSettings
+        PluginService.savePluginState(root.pluginId, "keyboardWidth", Math.round(w));
+        PluginService.savePluginState(root.pluginId, "keyboardHeight", Math.round(h));
     }
 
     // 把尺寸从 fromId 那套布局换算到当前布局（15u×5 行 ↔ 16u×6 行）：
@@ -720,9 +797,9 @@ PluginComponent {
         const toRows = fromKb75 ? 5 : 6;
 
         // 从盘上读尺寸，不用 root.savedW：layoutId 一变，baseKbWidth 跟着变，
-        // savedW 的 readNum 绑定会先重算成新布局的名义值，这时候拿它算等于没换算
-        const w0 = root.readNum("keyboardWidth", fromKb75 ? 1120 : 1050, 200, 4000);
-        const h0 = root.readNum("keyboardHeight", fromKb75 ? 510 : 444, 200, 4000);
+        // savedW 的 readNumRuntime 绑定会先重算成新布局的名义值，这时候拿它算等于没换算
+        const w0 = root.readNumRuntime("keyboardWidth", fromKb75 ? 1120 : 1050, 200, 4000);
+        const h0 = root.readNumRuntime("keyboardHeight", fromKb75 ? 510 : 444, 200, 4000);
 
         // 和 KeyboardMetrics.qml 同一套常量
         const gap = 6, pad = 8, quick = 0.78, handle = 0.75;
@@ -746,8 +823,10 @@ PluginComponent {
         if (!root.layoutCheckReady)
             return ;
         root.applyLayoutSize(root.lastLayoutId);
-        root.lastLayoutId = root.layoutId;
-        PluginService.savePluginData(root.pluginId, "lastLayout", root.layoutId);
+        if (root.lastLayoutId !== root.layoutId) {
+            root.lastLayoutId = root.layoutId;
+            PluginService.savePluginState(root.pluginId, "lastLayout", root.layoutId);
+        }
         // 75% 没有 page2：停在第二页会回落成主键区，不如直接回第一页
         if (root.knownPages.indexOf(root.page) < 0)
             root.setPage("page1");
@@ -911,6 +990,10 @@ PluginComponent {
 
         root.open = true;
         keyRouter.readSystemCaps();
+        // 收起时 releaseInputState 已经发过 bye，重新打开要把触控板设备建回来。
+        // 首次打开 panelW/H 还是 0，sendHello 会自己跳过，等 TouchpadSurface 报尺寸。
+        if (root.page === "touchpad")
+            touchpadBridge.sendHello();
         // 版本对不上时说一声，否则用户只会看到各种莫名的不生效
         if (root.addonVersionState === "mismatch")
             ToastService.showWarning(I18n.trFor("inlineKeyboard", "Input method addon needs update") + " (" + fcitxBridge.addonVersion + " / " + root.requiredAddonVersion + ")");
@@ -948,6 +1031,15 @@ PluginComponent {
             fcitxBridge.sendFcitx("release");
 
         PluginService.setGlobalVar(root.pluginId, "open", false);
+        root.releaseInputState();
+    }
+
+    // 收起 / 最小化时把「按着的东西」全部松开。
+    // 真实键盘上抬手就是这个效果，虚拟键盘没有「手离开」事件，只能在这些出口兜底。
+    function releaseInputState() {
+        keyRouter.releaseAllModifiers();
+        // 触控板设备也一并撤掉：不在这页了，没必要留一个指针设备在系统里
+        touchpadBridge.send("bye");
     }
 
     // 停靠 / 浮动 之间切换（IpcHandler 和功能页动作都走这里）
@@ -1093,6 +1185,9 @@ PluginComponent {
         // layoutId 现在是自己维护的属性，启动时先按盘上取值
         const savedLayout = PluginService.loadPluginData(root.pluginId, "layout", "phone");
         root.layoutId = savedLayout === "kb75" ? "kb75" : "phone";
+        // 尺寸也是运行时状态：State 优先、缺失时回落 Settings 老值
+        root.savedW = root.readNumRuntime("keyboardWidth", root.baseKbWidth, 200, 4000);
+        root.savedH = root.readNumRuntime("keyboardHeight", root.baseKbHeight, 200, 4000);
         // 上面这次赋值会触发 onLayoutIdChanged，但 layoutCheckReady 还是 false，
         // 换算统一放到 syncLayoutOnStart 里做：savedW/savedH 这会儿可能还没求值完，
         // 读到 0 会让换算直接放弃，所以推迟一拍
@@ -1102,8 +1197,10 @@ PluginComponent {
     // 启动时对齐一次布局尺寸：盘上记的上次布局跟现在不一样，说明是别处切过来的
     function syncLayoutOnStart() {
         root.applyLayoutSize(root.lastLayoutId);
-        root.lastLayoutId = root.layoutId;
-        PluginService.savePluginData(root.pluginId, "lastLayout", root.layoutId);
+        if (root.lastLayoutId !== root.layoutId) {
+            root.lastLayoutId = root.layoutId;
+            PluginService.savePluginState(root.pluginId, "lastLayout", root.layoutId);
+        }
         // 从这里往后 layoutId 的变化才是用户真的切了布局
         root.layoutCheckReady = true;
     }
@@ -1139,11 +1236,20 @@ PluginComponent {
         autoShow: root.autoShow
     }
 
+    // 触控板后端 socket。插件活着就一直连着，helper 没装时只是重试，
+    // 连上才把 touchpadBackendUp 置真、手势区才亮起来。
+    TouchpadBridge {
+        id: touchpadBridge
+
+        enabled: true
+    }
+
     // 按键路由（修饰键状态机 + 直通/ydotool 选择）
     KeyRouter {
         id: keyRouter
 
         bridge: fcitxBridge
+        // 键盘注入不再经过触控板后端（全部走 ydotool）
         blockTtySwitch: root.blockTtySwitch
         active: root.keyboardVisible
         actions: root.actions
@@ -1300,6 +1406,8 @@ PluginComponent {
         active: false
 
         KeyboardWindow {
+            controller: root
+            touchpadBackendUp: root.touchpadBackendUp
             kbWidth: root.kbWidth
             kbHeight: root.kbHeight
             avoidWindows: root.avoidWindows
@@ -1352,6 +1460,7 @@ PluginComponent {
             allCandidates: root.allCandidates
             candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
+            fcitxPreeditCursor: root.fcitxPreeditCursor
             fcitxVisible: root.fcitxVisible
             repeatInterval: root.repeatInterval
             slotActionId: root.slotActionId
@@ -1394,6 +1503,12 @@ PluginComponent {
             }
             onKeyPressed: (keyData) => {
                 root.handleKey(keyData);
+            }
+            onKeyDown: (keyData) => {
+                root.handleKeyDown(keyData);
+            }
+            onKeyUp: (keyData) => {
+                root.handleKeyUp(keyData);
             }
             onModifierPressed: (keyData) => {
                 return root.modifierPress(keyData);
@@ -1417,6 +1532,7 @@ PluginComponent {
 
         FloatingKeyboardWindow {
             controller: root
+            touchpadBackendUp: root.touchpadBackendUp
             kbWidth: root.kbWidth
             kbHeight: root.kbHeight
             fnActive: root.fnActive
@@ -1475,6 +1591,7 @@ PluginComponent {
             allCandidates: root.allCandidates
             candRevision: root.candRevision
             fcitxPreedit: root.fcitxPreedit
+            fcitxPreeditCursor: root.fcitxPreeditCursor
             fcitxVisible: root.fcitxVisible
             repeatInterval: root.repeatInterval
             slotActionId: root.slotActionId
@@ -1511,6 +1628,12 @@ PluginComponent {
             }
             onKeyPressed: (keyData) => {
                 root.handleKey(keyData);
+            }
+            onKeyDown: (keyData) => {
+                root.handleKeyDown(keyData);
+            }
+            onKeyUp: (keyData) => {
+                root.handleKeyUp(keyData);
             }
             onModifierPressed: (keyData) => {
                 return root.modifierPress(keyData);
@@ -1651,6 +1774,14 @@ PluginComponent {
         }
 
         function setMode(m: string) : string {
+            // 和别的 debug 入口一样要有 devMode：直接设 mode 会绕过 beginResize /
+            // enterTransparency 的现场保存，之后「取消」会还原成 0 并落盘
+            if (!root.devMode)
+                return "dev mode off";
+
+            if (["keys", "resize", "transparency"].indexOf(m) < 0)
+                return "bad-mode:" + m;
+
             root.mode = m;
             return "INLINE_KEYBOARD_MODE:" + m;
         }
@@ -1712,12 +1843,13 @@ PluginComponent {
             parts.push("isFloat=" + (root.activeCard && root.activeCard.isFloating ? 1 : 0));
             parts.push("candListOpen=" + (root.activeCard ? root.activeCard.candListOpen : "-"));
             parts.push("cand=" + root.fcitxCandidates.length + " dbg=" + root.debugCandItems.length + " all=" + root.allCandidates.length + " bar=" + (root.activeCard ? root.activeCard.candBarItems.length : -1) + " list=" + (root.activeCard ? root.activeCard.candListItems.length : -1));
-            parts.push("preedit=" + JSON.stringify(root.fcitxPreedit));
+            parts.push("preedit=" + JSON.stringify(root.fcitxPreedit) + " cur=" + root.fcitxPreeditCursor);
             parts.push("ydotoold=" + root.ydotooldUp);
             parts.push("winKey=" + root.winKeyStyle + "/" + (root.winKeyCustomIcon !== "" ? root.winKeyCustomIcon : "-") + " special=" + root.specialKeyStyle);
             // daemon → 窗口 → 卡片这条链断一次，属性就传不到
             parts.push("cardWin=" + (root.activeCard ? (root.activeCard.winKeyStyle + "/" + (root.activeCard.winKeyCustomIcon || "-")) : "-"));
-            parts.push("cardGeom=" + (root.activeCard ? (Math.round(root.activeCard.width) + "x" + Math.round(root.activeCard.height) + "@" + Math.round(root.activeCard.y) + " page=" + root.activeCard.page) : "-"));
+            parts.push("cardGeom=" + (root.activeCard ? (Math.round(root.activeCard.width) + "x" + Math.round(root.activeCard.height) + "@" + Math.round(root.activeCard.x) + "," + Math.round(root.activeCard.y) + " page=" + root.activeCard.page) : "-"));
+            parts.push("tp=" + (root.touchpadBackendUp ? "up" : "off") + "/" + (root.touchpadLastEvent === "" ? "-" : root.touchpadLastEvent));
             // 布局实际生效的证据：行数 / 行宽单位数 / 单元宽都从卡片自己的布局模块取，
             // 不能拿 daemon 上的 layoutId 反推（那样三个值永远自洽，查不出漏接线）
             parts.push("layout=" + root.layoutId

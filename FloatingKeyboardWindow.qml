@@ -45,6 +45,8 @@ PanelWindow {
     // 当前键盘布局（daemon 按设置传进来）：phone / kb75
     property string layoutId: "phone"
     property bool dockFill: true
+    // 触控板后端是否可用（daemon 传进来）
+    property bool touchpadBackendUp: false
     property var actionList: []
     property var fcitxCandidates: []
     property var fcitxCandidateComments: []
@@ -59,6 +61,7 @@ PanelWindow {
     property string fcitxImLabel: ""
     property bool fcitxPreeditEmbedded: false
     property string fcitxPreedit: ""
+    property int fcitxPreeditCursor: -1
     property bool fcitxVisible: false
     property string slotActionId: "float"
     property var quickBarActions: []
@@ -103,6 +106,8 @@ PanelWindow {
     signal slotChanged(string actionId)
     signal keyboardClosed()
     signal keyPressed(var keyData)
+    signal keyDown(var keyData)
+    signal keyUp(var keyData)
     signal modifierPressed(var keyData)
     signal modifierReleased(var keyData)
     signal textCommitRequested(string text)
@@ -268,10 +273,12 @@ PanelWindow {
         fcitxImLabel: root.fcitxImLabel
         fcitxPreeditEmbedded: root.fcitxPreeditEmbedded
         fcitxPreedit: root.fcitxPreedit
+        fcitxPreeditCursor: root.fcitxPreeditCursor
         fcitxVisible: root.fcitxVisible
         slotActionId: root.slotActionId
         quickBarActions: root.quickBarActions
         isFloating: true
+        touchpadBackendUp: root.touchpadBackendUp
         imList: root.imList
         imRows: root.imRows
         onQuickBarChanged: (list) => {
@@ -301,6 +308,13 @@ PanelWindow {
         onKeyPressed: (keyData) => {
             return root.keyPressed(keyData);
         }
+        onKeyDown: (keyData) => {
+            return root.keyDown(keyData);
+        }
+        onKeyUp: (keyData) => {
+            return root.keyUp(keyData);
+        }
+        onKeyRepeat: (keyData) => root.controller ? root.controller.handleKeyRepeat(keyData) : null
         onModifierPressed: (keyData) => {
             return root.modifierPressed(keyData);
         }
@@ -323,6 +337,9 @@ PanelWindow {
             root.posX = Math.max(0, Math.min(maxX, root.dragStartX + dx));
             root.posY = Math.max(0, Math.min(maxY, root.dragStartY + dy));
         }
+        // 触控板页：这一层只转发，socket 在 daemon 的 TouchpadBridge 里
+        onTouchpadLine: (text) => root.controller ? root.controller.touchpadLine(text) : null
+        onTouchpadGeometry: (w, h) => root.controller ? root.controller.touchpadGeometry(w, h) : null
     }
 
     // 输入区 = 卡片 + 卡片上方那条预编辑标签，其余整屏穿透。

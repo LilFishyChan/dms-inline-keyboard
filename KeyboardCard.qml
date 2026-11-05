@@ -40,6 +40,9 @@ Rectangle {
     // 窗口总会传 metrics.handleH，这里只是兜底
     property real handleH: Math.round(root.keyH * 0.75)
     property bool showHandle: true
+    // 触控板页的后端（uinput helper）是否可用。没有后端时触控板页仍能显示，
+    // 但手势区和左右键被禁用 —— 键盘本体不因为这个功能装没装而挂掉。
+    property bool touchpadBackendUp: false
     property bool dragEnabled: false
     // 长按自动重复的间隔（毫秒），由设置页配置
     property int repeatInterval: 60
@@ -170,6 +173,7 @@ Rectangle {
     // 候选 / 快捷条：候选来自 fcitx5 addon（inline-keyboard-status.json），没有候选时显示快捷键
     readonly property var candidates: root.fcitxCandidates
     readonly property string preedit: root.fcitxPreedit
+    readonly property int preeditCursor: root.fcitxPreeditCursor
     readonly property color fg: Theme.surfaceText
     // 顶部快捷条高度 = 圆形按钮直径（按钮填满这一行）。
     // 窗口总会传 metrics.quickH，这里的默认值只是没接线时的兜底，比例要和 KeyboardMetrics.quickBarRatio 保持一致。
@@ -271,6 +275,9 @@ Rectangle {
     property string fcitxImLabel: ""
     property bool fcitxPreeditEmbedded: false
     property string fcitxPreedit: ""
+    // 预编辑光标位置（字符串下标）。窗口没接线时是 0，
+    // 所以 CandidateBar 那边要能区分「真的是 0」和「没传」
+    property int fcitxPreeditCursor: -1
     property bool fcitxVisible: false
     // 已放进固定位置的动作用户不应在列表里再看到一次
     // 第三个参数必须用「冻结后」的固定栏：松手后到数据回来之前，固定栏已经显示新顺序了，用旧列表算会和眼睛看到的不一致。
@@ -363,6 +370,11 @@ Rectangle {
     signal modeChangeRequested(string mode)
     signal allCandidatesRequested()
     signal keyPressed(var keyData)
+    // 普通键的按下 / 松开：和真实键盘一样分成两段，长按重复由系统自己产生
+    signal keyDown(var keyData)
+    signal keyUp(var keyData)
+    // 长按重复：只有走输入法直通的键会被真正重发
+    signal keyRepeat(var keyData)
     // 表情 / 符号上屏：卡片只负责报「点了哪个字符」，真正怎么提交（addon commit / 剪贴板）由 daemon 决定。
     signal textCommitRequested(string text)
     // 点了第 index 个候选
@@ -381,6 +393,9 @@ Rectangle {
     signal orderChanged(var orderedActions)
     signal slotChanged(string actionId)
     signal dragMoved(real dx, real dy)
+    // 触控板页：原始协议行 + 手势区尺寸，由窗口转给 daemon
+    signal touchpadLine(string text)
+    signal touchpadGeometry(int w, int h)
 
     // 长按选择器点了一行：分派规则和地球键单击一致（纯键盘布局直接切，拼音类要校正中英文）
     // 语音行里的垃圾桶：主键盘里 controller 是这张卡片，daemon 那边的实现在窗口转发之后
@@ -1012,6 +1027,10 @@ Rectangle {
             autoCollapseTimer.restart();
 
     }
+    // 触控板页：卡片尺寸完全沿用键盘自己那一套，不再单独算宽度。
+    // （试过「宽度 = 高度 × 屏幕短长边比」，横竖屏要分别处理、还要夹屏幕上限，
+    //  拖动边界也跟着变，得不偿失。）
+    readonly property bool touchpadPage: root.page === "touchpad"
     width: unit * root.layoutModule.rowUnits + gap * (root.layoutModule.rowUnits - 1) + pad * 2
     // 和 Column 的结构逐项对齐，一项都不能少：这里也必须用同一个表达式，否则 Column 内容比卡片高、最后一项被挤出去。
     height: pad + Math.max(quickH, candH) + gap + layoutRowCount * keyH + Math.max(0, layoutRowCount - 1) * gap + handleH
@@ -1109,6 +1128,22 @@ Rectangle {
     }
 
     Column {
+        id: mainColumn
+
+        // 触控板页整块换掉：隐藏 Column 而不是逐项 visible，
+        // 免得键区/快捷栏在卡片变窄后重排、溢出到卡片外面。
+        // 用 opacity 交叉淡入（visible 跟着 opacity 收尾），换页不再是硬切
+        opacity: root.touchpadPage ? 0 : 1
+        visible: opacity > 0.001
+
+        Behavior on opacity {
+            enabled: root.animationsEnabled
+
+            NumberAnimation {
+                duration: Motion.dur(Motion.panel)
+            }
+        }
+
         anchors.fill: parent
         anchors.margins: root.pad
         // 底部不留 pad：把手行要贴到卡片底边
@@ -1425,6 +1460,36 @@ Rectangle {
             controller: root
         }
 
+    }
+
+    // ── 触控板页 ────────────────────────────────────────────────────
+    // 卡片根部的一层，盖住上面被隐藏的 Column。尺寸和卡片完全一致（anchors.fill），
+    // mask 读的是 card.width/height，所以这一页不需要任何额外的几何逻辑。
+    Item {
+        id: touchpadLayer
+
+        anchors.fill: parent
+        opacity: root.touchpadPage ? 1 : 0
+        visible: opacity > 0.001
+
+        Behavior on opacity {
+            enabled: root.animationsEnabled
+
+            NumberAnimation {
+                duration: Motion.dur(Motion.panel)
+            }
+        }
+
+
+        TouchpadSurface {
+            id: touchpadSurface
+
+            anchors.fill: parent
+            controller: root
+            backendUp: root.touchpadBackendUp
+            onLine: (text) => root.touchpadLine(text)
+            onSurfaceGeometry: (w, h) => root.touchpadGeometry(w, h)
+        }
     }
 
     // 拖动提交后的延迟收尾（Qt.callLater 会丢 root 上下文，用 Timer 代替）
