@@ -92,7 +92,9 @@ function cloneStatus(s) {
         items: Array.isArray(s.items) ? s.items.slice() : [],
         comments: Array.isArray(s.comments) ? s.comments.slice() : [],
         preedit: s.preedit || "",
-        cursor: Number.isFinite(s.cursor) ? s.cursor : 0,
+        // 兜底是「末尾」而不是 0：和 parseStatus 的语义一致，
+        // 解析失败时光标不会突然跳到串首
+        cursor: Number.isFinite(s.cursor) ? s.cursor : (s.preedit || "").length,
         visible: !!s.visible,
         keyboard: !!s.keyboard,
         im: s.im || "",

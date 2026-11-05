@@ -122,7 +122,7 @@ Item {
             // 无障碍信息挂在 Key 上：TapHandler 不是 Item，拿不到 Accessible 附加属性
             Accessible.role: Accessible.Button
             Accessible.name: keyItem.bottomLabel || keyItem.iconName || keyItem.mainLabel
-            Accessible.onPressAction: keyItem.pointer.clickAt()
+            Accessible.onPressAction: keyItem.pointer.activateAt()
 
             keyData: modelData.key
             unit: grid.c.unit
@@ -188,6 +188,13 @@ Item {
                     else
                         grid.c.modifierReleased(keyItem.keyData);
 
+                }
+
+                // 无障碍激活：完整按下 + 松开。
+                // clickAt 故意跳过 repeatable 键（避免重复注入），读屏器走它一个字都打不出来
+                function activateAt() {
+                    pressAt(keyItem.width / 2, keyItem.height / 2);
+                    releaseAt();
                 }
 
                 function clickAt() {

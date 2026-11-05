@@ -50,22 +50,26 @@ Item {
         return Object.keys(root.activeSlots).length;
     }
 
-    function push(text) {
-        root.lastReadout = text;
+    // line 只放协议字段（"down 0 123 456"），手指数之类的读数只给人看，
+    // 不能混进 socket —— helper 现在容忍，严格解析就会断
+    function push(line) {
+        if (root.showReadout)
+            root.lastReadout = line + "  fingers=" + root.countActive();
+
         if (root.backendUp)
-            root.line(text);
+            root.line(line);
     }
 
     function slotDown(slot, tp) {
         root.activeSlots[slot] = true;
-        root.push("down " + slot + " " + Math.round(tp.x) + " " + Math.round(tp.y) + "  fingers=" + root.countActive());
+        root.push("down " + slot + " " + Math.round(tp.x) + " " + Math.round(tp.y));
     }
 
     function slotMove(slot, tp) {
         if (root.activeSlots[slot] !== true)
             return;
 
-        root.push("move " + slot + " " + Math.round(tp.x) + " " + Math.round(tp.y) + "  fingers=" + root.countActive());
+        root.push("move " + slot + " " + Math.round(tp.x) + " " + Math.round(tp.y));
     }
 
     function slotUp(slot) {
@@ -73,7 +77,7 @@ Item {
             return;
 
         delete root.activeSlots[slot];
-        root.push("up " + slot + "  fingers=" + root.countActive());
+        root.push("up " + slot);
     }
 
     // 手势区尺寸在布局过程中会变两三次（先是兜底高度，再是真高度）。
@@ -84,6 +88,10 @@ Item {
     }
 
     function emitGeometry() {
+        // 隐藏的页面不握手：用户没进过触控板页，系统里不该多一个指针设备
+        if (!root.visible)
+            return ;
+
         if (surface.width > 0 && surface.height > 0)
             root.surfaceGeometry(Math.round(surface.width), Math.round(surface.height));
     }
@@ -126,6 +134,13 @@ Item {
                 anchors.fill: parent
                 minimumTouchPoints: 1
                 maximumTouchPoints: 5
+                // 触摸被合成器抢走 / 页面切走时不会再有 up，这里统一松开，
+                // 否则 helper 侧 slot_active 和虚拟按键会一直按着
+                onCanceled: {
+                    const keys = Object.keys(root.activeSlots);
+                    for (let i = 0; i < keys.length; i++)
+                        root.slotUp(Number(keys[i]));
+                }
                 touchPoints: [
                     TouchPoint {
                         id: tp0
@@ -201,7 +216,7 @@ Item {
                 }
             }
 
-            Text {
+            StyledText {
                 visible: root.showReadout
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
@@ -235,7 +250,7 @@ Item {
                 // 透明度只乘底色（和键盘 Key 的 bg.opacity 等价），文字保持实色。
                 color: Theme.withAlpha(leftArea.pressed ? Theme.primary : Theme.chipSurfaceNested, root.keyOpacity)
 
-                Text {
+                StyledText {
                     anchors.centerIn: parent
                     text: "L"
                     color: leftArea.pressed ? Theme.onPrimary : Theme.withAlpha(root.fg, 0.7)
@@ -267,7 +282,7 @@ Item {
                 // 透明度只乘底色（和键盘 Key 的 bg.opacity 等价），文字保持实色。
                 color: Theme.withAlpha(rightArea.pressed ? Theme.primary : Theme.chipSurfaceNested, root.keyOpacity)
 
-                Text {
+                StyledText {
                     anchors.centerIn: parent
                     text: "R"
                     color: rightArea.pressed ? Theme.onPrimary : Theme.withAlpha(root.fg, 0.7)

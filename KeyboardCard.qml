@@ -893,6 +893,8 @@ Rectangle {
             return I18n.trFor("inlineKeyboard", "Next input method");
         case "Clipboard":
             return I18n.trFor("inlineKeyboard", "Clipboard");
+        case "Touchpad":
+            return I18n.trFor("inlineKeyboard", "Touchpad");
         case "Emoji & symbols":
             return I18n.trFor("inlineKeyboard", "Emoji & symbols");
         case "Avoid windows":

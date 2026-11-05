@@ -17,6 +17,10 @@ Item {
     // 调试通道写设置也要过 settings_write：manifest 掉了权限时设置页会拒绝，
     // 这里不能变成另一条能写的路
     readonly property bool canWriteSettings: {
+        // controller 由 Loader.onLoaded 注入，首次求值时还是 null
+        if (!controller || !controller.pluginId)
+            return false;
+
         const info = PluginService.availablePlugins ? PluginService.availablePlugins[controller.pluginId] : null;
         const perms = info ? info.permissions : null;
         return !!perms && perms.indexOf("settings_write") !== -1;

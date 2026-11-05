@@ -150,6 +150,8 @@ Item {
             "items": candidates,
             "comments": candidateComments,
             "preedit": preedit,
+            // 解析失败会原样返回 prev，cursor 缺了会兜成 0、光标闪到串首
+            "cursor": preeditCursor,
             "visible": panelVisible,
             "keyboard": imKeyboard,
             "im": imName,
