@@ -27,7 +27,7 @@ Column {
     // 两个后端的期望版本。后端把自己实际跑的版本写进 $XDG_RUNTIME_DIR/<x>.version，
     // 设置页读文件比对 —— 单客户端设计让设置页没法连 socket 去问。
     // 改这里要和 InlineKeyboardDaemon.qml 的 requiredAddonVersion 一起改。
-    readonly property string requiredAddonVersion: "0.1.2"
+    readonly property string requiredAddonVersion: "0.1.3"
     readonly property string requiredVtpadVersion: "0.1.0"
     property string addonInstalledVersion: ""
     property string vtpadInstalledVersion: ""
