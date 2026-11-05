@@ -1,6 +1,7 @@
 // 键位网格：绝对定位（同一行可能有跨行键，用 Grid/Row 反而要写一堆特例）。
 // 空格键中间叠当前输入法标识，点击仍是空格键。
 import QtQuick
+import "modifiers.js" as Modifiers
 import qs.Common
 import qs.Widgets
 
@@ -118,6 +119,10 @@ Item {
             required property var modelData
             // 把按键的按下 / 松开 / 点击入口暴露给 grid：模拟点击走同一条代码路径
             property alias pointer: keyMouse
+            // 无障碍信息挂在 Key 上：TapHandler 不是 Item，拿不到 Accessible 附加属性
+            Accessible.role: Accessible.Button
+            Accessible.name: keyItem.bottomLabel || keyItem.iconName || keyItem.mainLabel
+            Accessible.onPressAction: keyItem.pointer.clickAt()
 
             keyData: modelData.key
             unit: grid.c.unit
@@ -139,22 +144,26 @@ Item {
             x: modelData.col * (grid.c.unit + grid.c.gap)
             y: modelData.row * (grid.c.keyH + grid.c.gap)
 
-            MouseArea {
+            // TapHandler 而不是 MouseArea：每个键一个实例、各自抓一个触摸点，
+            // 两根手指按两个键会同时 pressed。MouseArea 不是 PointerHandler，
+            // 触屏上 Qt 只合成一个鼠标指针，第二根手指的按键直接丢掉。
+            TapHandler {
                 id: keyMouse
 
-                // 只有「按住能连续产出内容」的键才重复。
-                // 判断必须按 label 白名单：k 是 "key" 的还有 Alt / Ctrl / Win /
+                // 「没有多种状态」的键都重复：字符、空格，以及所有普通按键
+                // （Tab / Enter / Esc / Backspace / Del / 方向键 / 菜单键…）。
+                // 按住没有「连续产出」语义的键才不重复：
+                //   - 修饰键 Shift / Ctrl / Alt / Win / Caps / Fn（按住是状态，不是连发）
+                //   - 换页键（切页只有「停在哪页」，重复等于狂切）
+                // 判据走 Modifiers.modifierNameFor，别用 Key.isModifier —— 那个是绘制用的，
+                // 所有 k === "key" 的键都是 true（Backspace 也算）
                 readonly property bool repeatable: {
                     const k = keyItem.keyData || {
                     };
-                    if (k.k === "char" || k.k === "space")
-                        return true;
-
-                    if (k.k !== "key")
+                    if (!k || k.k === "spacer" || k.k === "page")
                         return false;
 
-                    const label = k.l || "";
-                    return label === "Backspace" || label === "Del" || label === "End" || label === "Home" || label === "PgUp" || label === "PgDn";
+                    return Modifiers.modifierNameFor(k) === "";
                 }
 
                 // 按下 / 松开 / 点击各自成一个函数：手势直接调用，模拟点击也调它们，两条路共用同一份逻辑（长按重复、修饰键状态、涟漪都不会漏）
@@ -180,36 +189,39 @@ Item {
 
                 }
 
-                Accessible.role: Accessible.Button
-                Accessible.name: keyItem.bottomLabel || keyItem.iconName || keyItem.mainLabel
-                Accessible.onPressAction: clickAt()
-                anchors.fill: parent
                 enabled: !keyItem.isSpacer
-                onPressed: (mouse) => {
-                    return pressAt(mouse.x, mouse.y);
+                // 按下即触发、松开收尾；point 是当前这根手指。
+                // 长按重复仍由下面两个 Timer 管（400ms 后开始重复）
+                onPressedChanged: {
+                    if (pressed)
+                        pressAt(point.position.x, point.position.y);
+                    else
+                        releaseAt();
                 }
-                onReleased: releaseAt()
-                onCanceled: releaseAt()
-                onClicked: clickAt()
+                onTapped: clickAt()
+                onCanceled: () => releaseAt()
 
-                // 长按判定：按住超过 400ms 开始重复
-                Timer {
-                    id: holdTimer
+            }
 
-                    interval: 400
-                    repeat: false
-                    onTriggered: repeatTimer.start()
-                }
+            // Timer 不能挂在 TapHandler 下面：pointer handler 没有 default property，
+            // 子对象会被当成「给不存在的属性赋值」直接报错。放回 Key 这一层，
+            // 作用域仍然能看到 keyItem / grid.c，TapHandler 也能引用它们。
+            // 长按判定：按住超过 400ms 开始重复
+            Timer {
+                id: holdTimer
 
-                // 重复间隔由设置决定（ydotool 输出间隔）
-                Timer {
-                    id: repeatTimer
+                interval: 400
+                repeat: false
+                onTriggered: repeatTimer.start()
+            }
 
-                    interval: Math.max(20, grid.c.repeatInterval || 60)
-                    repeat: true
-                    onTriggered: grid.c.keyPressed(keyItem.effectiveKeyData)
-                }
+            // 重复间隔由设置决定（ydotool 输出间隔）
+            Timer {
+                id: repeatTimer
 
+                interval: Math.max(20, grid.c.repeatInterval || 60)
+                repeat: true
+                onTriggered: grid.c.keyPressed(keyItem.effectiveKeyData)
             }
 
         }

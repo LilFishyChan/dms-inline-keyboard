@@ -30,6 +30,7 @@ window.
   editing keys)
 - A 75% layout is also available: 16 units × 6 rows on one page, with the F row,
   nav column and arrows always visible (Settings → Appearance)
+- Multi-touch: two fingers tapping two keys at once both register
 - Candidates, preedit and input-method state are drawn **inside** the keyboard —
   no separate popup window; long preedit elides from the front
 - Paged, scrollable candidate list; clipboard action; a globe key that cycles
