@@ -585,8 +585,8 @@ PluginSettings {
             settingKey: "hideOnScreenshot"
             pluginRoot: root
             defaultValue: true
-            text: I18n.trFor("inlineKeyboard", "Collapse when taking a screenshot")
-            description: I18n.trFor("inlineKeyboard", "Pressing PrtSc hides the keyboard first, so the screenshot does not include it. Bind Print to your screenshot action in the compositor to use it.")
+            text: I18n.trFor("inlineKeyboard", "Hide the keyboard on PrtSc")
+            description: I18n.trFor("inlineKeyboard", "Only the on-screen PrtSc key is affected — a physical keyboard's PrtSc is handled by the compositor.")
         }
 
         PluginSettingRow {

@@ -89,9 +89,6 @@
     "Collapse keyboard": {
         "Collapse keyboard": "收起键盘"
     },
-    "Collapse when taking a screenshot": {
-        "Collapse when taking a screenshot": "截图时收起键盘"
-    },
     "Command": {
         "Command": "命令"
     },
@@ -203,6 +200,9 @@
     "Hide": {
         "Hide": "隐藏"
     },
+    "Hide the keyboard on PrtSc": {
+        "Hide the keyboard on PrtSc": "按下 PrtSc 时收起键盘"
+    },
     "Hold and drag to customise": {
         "Hold and drag to customise": "按住并拖动以自定义"
     },
@@ -284,6 +284,9 @@
     "Off opens the docked keyboard.": {
         "Off opens the docked keyboard.": "关掉时按停靠模式打开"
     },
+    "Only the on-screen PrtSc key is affected — a physical keyboard's PrtSc is handled by the compositor.": {
+        "Only the on-screen PrtSc key is affected — a physical keyboard's PrtSc is handled by the compositor.": "只对屏幕键盘上的 PrtSc 生效；物理键盘的 PrtSc 由合成器直接处理。"
+    },
     "Opacity": {
         "Opacity": "透明度"
     },
@@ -292,9 +295,6 @@
     },
     "People & Body": {
         "People & Body": "人物与身体"
-    },
-    "Pressing PrtSc hides the keyboard first, so the screenshot does not include it. Bind Print to your screenshot action in the compositor to use it.": {
-        "Pressing PrtSc hides the keyboard first, so the screenshot does not include it. Bind Print to your screenshot action in the compositor to use it.": "按下 PrtSc 先收起键盘，截图里就不会带上一整块键盘。需要在合成器里把 Print 绑到截图动作才会真正触发。"
     },
     "Punctuation": {
         "Punctuation": "标点"
