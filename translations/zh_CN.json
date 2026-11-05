@@ -47,6 +47,9 @@
     "Back": {
         "Back": "返回"
     },
+    "Back to keyboard": {
+        "Back to keyboard": "切回键盘"
+    },
     "Background opacity": {
         "Background opacity": "背景透明度"
     },
@@ -74,9 +77,6 @@
     "Cancel": {
         "Cancel": "取消"
     },
-    "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": {
-        "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.": "候选、拼音串和地球键切换都来自一个 fcitx5 小扩展。没装它也能打字（按键走 ydotool），只是候选栏一直是空的。"
-    },
     "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": {
         "Cannot insert text: install the fcitx5 addon (inline-keyboard-status)": "无法上屏：需要安装 fcitx5 扩展（inline-keyboard-status）"
     },
@@ -101,8 +101,8 @@
     "Confirm": {
         "Confirm": "确定"
     },
-    "Connected — candidates, preedit and the globe switcher are live.": {
-        "Connected — candidates, preedit and the globe switcher are live.": "已连接 —— 候选、拼音串和地球键切换都可用。"
+    "Connected — candidates, preedit and the globe switcher are live": {
+        "Connected — candidates, preedit and the globe switcher are live": "已连接 —— 候选、拼音串和地球键可用"
     },
     "Copied — long press the text field to paste": {
         "Copied — long press the text field to paste": "已复制，长按输入框粘贴"
@@ -112,6 +112,15 @@
     },
     "Copy is still finishing, try again": {
         "Copy is still finishing, try again": "上一次复制还没完成，请稍后再试"
+    },
+    "Copy update commands": {
+        "Copy update commands": "复制更新命令"
+    },
+    "Could not copy to clipboard": {
+        "Could not copy to clipboard": "复制到剪贴板失败"
+    },
+    "Could not disable autostart": {
+        "Could not disable autostart": "关闭开机自启失败"
     },
     "Could not enable ydotoold": {
         "Could not enable ydotoold": "设置 ydotoold 自启失败"
@@ -143,6 +152,12 @@
     "Delete": {
         "Delete": "删除"
     },
+    "Dependencies": {
+        "Dependencies": "依赖"
+    },
+    "Disable autostart": {
+        "Disable autostart": "禁用开机自启"
+    },
     "Discard recording": {
         "Discard recording": "丢弃录音"
     },
@@ -169,6 +184,9 @@
     },
     "Enable at login": {
         "Enable at login": "开机自启"
+    },
+    "Enable autostart": {
+        "Enable autostart": "启用开机自启"
     },
     "Esc on the top-left key": {
         "Esc on the top-left key": "左上角按键为 Esc"
@@ -200,6 +218,9 @@
     "Hide": {
         "Hide": "隐藏"
     },
+    "Hide command": {
+        "Hide command": "收起命令"
+    },
     "Hide the keyboard on PrtSc": {
         "Hide the keyboard on PrtSc": "按下 PrtSc 时收起键盘"
     },
@@ -217,6 +238,9 @@
     },
     "Inline Keyboard requires: %1": {
         "Inline Keyboard requires: %1": "Inline Keyboard 需要以下命令：%1"
+    },
+    "Input method addon (fcitx5)": {
+        "Input method addon (fcitx5)": "输入法扩展（fcitx5）"
     },
     "Input method addon needs update": {
         "Input method addon needs update": "输入法插件需要更新"
@@ -241,6 +265,9 @@
     },
     "Keyboard page": {
         "Keyboard page": "键盘页"
+    },
+    "Left click": {
+        "Left click": "左键"
     },
     "Loading…": {
         "Loading…": "加载中…"
@@ -275,6 +302,15 @@
     "Not applicable to the 75% layout — its first key is already Esc.": {
         "Not applicable to the 75% layout — its first key is already Esc.": "75% 布局不适用 —— 它的第一个键本来就是 Esc。"
     },
+    "Not installed — the keyboard still types, but the candidate strip stays empty": {
+        "Not installed — the keyboard still types, but the candidate strip stays empty": "未安装 —— 键盘仍能打字，但没有候选栏"
+    },
+    "Not installed — the touchpad page stays disabled": {
+        "Not installed — the touchpad page stays disabled": "未安装 —— 触控板页不可用"
+    },
+    "Not running": {
+        "Not running": "未运行"
+    },
     "Numbers": {
         "Numbers": "序号"
     },
@@ -289,9 +325,6 @@
     },
     "Opacity": {
         "Opacity": "透明度"
-    },
-    "Optional: fcitx5 bridge": {
-        "Optional: fcitx5 bridge": "可选扩展：fcitx5 桥接"
     },
     "People & Body": {
         "People & Body": "人物与身体"
@@ -310,6 +343,9 @@
     },
     "Restore keyboard": {
         "Restore keyboard": "恢复键盘"
+    },
+    "Right click": {
+        "Right click": "右键"
     },
     "Save": {
         "Save": "保存"
@@ -331,6 +367,9 @@
     },
     "Show": {
         "Show": "显示"
+    },
+    "Show command": {
+        "Show command": "展开命令"
     },
     "Show hints when hovering over keyboard buttons.": {
         "Show hints when hovering over keyboard buttons.": "鼠标悬停在键盘按钮上时显示功能说明。"
@@ -359,11 +398,14 @@
     "Start": {
         "Start": "启动"
     },
-    "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": {
-        "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool": "先在下面启动一次，或者永久启用让它开机自启：systemctl --user enable --now ydotool"
-    },
     "Start recording": {
         "Start recording": "开始录音"
+    },
+    "Started": {
+        "Started": "已启动"
+    },
+    "Stop": {
+        "Stop": "停止"
     },
     "Stop recording": {
         "Stop recording": "停止录音"
@@ -395,8 +437,8 @@
     "This key sends Super. Show it as text or an icon.": {
         "This key sends Super. Show it as text or an icon.": "这个键实际发的是 Super，可以显示成文字或图标。"
     },
-    "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": {
-        "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.": "键盘用 `dms ipc call inlineKeyboard toggle` 开合，也可以把 DankBar 上的小部件加进来。"
+    "Touchpad backend": {
+        "Touchpad backend": "触控板后端"
     },
     "Travel & Places": {
         "Travel & Places": "出行与地点"
@@ -416,16 +458,34 @@
     "Win key label": {
         "Win key label": "Win 键显示"
     },
+    "[no backend]": {
+        "[no backend]": "无后端"
+    },
+    "autostart off": {
+        "autostart off": "未开机自启"
+    },
+    "autostart on": {
+        "autostart on": "开机自启"
+    },
     "e.g. grim -g \"$(slurp)\"": {
         "e.g. grim -g \"$(slurp)\"": "命令，例如 grim -g \"$(slurp)\""
+    },
+    "needs update": {
+        "needs update": "需要更新"
+    },
+    "no service": {
+        "no service": "无服务"
     },
     "svg/png path": {
         "svg/png path": "svg/png 路径"
     },
+    "system-level": {
+        "system-level": "系统级"
+    },
+    "user-level": {
+        "user-level": "用户级"
+    },
     "ydotoold is not running": {
         "ydotoold is not running": "ydotoold 没有运行"
-    },
-    "ydotoold is not running — the keyboard cannot type until it starts.": {
-        "ydotoold is not running — the keyboard cannot type until it starts.": "ydotoold 没有运行 —— 启动之前键盘打不了字。"
     }
 }

@@ -19,8 +19,7 @@ import qs.Widgets
 PluginSettings {
     id: root
 
-    // ydotoold 状态：没有它什么键都发不出去，所以摆在最上面
-    property bool ydotooldUp: true
+
     // 标准设置组件不自带存取，这里自己 load / save
     property int repeatInterval: 60
     // 按键和卡片的描边粗细，0 = 不画
@@ -28,11 +27,6 @@ PluginSettings {
     // 调试 IPC（只读诊断 + 模拟点击 / 长按 / 拖动）给 scripts/acceptance.py 用，普通使用用不到，所以打开前必须过一次确认框。
     property bool debugModeOn: false
     property bool debugConfirmOpen: false
-    // 可选扩展：fcitx5 桥接
-    // 装了 addon 才有候选、拼音串和地球键切换；没装也能打字（按键走 ydotool）
-    property bool bridgeUp: false
-    // 安装命令直接摆出来，省得用户回 README 找
-    readonly property string installCommands: "git clone https://github.com/LilFishyChan/fcitx5-inline-keyboard-status\n" + "cd fcitx5-inline-keyboard-status && cmake -B build -G Ninja && ninja -C build\n" + "cmake --install build --prefix ~/.local\n" + "systemctl --user restart 'app-org.fcitx.Fcitx5@autostart.service'"
     // 正在改图标的动作索引（-1 = 没在选）
     // 内置动作的 id 集合：ListSetting 直接读文件里的原始数组（不经 sanitize），老数据没有 builtin 字段，靠这张表兜底
     readonly property var builtinIds: {
@@ -89,6 +83,7 @@ PluginSettings {
         root.winIconValue = v;
         root.saveValue("winKeyCustomIcon", v);
     }
+
 
     function refreshDebugMode() {
         root.debugModeOn = root.loadValue("debugMode", false);
@@ -229,13 +224,11 @@ PluginSettings {
     // 只在打开设置页时探一次；Start/Enable 按钮的 onExited 里还会再探
     // pluginService 由 PluginSettingsHost 在 Loader.onLoaded 注入，晚于 Component.onCompleted
     onPluginServiceChanged: root.reloadSettings()
+
     Component.onCompleted: {
-        daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
-        daemonCheck.running = true;
         Qt.callLater(function() {
             root.settingsReady = true;
         });
-        bridgeCheck.running = true;
         root.reloadSettings();
         root.refreshDebugMode();
     }
@@ -259,177 +252,9 @@ PluginSettings {
         enabled: target !== null
     }
 
-    Process {
-        id: daemonCheck
 
-        running: false
-        // 同时看进程和 socket：ydotoold 停掉后 socket 文件会残留，只测 socket 会误判
-        onExited: (code) => {
-            return root.ydotooldUp = (code === 0);
-        }
-    }
-
-    Process {
-        id: daemonStart
-
-        running: false
-        command: ["systemctl", "--user", "start", "ydotool"]
-        onExited: (code) => {
-            if (code !== 0)
-                ToastService.showError(I18n.trFor("inlineKeyboard", "Could not start ydotoold"));
-
-            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
-            daemonCheck.running = true;
-        }
-    }
-
-    Process {
-        id: daemonEnable
-
-        running: false
-        command: ["systemctl", "--user", "enable", "--now", "ydotool"]
-        onExited: (code) => {
-            if (code !== 0)
-                ToastService.showError(I18n.trFor("inlineKeyboard", "Could not enable ydotoold"));
-
-            daemonCheck.command = ["sh", "-c", 'pgrep -x ydotoold >/dev/null && test -S "${YDOTOOL_SOCKET:-$XDG_RUNTIME_DIR/.ydotool_socket}"'];
-            daemonCheck.running = true;
-        }
-    }
-
-    Process {
-        id: bridgeCheck
-
-        running: false
-        // 和 daemonCheck 同理由：文件残留会误判，所以测的是 socket 本身
-        command: ["sh", "-c", 'test -S "$XDG_RUNTIME_DIR/inline-keyboard.sock"']
-        onExited: (code) => {
-            return root.bridgeUp = (code === 0);
-        }
-    }
-
-    Process {
-        id: copyInstall
-
-        running: false
-        command: ["dms", "cl", "copy", root.installCommands]
-    }
-
-    // ydotoold 没跑：警告 + 两种做法（临时启动 / 设为开机自启）
-    DCommon.DCard {
+    DependencySection {
         width: parent.width
-        visible: !root.ydotooldUp
-        // DTone 只有 primary/secondary/tertiary，错误色得自己覆盖
-        color: Theme.withAlpha(Theme.error, Alpha.Focus)
-        border.color: Theme.withAlpha(Theme.error, Alpha.Half)
-        implicitHeight: warnColumn.implicitHeight + pad * 2
-
-        Column {
-            id: warnColumn
-
-            width: parent.width
-            spacing: Theme.spacingS
-
-            StyledText {
-                width: parent.width
-                text: I18n.trFor("inlineKeyboard", "ydotoold is not running — the keyboard cannot type until it starts.")
-                color: Theme.surfaceText
-                wrapMode: Text.WordWrap
-                font.pixelSize: Theme.fontSizeMedium
-            }
-
-            StyledText {
-                width: parent.width
-                text: I18n.trFor("inlineKeyboard", "Start it once below, or enable it permanently so it survives a reboot: systemctl --user enable --now ydotool")
-                color: Theme.surfaceVariantText
-                wrapMode: Text.WordWrap
-                font.pixelSize: Theme.fontSizeSmall
-            }
-
-            Row {
-                spacing: Theme.spacingS
-
-                DCommon.DButton {
-                    text: I18n.trFor("inlineKeyboard", "Start")
-                    onClicked: daemonStart.running = true
-                }
-
-                DCommon.DButton {
-                    text: I18n.trFor("inlineKeyboard", "Enable at login")
-                    backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
-                    textColor: Theme.surfaceText
-                    onClicked: daemonEnable.running = true
-                }
-
-            }
-
-        }
-
-    }
-
-    StyledText {
-        width: parent.width
-        text: I18n.trFor("inlineKeyboard", "Toggle it with `dms ipc call inlineKeyboard toggle`, or add the widget to your DankBar.")
-        font.pixelSize: Theme.fontSizeMedium
-        color: Theme.surfaceVariantText
-        wrapMode: Text.WordWrap
-    }
-
-    // 装了就收成一行「已连接」，没装才展开安装步骤 —— 已经把说明塞满页面了
-    Column {
-        width: parent.width
-        spacing: Math.round(Theme.spacingS)
-
-        StyledText {
-            width: parent.width
-            text: I18n.trFor("inlineKeyboard", "Optional: fcitx5 bridge")
-            font.pixelSize: Theme.fontSizeLarge
-            font.weight: Font.Bold
-            color: Theme.surfaceText
-            topPadding: Theme.spacingL
-        }
-
-        StyledText {
-            width: parent.width
-            text: root.bridgeUp ? I18n.trFor("inlineKeyboard", "Connected — candidates, preedit and the globe switcher are live.") : I18n.trFor("inlineKeyboard", "Candidates, the pinyin preedit and the globe input-method switcher come from a small fcitx5 addon. Without it the keyboard still types (keys go through ydotool), but the candidate strip stays empty.")
-            font.pixelSize: Theme.fontSizeMedium
-            color: root.bridgeUp ? Theme.primary : Theme.surfaceVariantText
-            wrapMode: Text.WordWrap
-        }
-
-        Rectangle {
-            width: parent.width
-            visible: !root.bridgeUp
-            // height 和 visible 互相引用会成环：高度由 implicitHeight 一次算清
-            implicitHeight: cmdText.implicitHeight + Theme.spacingL * 2
-            height: implicitHeight
-            radius: Theme.cornerRadius
-            color: Theme.withAlpha(Theme.surfaceText, Alpha.Whisper)
-
-            StyledText {
-                id: cmdText
-
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: Theme.spacingL
-                text: root.installCommands
-                color: Theme.surfaceText
-                font.family: Theme.monoFontFamily
-                font.pixelSize: Theme.fontSizeSmall
-                wrapMode: Text.WrapAnywhere
-            }
-
-        }
-
-        DCommon.DButton {
-            visible: !root.bridgeUp
-            text: I18n.trFor("inlineKeyboard", "Copy install commands")
-            backgroundColor: Theme.withAlpha(Theme.surfaceText, Alpha.Focus)
-            textColor: Theme.surfaceText
-            onClicked: copyInstall.running = true
-        }
-
     }
 
     SettingsSection {
@@ -539,6 +364,7 @@ PluginSettings {
         }
 
     }
+
 
     SettingsSection {
         text: I18n.trFor("inlineKeyboard", "Behaviour")

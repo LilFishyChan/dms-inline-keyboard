@@ -1,23 +1,11 @@
-// 分组标题：小字，和 DMS 设置页的章节标题一致。
+// 分组标题：直接复用 DMS 的 SettingsSectionLabel。
+//
+// 自己画过一版（12px、无上下 gap、无 Accessible），和 DMS 卡片标题的层级差一档；
+// 换成现成的之后字号、间距、读屏角色都和系统设置页一致。
+
 import QtQuick
-import qs.Common
-import qs.Widgets
+import qs.Modules.Settings.Widgets
 
-Item {
+SettingsSectionLabel {
     id: root
-
-    property alias text: titleText.text
-
-    width: parent.width
-    height: titleText.implicitHeight
-
-    StyledText {
-        id: titleText
-
-        width: parent.width
-        font.pixelSize: Theme.fontSizeSmall
-        font.weight: Theme.fontWeightMedium
-        color: Theme.primary
-    }
-
 }
