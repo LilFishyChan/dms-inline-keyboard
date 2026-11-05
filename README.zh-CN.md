@@ -27,6 +27,9 @@
 - 可翻页、可滚动的候选列表；剪贴板动作；地球键循环切换输入法，并显示当前子模式标识
   （万 / abc）
 - 表情页（9 个分类、约 1900 个表情）和符号页（数学、标点、箭头、货币、几何、框线……）
+- 触控板页（可选）：同一张浮卡切成虚拟触控板。一个小巧的 uinput 后端只上报手指，
+  指针加速、轻点即点、双指滚动和拖拽全交给 libinput —— 手感和真触控板一致。
+  没装后端时这一页不可用。
 
 **布局与外观**
 
@@ -108,6 +111,17 @@ fcitx5 addon（[独立仓库](https://github.com/LilFishyChan/fcitx5-inline-keyb
 **可选**
 
 - `vinput` —— 语音输入。没有它，「语音输入」动作和语音模式是灰的，键盘其余部分不受影响。
+- `dms-vtpad-helper` —— 虚拟触控板后端（uinput）。没有它触控板页不可用，键盘其余部分
+  不受影响。它装到 `~/.local`，**不会**自动启用 —— 装完到设置页「依赖」区点启动：
+
+  ```sh
+  git clone https://github.com/LilFishyChan/dms-vtpad-helper
+  cd dms-vtpad-helper && make
+  mkdir -p ~/.local/bin ~/.config/systemd/user
+  install -m755 dms-vtpad-helper vtpadctl ~/.local/bin/
+  cp dms-vtpad-helper.service ~/.config/systemd/user/
+  systemctl --user daemon-reload
+  ```
 
 剪贴板复制走 DMS 自带的 `dms cl copy`，不需要额外装什么。
 
@@ -136,6 +150,9 @@ dms ipc call inlineKeyboard toggle
 | `QuickBar.qml` | 顶部快捷栏：导航钮、快捷动作、右侧圆槽 |
 | `ActionList.qml` | 功能动作网格、编辑态、拖拽排序 |
 | `CandidateBar.qml` | 候选条 —— 第一个词从左边省略，其余从右边省略 |
+| `TouchpadSurface.qml` | 触控板页：手势区 + 左右键，把触摸翻译成协议行 |
+| `TouchpadBridge.qml` | 连 `dms-vtpad-helper` 的 socket 客户端；几何握手与心跳 |
+| `DependencyRow.qml`, `CommandBlock.qml` | 设置页构件：单条依赖状态行、安装/更新命令框 |
 | `TransparencyPanel.qml`、`OpacitySliderRow.qml` | 双滑块透明度面板 |
 | `ImPicker.qml` | 长按地球键弹出的输入法选择器 |
 | `DragGhost.qml` | 拖动动作时跟手的方块 |
@@ -150,6 +167,7 @@ dms ipc call inlineKeyboard toggle
 | `layouts/emoji.js` | **生成物**：表情分组（Unicode 16）+ 符号分组 |
 | `tools/gen-emoji.py` | 从 Unicode 的 `emoji-test.txt` 重新生成 `layouts/emoji.js` |
 | `scripts/` | 验收工具：`acceptance.py` 与它的 `sections/` 分块、addon 探针、单元测试 |
+| `DependencySection.qml` | 设置页顶部「依赖」区：三行状态、安装命令、服务启停、版本检查 |
 | `InlineKeyboardSettings.qml` | 设置页：外观 / 行为 / 动作 / 调试，全部走 MD3 `SettingsGroup` 行 |
 | `SettingsSection.qml` | 设置页的分组标题 |
 | `FcitxBridge.qml` | fcitx5 socket 桥：状态、候选、注释、输入法清单 |

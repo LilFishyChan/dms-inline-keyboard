@@ -37,6 +37,10 @@ window.
   input methods and shows the current sub-mode label (万 / abc)
 - Emoji page (~1900 emoji in 9 categories) and a symbols page (math, punctuation,
   arrows, currency, shapes, box drawing…)
+- Touchpad page (optional): the same floating card doubles as a virtual trackpad.
+  A small uinput backend reports raw fingers, so libinput itself provides pointer
+  acceleration, tap-to-click, two-finger scroll and drag — same feel as a real
+  touchpad. Without the backend the page stays disabled.
 
 **Layout and chrome**
 
@@ -125,6 +129,19 @@ just get no candidates and no input-method switching)
 
 - `vinput` — voice input. Without it the *Voice input* action and voice mode stay
   greyed out; the rest of the keyboard is unaffected.
+- `dms-vtpad-helper` — virtual touchpad backend (uinput). Without it the touchpad
+  page stays disabled; the rest of the keyboard is unaffected. It installs to
+  `~/.local` and is **not** enabled automatically — use the buttons on the
+  Dependencies section of the settings page to start it:
+
+  ```sh
+  git clone https://github.com/LilFishyChan/dms-vtpad-helper
+  cd dms-vtpad-helper && make
+  mkdir -p ~/.local/bin ~/.config/systemd/user
+  install -m755 dms-vtpad-helper vtpadctl ~/.local/bin/
+  cp dms-vtpad-helper.service ~/.config/systemd/user/
+  systemctl --user daemon-reload
+  ```
 
 Clipboard copies go through DMS's own `dms cl copy`, so no extra package is needed.
 
@@ -153,6 +170,9 @@ Cloning into a directory named after the plugin id (`inlineKeyboard`) keeps thin
 | `QuickBar.qml` | Top quick bar: nav button, quick actions, circular slot |
 | `ActionList.qml` | Function action grid, edit mode, drag-to-reorder |
 | `CandidateBar.qml` | Candidate strip — first item elided from the left, the rest from the right |
+| `TouchpadSurface.qml` | Touchpad page: gesture area + left/right buttons, translates touches to protocol lines |
+| `TouchpadBridge.qml` | Socket client for `dms-vtpad-helper`; geometry handshake and heartbeat |
+| `DependencyRow.qml`, `CommandBlock.qml` | Settings building blocks: one dependency line, and the install/update command box |
 | `TransparencyPanel.qml`, `OpacitySliderRow.qml` | The two-slider opacity panel |
 | `ImPicker.qml` | Input-method picker shown on long-press of the globe |
 | `DragGhost.qml` | Follow-the-finger block while dragging an action |
@@ -167,6 +187,7 @@ Cloning into a directory named after the plugin id (`inlineKeyboard`) keeps thin
 | `layouts/emoji.js` | **Generated**: emoji groups (Unicode 16) + symbol groups |
 | `tools/gen-emoji.py` | Regenerates `layouts/emoji.js` from Unicode's `emoji-test.txt` |
 | `scripts/` | Acceptance harness: `acceptance.py` plus its `sections/` blocks, addon probe and unit tests |
+| `DependencySection.qml` | Settings "Dependencies" section: status rows, install commands, service control, version check |
 | `InlineKeyboardSettings.qml` | Settings page: appearance / behaviour / actions / debugging, all on MD3 `SettingsGroup` rows |
 | `SettingsSection.qml` | Section heading inside the settings page |
 | `FcitxBridge.qml` | fcitx5 socket bridge: state, candidates, comments, input-method list |
