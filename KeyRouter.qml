@@ -478,7 +478,7 @@ Item {
         runCommand(["ydotool", "key", code + ":1", code + ":0"]);
     }
 
-    function notifyUnimplemented() {
+    function notifyUnimplemented(reason) {
         if (typeof ToastService === "undefined" || !ToastService)
             return ;
 
@@ -488,7 +488,7 @@ Item {
             return ;
 
         router.lastToastAt = now;
-        ToastService.showInfo(I18n.trFor("inlineKeyboard", "ydotoold is not running"));
+        ToastService.showInfo(I18n.trFor("inlineKeyboard", reason || "Not implemented yet"));
     }
 
     function findAction(key) {

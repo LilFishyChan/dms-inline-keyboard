@@ -275,7 +275,7 @@ Rectangle {
     property string fcitxImLabel: ""
     property bool fcitxPreeditEmbedded: false
     property string fcitxPreedit: ""
-    // 预编辑光标位置（字符串下标）。窗口没接线时是 0，
+    // 预编辑光标位置（字符串下标）。窗口没接线时是 -1（不是 0），
     // 所以 CandidateBar 那边要能区分「真的是 0」和「没传」
     property int fcitxPreeditCursor: -1
     property bool fcitxVisible: false

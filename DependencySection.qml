@@ -31,9 +31,26 @@ Column {
     readonly property string requiredVtpadVersion: "0.1.0"
     property string addonInstalledVersion: ""
     property string vtpadInstalledVersion: ""
-    // 只有拿到版本才谈得上「过期」；没拿到（老版本不写文件）当作不知道
-    readonly property bool addonOutdated: root.addonInstalledVersion !== "" && root.addonInstalledVersion !== root.requiredAddonVersion
-    readonly property bool vtpadOutdated: root.vtpadInstalledVersion !== "" && root.vtpadInstalledVersion !== root.requiredVtpadVersion
+    // 只有拿到版本才谈得上「过期」；没拿到（老版本不写文件）当作不知道。
+    // 按数值比较：装了更新的版本不该被提示「需要更新」
+    function versionLessThan(installed, required) {
+        if (!installed || !required)
+            return false;
+
+        const a = installed.split(".").map(Number);
+        const b = required.split(".").map(Number);
+        const n = Math.max(a.length, b.length);
+        for (let i = 0; i < n; i++) {
+            const x = a[i] || 0;
+            const y = b[i] || 0;
+            if (x !== y)
+                return x < y;
+
+        }
+        return false;
+    }
+    readonly property bool addonOutdated: root.versionLessThan(root.addonInstalledVersion, root.requiredAddonVersion)
+    readonly property bool vtpadOutdated: root.versionLessThan(root.vtpadInstalledVersion, root.requiredVtpadVersion)
     property string ydotooldLevel: "none"   // user / system / none
 
     // 触控板后端服务（可选，装在 systemd --user 下）。设置页直接管启停和开机自启。
