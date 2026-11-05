@@ -203,6 +203,8 @@ PluginComponent {
     property bool blockTtySwitch: PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true)
     // 输入框拿到焦点时自动弹出键盘
     property bool autoShow: PluginService.loadPluginData(root.pluginId, "autoShow", false)
+    // 截图时收起键盘：按下 PrtSc 先把自己收起来，截图里就不会带上一整块键盘
+    property bool hideOnScreenshot: PluginService.loadPluginData(root.pluginId, "hideOnScreenshot", true)
     // 上一次失焦的时刻，用来挡掉「点空白处」引起的焦点抖动
     property real lastFocusLostAt: 0
     // 语音输入（fcitx5-vinput）。vinput 没有「正在录音吗」的查询接口
@@ -297,6 +299,12 @@ PluginComponent {
     function handleKey(keyData) {
         if (!keyData)
             return ;
+
+        // 截图键（PrtSc / KEY_SYSRQ = 99）：先把键盘收起来，否则截出来的图上
+        // 会带着一整块键盘。键本身照常发出去 —— 用户可能给它绑了截图快捷键，
+        // 收起来之后再发，合成器截屏时窗口已经开始销毁了
+        if (root.hideOnScreenshot && keyData.c === 99)
+            root.hideKeyboard();
 
         if (keyData.k === "page") {
             if (root.page === "emoji") {
@@ -829,6 +837,10 @@ PluginComponent {
         const nextBlockTty = PluginService.loadPluginData(root.pluginId, "blockTtySwitch", true);
         if (nextBlockTty !== root.blockTtySwitch)
             root.blockTtySwitch = nextBlockTty;
+
+        const nextHideOnShot = PluginService.loadPluginData(root.pluginId, "hideOnScreenshot", true);
+        if (nextHideOnShot !== root.hideOnScreenshot)
+            root.hideOnScreenshot = nextHideOnShot;
 
         const nextDebugMode = PluginService.loadPluginData(root.pluginId, "debugMode", false);
         if (nextDebugMode !== root.debugModeSetting)

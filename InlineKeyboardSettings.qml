@@ -580,6 +580,15 @@ PluginSettings {
             description: I18n.trFor("inlineKeyboard", "These combinations switch to a TTY at the kernel level, so the compositor cannot stop them. Keep this on unless you need to reach a TTY from the keyboard.")
         }
 
+        // 截图时收起键盘：PrtSc 按下先把键盘收起来，截图里就不会带上一整块键盘
+        PluginSettingRow {
+            settingKey: "hideOnScreenshot"
+            pluginRoot: root
+            defaultValue: true
+            text: I18n.trFor("inlineKeyboard", "Collapse when taking a screenshot")
+            description: I18n.trFor("inlineKeyboard", "Pressing PrtSc hides the keyboard first, so the screenshot does not include it. Bind Print to your screenshot action in the compositor to use it.")
+        }
+
         PluginSettingRow {
             settingKey: "avoidWindows"
             pluginRoot: root
