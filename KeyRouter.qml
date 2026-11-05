@@ -126,6 +126,21 @@ Item {
         }
     }
 
+    // 收起 / 最小化时把「按着」的普通键也松开。
+    // 只松修饰键不够：按住 Backspace（或任意键）时点收起，up 永远发不出去，
+    // 系统里那个键会一直是按下态、一直 auto-repeat。
+    function releaseAllKeys() {
+        const keys = Object.keys(router.heldKeys);
+        for (let i = 0; i < keys.length; i++) {
+            const how = router.heldKeys[keys[i]];
+            if (how === KeyRoute.ROUTE.fcitx || how === "fallback")
+                continue;
+
+            router.runKey(Number(keys[i]), 0);
+        }
+        router.heldKeys = {};
+    }
+
     function setState(name, value) {
         const prev = router.stateOf(name);
         switch (name) {
@@ -324,6 +339,12 @@ Item {
             route = KeyRoute.ROUTE.ydotool;
         }
 
+        // 测试用：只记下要发什么，不真的往系统发（与 injectKey 的 dryRun 行为一致）
+        if (dryRun) {
+            router.noteDryRun(code, sym, k, KeyRoute.ROUTE.ydotool, 0);
+            return ;
+        }
+
         // 按键注入只走 ydotool：down / up 分开发，按住才成立
         // （长按连删、Shift+字母靠这个；触控板 helper 只管指针，不掺和键盘）
         router.heldKeys[code] = KeyRoute.ROUTE.ydotool;
@@ -334,6 +355,11 @@ Item {
     //   29:1 按下、29:0 松开（ydotool 没有独立 keydown/keyup 子命令）
     function runKey(code, down) {
         if (!code)
+            return ;
+
+        // dry-run 只在注入口拦，不记录。记录交给 keyDown 统一做一次：
+        // 这里再记的话一次按键会产生 down/up 两条，验收里 n1 == 1 的断言会挂
+        if (router.dryRun)
             return ;
 
         if (ydotooldUp === false) {
@@ -361,8 +387,12 @@ Item {
         const how = router.heldKeys[code];
         delete router.heldKeys[code];
 
-        if (how === KeyRoute.ROUTE.fcitx || how === "fallback")
+        if (how === KeyRoute.ROUTE.fcitx || how === "fallback") {
+            // 一次性修饰键在松开之后复位。fcitx 路径也必须走这一步：
+            // 中文模式下普通字母默认走 fcitx，漏掉就会让 Shift 一直卡着
+            router.clearTransientModifiers();
             return ;
+        }
 
         router.runKey(code, 0);
 
@@ -443,13 +473,9 @@ Item {
             notifyUnimplemented("ydotoold is not running");
             return ;
         }
-        const seq = Modifiers.modifierSequence(modifierStates);
-        const cmd = ["ydotool", "key"];
-        for (let i = 0; i < seq.down.length; i++) cmd.push(seq.down[i])
-        cmd.push(code + ":1");
-        cmd.push(code + ":0");
-        for (let i = 0; i < seq.up.length; i++) cmd.push(seq.up[i])
-        runCommand(cmd);
+        // 修饰键已经由 syncModifierKey 真按真松，这里不再拼 modifierSequence：
+        // 再拼一遍会按两次、末尾多松一次，系统里松了而 UI 还显示锁定
+        runCommand(["ydotool", "key", code + ":1", code + ":0"]);
     }
 
     function notifyUnimplemented() {

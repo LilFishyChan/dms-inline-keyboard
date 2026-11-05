@@ -375,8 +375,13 @@ PluginComponent {
         if (!keyData)
             return ;
 
-        if (root.hideOnScreenshot && keyData.c === 99)
+        if (root.hideOnScreenshot && keyData.c === 99) {
+            // 先按下再收键盘：反过来的话窗口已经没了，keyUp 永远发不出去，
+            // 系统里 PrtSc 会一直是按下态
+            keyRouter.keyDown(keyData);
             root.hideKeyboard();
+            return ;
+        }
 
         keyRouter.keyDown(keyData);
     }
@@ -1038,6 +1043,9 @@ PluginComponent {
     // 真实键盘上抬手就是这个效果，虚拟键盘没有「手离开」事件，只能在这些出口兜底。
     function releaseInputState() {
         keyRouter.releaseAllModifiers();
+        // 按着的普通键也要松：只松修饰键的话，按住 Backspace 时点收起，
+        // up 永远发不出去，系统里那个键会一直 auto-repeat
+        keyRouter.releaseAllKeys();
         // 触控板设备也一并撤掉：不在这页了，没必要留一个指针设备在系统里
         touchpadBridge.send("bye");
     }
